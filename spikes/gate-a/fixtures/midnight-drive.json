@@ -1,0 +1,14 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "Midnight Drive", "hasToolResult": false },
+      "response": {
+        "toolCalls": [{ "name": "getComposition", "arguments": "{\"title\":\"Midnight Drive\"}" }]
+      }
+    },
+    {
+      "match": { "userMessage": "Midnight Drive", "hasToolResult": true },
+      "response": { "content": "Here is the catalog record for Midnight Drive." }
+    }
+  ]
+}
