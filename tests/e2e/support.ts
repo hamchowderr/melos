@@ -11,6 +11,10 @@ export async function signUp(page: Page, label: string): Promise<TestUser> {
   const stamp = Date.now();
   const email = `${label.toLowerCase()}-${stamp}@example.test`;
   const password = `${label.toLowerCase()}-password-123`;
+  // Each test user is its own client (a 198.18.0.0/15 benchmarking address), so Better Auth's
+  // per-IP sign-up and sign-in limit (3 per 10 s) counts people, not the whole suite.
+  const clientIp = `198.18.${(stamp >> 8) & 255}.${stamp & 255}`;
+  await page.setExtraHTTPHeaders({ 'x-forwarded-for': clientIp });
 
   await page.goto('/sign-up');
   await page.getByLabel('Name').fill(`${label} Test`);
