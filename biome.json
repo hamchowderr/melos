@@ -20,10 +20,10 @@
       "!**/package-lock.json",
       "!**/src/server/db/migrations/control/meta",
       "!**/.beads",
-      "!**/.claude",
-      "!**/.codex",
-      "!**/.cursor",
-      "!**/.agents",
+      "!.claude",
+      "!.codex",
+      "!.cursor",
+      "!.agents",
       "!**/docs/source"
     ]
   },
