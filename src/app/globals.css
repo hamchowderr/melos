@@ -92,10 +92,21 @@ body {
 }
 
 .chat-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--melos-line);
   background: var(--melos-surface);
   font-weight: 600;
+}
+
+.chat-header-workspace {
+  min-width: 0;
+  color: var(--melos-muted);
+  font-weight: 400;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
 }
 
 .chat-status {
