@@ -7,7 +7,7 @@ import { createTokenCipher } from '../db/token-cipher';
 import { createWorkspaceHost } from '../db/workspace-hosts';
 import { applyWorkspaceMigrations } from '../db/workspace-migrations';
 import { getServerEnv } from '../env';
-import { controlIntegrityGuard as guard } from './integrity-guard';
+import { type GuardTransaction, controlIntegrityGuard as guard } from './integrity-guard';
 
 export type WorkspaceRegistryRow = typeof workspaceRegistry.$inferSelect;
 
@@ -134,4 +134,43 @@ export async function provisionWorkspace(
     await updateRow(row.id, { status: 'failed', statusDetail });
     throw new Error(`Workspace ${row.id} ${statusDetail}`);
   }
+}
+
+/**
+ * §7.2 organization delete, steps 1 and 2: commits `deleting`, then deletes the database. Returns
+ * the row for `removeWorkspace`, or undefined when there is none. A failed host delete keeps the
+ * row `deleting` with the step and error code, then throws; deleting again resumes.
+ */
+export async function deleteWorkspaceDatabase(
+  organizationId: string,
+): Promise<WorkspaceRegistryRow | undefined> {
+  const byOrganization = eq(workspaceRegistry.organizationId, organizationId);
+  const [existing] = await controlDb.select().from(workspaceRegistry).where(byOrganization);
+  if (!existing) return undefined;
+  const row = await updateRow(existing.id, { status: 'deleting' });
+  const host = createWorkspaceHost(getServerEnv().workspaceHost);
+  // Only a host's create sets database_url, so without a host no database was created.
+  if (host.kind === 'unconfigured' && row.databaseUrl === '') return row;
+  try {
+    await host.delete(row.databaseName);
+    return row;
+  } catch (error) {
+    const statusDetail = `delete_database failed: ${errorCode(error)}`;
+    await updateRow(row.id, { statusDetail });
+    throw new Error(`Workspace ${row.id} ${statusDetail}`);
+  }
+}
+
+/** §7.2 organization delete, step 3, in the transaction that deletes the organization (ADR-030). */
+export async function removeWorkspace(
+  tx: GuardTransaction,
+  row: WorkspaceRegistryRow,
+  actorUserId: string | null,
+): Promise<void> {
+  const { id, organizationId } = row;
+  const audit = { id: `cad_${ulid()}`, actorUserId, organizationId, occurredAt: now() };
+  const target = { action: 'workspace.deleted', targetType: 'workspace', targetId: id };
+  await guard.insert(tx, controlAuditLog, [{ ...audit, ...target, beforeJson: auditJson(row) }]);
+  // Its migration_runs rows cascade.
+  await guard.delete(tx, workspaceRegistry, eq(workspaceRegistry.id, id));
 }
