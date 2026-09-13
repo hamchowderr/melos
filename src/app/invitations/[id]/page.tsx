@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { PageCard } from '@/components/page-card';
 import { InvitationResponse } from '@/components/workspace/invitation-response';
 import { auth } from '@/server/auth/auth';
 
@@ -18,19 +19,20 @@ export default async function InvitationPage({ params }: { params: Promise<{ id:
     : null;
 
   return (
-    <main className="auth-page">
+    <main className="flex min-h-svh items-center justify-center p-6">
       {invitation ? (
         <InvitationResponse invitation={invitation} />
       ) : (
-        <section className="auth-card">
-          <h1>Workspace invitation</h1>
-          <p className="auth-switch">
+        <PageCard title="Workspace invitation">
+          <p className="text-muted-foreground">
             {session.user.emailVerified
               ? 'This invitation has expired, was already answered, or was sent to another address.'
               : 'Verify your email address with the link we emailed you, then open this invitation again.'}{' '}
-            <Link href="/">Back to Melos</Link>
+            <Link href="/" className="text-foreground underline underline-offset-4">
+              Back to Melos
+            </Link>
           </p>
-        </section>
+        </PageCard>
       )}
     </main>
   );

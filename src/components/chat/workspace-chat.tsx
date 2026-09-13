@@ -85,7 +85,7 @@ function ReadyChat() {
   return (
     <CopilotChat
       agentId={WORKSPACE_AGENT_ID}
-      className="melos-chat"
+      className="min-h-0 flex-1"
       onError={onError}
       messageView={{
         children: ({ messageElements, interruptElement, isRunning }) => (
@@ -119,13 +119,13 @@ function Chat() {
       parameters: pingInputSchema,
       render: (props) => {
         if (props.status !== 'complete') {
-          return <div className="chat-status">Pinging workspace...</div>;
+          return <div className="p-4 text-sm text-muted-foreground">Pinging workspace...</div>;
         }
         const result = parsePingResult(props.result);
         return result ? (
           <PingCard result={result} />
         ) : (
-          <div role="alert" className="form-error">
+          <div role="alert" className="text-sm text-destructive">
             Unexpected ping result.
           </div>
         );
@@ -134,7 +134,9 @@ function Chat() {
     [],
   );
 
-  if (!ready) return <div className="chat-status">Connecting to the agent...</div>;
+  if (!ready) {
+    return <div className="p-4 text-sm text-muted-foreground">Connecting to the agent...</div>;
+  }
   return <ReadyChat />;
 }
 

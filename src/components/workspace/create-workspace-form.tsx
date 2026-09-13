@@ -1,6 +1,10 @@
 'use client';
 
 import { type FormEvent, useState } from 'react';
+import { PageCard } from '@/components/page-card';
+import { Button } from '@/components/ui/button';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { authClient } from '@/lib/auth/client';
 
 function toSlug(name: string): string {
@@ -45,20 +49,19 @@ export function CreateWorkspaceForm() {
   }
 
   return (
-    <form className="auth-card" onSubmit={onSubmit}>
-      <h1>Create a workspace</h1>
-      <label>
-        Workspace name
-        <input name="name" autoComplete="organization" required maxLength={80} />
-      </label>
-      {error ? (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      ) : null}
-      <button type="submit" disabled={pending}>
-        {pending ? 'Creating workspace...' : 'Create workspace'}
-      </button>
-    </form>
+    <PageCard title="Create a workspace">
+      <form onSubmit={onSubmit}>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="name">Workspace name</FieldLabel>
+            <Input id="name" name="name" autoComplete="organization" required maxLength={80} />
+          </Field>
+          <FieldError>{error}</FieldError>
+          <Button type="submit" disabled={pending}>
+            {pending ? 'Creating workspace...' : 'Create workspace'}
+          </Button>
+        </FieldGroup>
+      </form>
+    </PageCard>
   );
 }

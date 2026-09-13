@@ -10,7 +10,7 @@ export default async function NewWorkspacePage() {
   if (!session) redirect('/sign-in');
 
   return (
-    <main className="auth-page">
+    <main className="flex min-h-svh items-center justify-center p-6">
       <CreateWorkspaceForm />
     </main>
   );

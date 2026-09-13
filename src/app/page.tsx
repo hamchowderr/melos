@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { WorkspaceChat } from '@/components/chat/workspace-chat';
+import { buttonVariants } from '@/components/ui/button';
 import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import { auth } from '@/server/auth/auth';
 import { tenantContextResolver } from '@/server/services/tenant-context';
@@ -24,9 +25,11 @@ export default async function HomePage() {
   if (!workspace) redirect('/workspaces/new');
 
   return (
-    <main className="chat-page">
+    <main className="flex h-dvh flex-col">
       <WorkspaceHeader workspaceName={workspace.name}>
-        <Link href="/settings">Settings</Link>
+        <Link href="/settings" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+          Settings
+        </Link>
       </WorkspaceHeader>
       <WorkspaceChat />
     </main>

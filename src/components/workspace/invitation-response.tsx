@@ -1,6 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { PageCard } from '@/components/page-card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { authClient } from '@/lib/auth/client';
 
 type Invitation = { id: string; organizationName: string; role: string; inviterEmail: string };
@@ -26,24 +30,31 @@ export function InvitationResponse({ invitation }: { invitation: Invitation }) {
   }
 
   return (
-    <section className="auth-card">
-      <h1>Workspace invitation</h1>
-      <p className="auth-switch">
+    <PageCard title="Workspace invitation">
+      <p className="text-muted-foreground">
         {invitation.inviterEmail} invited you to{' '}
-        <strong data-testid="invitation-workspace-name">{invitation.organizationName}</strong> as{' '}
-        <strong data-testid="invitation-role">{invitation.role}</strong>.
+        <strong className="font-medium text-foreground" data-testid="invitation-workspace-name">
+          {invitation.organizationName}
+        </strong>{' '}
+        as{' '}
+        <Badge variant="secondary" data-testid="invitation-role">
+          {invitation.role}
+        </Badge>
+        .
       </p>
       {error ? (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
-      <button type="button" disabled={pending} onClick={() => respond(true)}>
-        Accept invitation
-      </button>
-      <button type="button" className="secondary" disabled={pending} onClick={() => respond(false)}>
-        Decline
-      </button>
-    </section>
+      <div className="flex flex-col gap-2">
+        <Button type="button" disabled={pending} onClick={() => respond(true)}>
+          Accept invitation
+        </Button>
+        <Button type="button" variant="outline" disabled={pending} onClick={() => respond(false)}>
+          Decline
+        </Button>
+      </div>
+    </PageCard>
   );
 }
