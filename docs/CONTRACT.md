@@ -2047,6 +2047,8 @@ interface AssetStorage {
 
 Production startup fails when either variable selects `sandbox` or `local` (owner decision 2026-09-12).
 
+**Auth email and sign-up.** Better Auth's verification and invitation emails go through `sendAuthEmail` (`src/server/auth/mailer.ts`), selected by `MELOS_AUTH_MAILER`: `outbox` (development default, `.data/auth-outbox/`), `memory` (tests) or `disabled`, which sends and writes nothing. Until phase 8 wires Resend, production startup accepts only `disabled` (owner decision 2026-09-12): sign-up sends no verification email, and a `hooks.before` handler refuses `/organization/invite-member` with 403 `INVITATIONS_UNAVAILABLE` before Better Auth writes or extends an invitation. `MELOS_SIGNUP_ALLOWED_EMAILS` lists the addresses that may sign up, comma-separated and compared case-insensitively; `databaseHooks.user.create.before`, which every Better Auth user-creation path runs, refuses any other address with 422 `SIGN_UP_NOT_ALLOWED`. Unset, anyone may sign up outside production and nobody may in production. Signing in never consults the list.
+
 ### 7.6 Import pipeline (Airtable and CSV)
 
 Owner decisions 2026-09-12. One pipeline, two readers.

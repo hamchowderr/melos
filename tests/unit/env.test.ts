@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseServerEnv, ServerEnvError, TEST_CHAT_MODEL_ID } from '../../src/server/env';
 
 const SECRET = 'unit-test-secret-value-that-is-long-enough';
+const TEST_MODEL = { BETTER_AUTH_SECRET: SECRET, MELOS_LLM_BASE_URL: 'http://127.0.0.1:4010/v1' };
 
 function problemsOf(source: Record<string, string | undefined>) {
   try {
@@ -79,7 +80,41 @@ describe('parseServerEnv', () => {
     const { register } = await import('../../src/instrumentation');
     const failure = (await register().catch((error: unknown) => error)) as ServerEnvError;
     expect(failure.problems.map((p) => p.name)).toEqual(['MELOS_AUTH_MAILER']);
-    expect(failure.message).toContain('development mailer, which production refuses');
+    expect(failure.message).toContain('must be disabled in production');
+  });
+
+  it('accepts the disabled mailer everywhere and only it in production', () => {
+    for (const mailer of ['outbox', 'memory', undefined]) {
+      const error = problemsOf({
+        ...TEST_MODEL,
+        VERCEL_ENV: 'production',
+        MELOS_AUTH_MAILER: mailer,
+      });
+      expect(error.problems.map((p) => p.name)).toEqual(['MELOS_AUTH_MAILER']);
+    }
+    for (const VERCEL_ENV of ['production', 'preview', undefined]) {
+      const env = parseServerEnv({ ...TEST_MODEL, VERCEL_ENV, MELOS_AUTH_MAILER: 'disabled' });
+      expect(env.authMailer).toBe('disabled');
+    }
+  });
+
+  it('parses the sign-up allowlist and fails closed in production when it is unset', () => {
+    const listed = parseServerEnv({
+      ...TEST_MODEL,
+      MELOS_SIGNUP_ALLOWED_EMAILS: ' Owner@Example.com, ,team@example.com,',
+    });
+    expect(listed.signUpAllowedEmails).toEqual(['owner@example.com', 'team@example.com']);
+    expect(parseServerEnv(TEST_MODEL).signUpAllowedEmails).toBeNull();
+    expect(
+      parseServerEnv({ ...TEST_MODEL, MELOS_SIGNUP_ALLOWED_EMAILS: ' ' }).signUpAllowedEmails,
+    ).toBeNull();
+
+    const production = { ...TEST_MODEL, VERCEL_ENV: 'production', MELOS_AUTH_MAILER: 'disabled' };
+    expect(parseServerEnv(production).signUpAllowedEmails).toEqual([]);
+    expect(
+      parseServerEnv({ ...production, MELOS_SIGNUP_ALLOWED_EMAILS: 'owner@example.com' })
+        .signUpAllowedEmails,
+    ).toEqual(['owner@example.com']);
   });
 
   it('refuses local files and the test model endpoint on Vercel', () => {
@@ -133,5 +168,25 @@ describe('parseServerEnv', () => {
     });
     expect(explicit.auth.baseURL).toBe('https://melos.example.com');
     expect(explicit.auth.trustedOrigins).toContain('https://melos-abc123-otaku.vercel.app');
+
+    const withProductionDomain = {
+      ...vercel,
+      VERCEL_BRANCH_URL: 'melos-git-main-otaku.vercel.app',
+      VERCEL_PROJECT_PRODUCTION_URL: 'melos-otaku.vercel.app',
+    };
+    const preview = parseServerEnv({ ...withProductionDomain, VERCEL_ENV: 'preview' });
+    expect(preview.auth.baseURL).toBe('https://melos-git-main-otaku.vercel.app');
+
+    const production = parseServerEnv({
+      ...withProductionDomain,
+      VERCEL_ENV: 'production',
+      MELOS_AUTH_MAILER: 'disabled',
+    });
+    expect(production.auth.baseURL).toBe('https://melos-otaku.vercel.app');
+    expect(production.auth.trustedOrigins).toEqual([
+      'https://melos-otaku.vercel.app',
+      'https://melos-git-main-otaku.vercel.app',
+      'https://melos-abc123-otaku.vercel.app',
+    ]);
   });
 });
