@@ -10,7 +10,7 @@ test('an invitee verifies their email, accepts the invitation and opens the work
   const inviteePage = await browser.newPage();
   const invitee = await signUp(inviteePage, 'Invitee');
 
-  // No members UI yet (melos-9mg.5): the owner invites through the Better Auth endpoint.
+  // The owner invites through the Better Auth endpoint; AUTH-E2E-002 covers the members page.
   const invited = await page.request.post('/api/auth/organization/invite-member', {
     headers: { origin: new URL(page.url()).origin },
     data: { email: invitee.email, role: 'admin' },
