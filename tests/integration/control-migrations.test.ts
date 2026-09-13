@@ -90,6 +90,7 @@ describe('AUTH-INT-006: control-plane migrations are separate from workspace mig
       'status_detail TEXT',
       'created_at TEXT NOT NULL',
       'updated_at TEXT NOT NULL',
+      'attempt_id TEXT',
       'UNIQUE workspace_registry_database_name_unique(database_name)',
       'UNIQUE workspace_registry_organization_id_unique(organization_id)',
       'FK organization_id -> organization(id) ON DELETE RESTRICT',

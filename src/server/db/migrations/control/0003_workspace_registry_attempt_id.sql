@@ -1,0 +1,1 @@
+ALTER TABLE `workspace_registry` ADD `attempt_id` text;
