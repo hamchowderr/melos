@@ -59,10 +59,11 @@ export interface IntegrityGuard {
   /** Deletes rows after applying the ON DELETE action of every rule referencing them (rule 2). */
   delete(tx: GuardTransaction, table: SQLiteTable, where: SQL): Promise<void>;
   /**
-   * Sets `deleted_at` and `updated_at` on the live rows `where` matches unless a RESTRICT or NO
-   * ACTION rule references them (rule 2). Throws for a table without `deleted_at`.
+   * Sets `deleted_at`, `updated_at` and `updated_by` (`actor`, the user the write runs for; §4.2)
+   * on the live rows `where` matches unless a live row references them through a RESTRICT or NO
+   * ACTION rule (rule 2). Throws for a table without `deleted_at`.
    */
-  softDelete(tx: GuardTransaction, table: SQLiteTable, where: SQL): Promise<void>;
+  softDelete(tx: GuardTransaction, table: SQLiteTable, where: SQL, actor: string): Promise<void>;
 }
 
 type Counts = Record<string, number>;
@@ -166,12 +167,16 @@ async function savepoint(tx: GuardTransaction, work: () => Promise<void>) {
  */
 export function createIntegrityGuard(rules: readonly ForeignKeyRule[]): IntegrityGuard {
   /** Rows of RESTRICT, NO ACTION and SET DEFAULT (not in §4.4: fail closed) children of `rows`. */
-  async function referencing(tx: GuardTransaction, table: string, rows: SQL): Promise<Counts> {
+  async function referencing(tx: GuardTransaction, table: string, rows: SQL, live = false) {
     const referenced: Counts = {};
     for (const rule of rules.filter((candidate) => candidate.parentTable === table)) {
       if (rule.onDelete === 'CASCADE' || rule.onDelete === 'SET NULL') continue;
-      const n = await count(tx, sql`FROM ${id(rule.table)} WHERE ${references(rule, rows)}`);
-      tally(referenced, rule.table, n);
+      // A soft delete (`live`) counts only the live rows of a child table with `deleted_at`.
+      const where = [references(rule, rows)];
+      const hasDeletedAt = sql`FROM pragma_table_info(${rule.table}) WHERE name = 'deleted_at'`;
+      if (live && (await count(tx, hasDeletedAt))) where.push(sql`child.deleted_at IS NULL`);
+      const children = sql`FROM ${id(rule.table)} AS child WHERE ${joined(where, ' AND ')}`;
+      tally(referenced, rule.table, await count(tx, children));
     }
     return referenced;
   }
@@ -204,6 +209,8 @@ export function createIntegrityGuard(rules: readonly ForeignKeyRule[]): Integrit
 
   return {
     async insert(tx, table, rows) {
+      // drizzle's values() throws this for no rows; throw it before any check reads the database.
+      if (rows.length === 0) throw new Error('values() must be called with at least one value');
       const name = getTableName(table);
       const column = columnsOf(table);
       const written = rows.map((row) => stored(table, row, true));
@@ -278,16 +285,18 @@ export function createIntegrityGuard(rules: readonly ForeignKeyRule[]): Integrit
       await savepoint(tx, () => remove(tx, name, rowids, new Set()));
     },
 
-    async softDelete(tx, table, where) {
+    async softDelete(tx, table, where, actor) {
       const name = getTableName(table);
       const column = columnsOf(table);
       const deletedAt = column('deleted_at');
       const updatedAt = column('updated_at');
       const live = sql`(${where}) AND ${isNull(deletedAt.column)}`;
-      const referenced = await referencing(tx, name, sql`${id(name)} WHERE ${live}`);
+      const referenced = await referencing(tx, name, sql`${id(name)} WHERE ${live}`, true);
       if (Object.keys(referenced).length) throw new IntegrityError('REFERENCED', name, referenced);
       const now = new Date().toISOString();
-      const stamps = { [deletedAt.key]: now, [updatedAt.key]: now };
+      const stamps: Record<string, string> = { [deletedAt.key]: now, [updatedAt.key]: now };
+      const updatedBy = Object.values(getTableColumns(table)).some((c) => c.name === 'updated_by');
+      if (updatedBy) stamps[column('updated_by').key] = actor;
       await tx.update(table).set(stamps).where(live);
     },
   };
