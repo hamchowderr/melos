@@ -39,8 +39,11 @@ const rawEnvSchema = z.object({
   ),
   MELOS_AUTH_MAILER: z.preprocess(
     blankToUndefined,
-    z.enum(['outbox', 'memory'], { error: 'must be one of: outbox, memory' }).default('outbox'),
+    z
+      .enum(['outbox', 'memory', 'disabled'], { error: 'must be one of: outbox, memory, disabled' })
+      .default('outbox'),
   ),
+  MELOS_SIGNUP_ALLOWED_EMAILS: optionalText,
 });
 
 type RawEnv = z.infer<typeof rawEnvSchema>;
@@ -69,9 +72,12 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
     }
   }
 
-  // Both mailers are development mailers; production gets one when phase 8 wires Resend.
-  if (env.VERCEL_ENV === 'production') {
-    flag('MELOS_AUTH_MAILER', 'selects a development mailer, which production refuses');
+  // outbox and memory are development mailers; production gets one when phase 8 wires Resend.
+  if (env.VERCEL_ENV === 'production' && env.MELOS_AUTH_MAILER !== 'disabled') {
+    flag(
+      'MELOS_AUTH_MAILER',
+      'must be disabled in production (outbox and memory are for development)',
+    );
   }
 
   if (!env.MELOS_LLM_BASE_URL) {
@@ -96,7 +102,9 @@ export type ServerEnv = {
   agentDatabase: DatabaseSetting;
   chatModel: ChatModelSetting;
   emailTransport: 'sandbox';
-  authMailer: 'outbox' | 'memory';
+  authMailer: 'outbox' | 'memory' | 'disabled';
+  /** Lower-cased addresses that may sign up; null lets anyone sign up (never in production). */
+  signUpAllowedEmails: string[] | null;
 };
 
 export type EnvProblem = { name: string; reason: string };
@@ -124,20 +132,31 @@ function resolveAuthUrls(env: RawEnv): {
 } {
   const branchUrl = httpsOrigin(env.VERCEL_BRANCH_URL);
   const deploymentUrl = httpsOrigin(env.VERCEL_URL);
-  const baseURL = env.BETTER_AUTH_URL ?? branchUrl ?? deploymentUrl ?? LOCAL_BASE_URL;
+  const productionUrl = httpsOrigin(env.VERCEL_PROJECT_PRODUCTION_URL);
+  // Production is served at its project domain; a preview at its branch URL.
+  const vercelUrl =
+    env.VERCEL_ENV === 'production'
+      ? (productionUrl ?? branchUrl ?? deploymentUrl)
+      : (branchUrl ?? deploymentUrl);
+  const baseURL = env.BETTER_AUTH_URL ?? vercelUrl ?? LOCAL_BASE_URL;
   // Exact origins only: a preview is reachable at its branch URL and its deployment URL.
-  const candidates = [
-    baseURL,
-    branchUrl,
-    deploymentUrl,
-    httpsOrigin(env.VERCEL_PROJECT_PRODUCTION_URL),
-  ];
+  const candidates = [baseURL, branchUrl, deploymentUrl, productionUrl];
   const trustedOrigins = [
     ...new Set(
       candidates.filter((url): url is string => Boolean(url)).map((url) => new URL(url).origin),
     ),
   ];
   return { baseURL, trustedOrigins };
+}
+
+/** Unset admits anyone outside production and nobody in production (fail closed). */
+function parseSignUpAllowlist(env: RawEnv): string[] | null {
+  if (env.MELOS_SIGNUP_ALLOWED_EMAILS === undefined) {
+    return env.VERCEL_ENV === 'production' ? [] : null;
+  }
+  return env.MELOS_SIGNUP_ALLOWED_EMAILS.split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 /** Parses an environment record. Throws ServerEnvError listing variable names, never values. */
@@ -173,6 +192,7 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
       : { provider: 'router', id: env.MELOS_CHAT_MODEL ?? '' },
     emailTransport: env.MELOS_EMAIL_TRANSPORT,
     authMailer: env.MELOS_AUTH_MAILER,
+    signUpAllowedEmails: parseSignUpAllowlist(env),
   };
 }
 
