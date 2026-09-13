@@ -2,6 +2,11 @@ import { writeFileSync } from 'node:fs';
 import { type Client, createClient, type Row } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import { migrate } from 'drizzle-orm/libsql/migrator';
+import {
+  applyWorkspaceMigrations,
+  readWorkspaceMigrations,
+  WORKSPACE_MIGRATIONS,
+} from './workspace-migrations.ts';
 
 export const FK_RULES_FILE = './src/server/db/fk-rules.generated.ts';
 export const CONTROL_MIGRATIONS = './src/server/db/migrations/control';
@@ -29,14 +34,14 @@ export interface ForeignKeyRule {
   onUpdate: ForeignKeyAction;
 }
 
-/** Rules per database. Phase 2 adds `workspace` and phase 5 `runtime` (CONTRACT §4.4). */
-export type ForeignKeyDatabase = 'control';
+/** Rules per database. Phase 5 adds `runtime` (CONTRACT §4.4). */
+export type ForeignKeyDatabase = 'control' | 'workspace';
 export type ForeignKeyRules = Readonly<Record<ForeignKeyDatabase, readonly ForeignKeyRule[]>>;
 
-/** IntegrityGuard interpolates these names into SQL, so anything but a plain identifier fails. */
-function identifier(value: Row[string]): string {
+/** Generated code interpolates these names into SQL and TypeScript, so anything else fails. */
+export function identifier(value: Row[string]): string {
   if (typeof value === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) return value;
-  throw new Error(`Foreign-key rules need plain identifiers, got ${String(value)}`);
+  throw new Error(`Generated schema code needs plain identifiers, got ${String(value)}`);
 }
 
 function action(value: Row[string]): ForeignKeyAction {
@@ -110,19 +115,37 @@ export function renderForeignKeyRules(rules: ForeignKeyRules): string {
 }
 
 /**
- * Migrates an empty in-memory libSQL database with each schema's migrations and renders the
- * rules. In memory because Windows keeps a closed libSQL file locked until the process exits.
+ * Runs `read` on an empty in-memory libSQL database that `prepare` migrated. In memory because
+ * Windows keeps a closed libSQL file locked until the process exits.
  */
-export async function generateForeignKeyRules(
-  controlMigrations = CONTROL_MIGRATIONS,
-): Promise<string> {
+export async function readMigrated<T>(
+  prepare: (client: Client) => Promise<unknown>,
+  read: (client: Client) => Promise<T>,
+): Promise<T> {
   const client = createClient({ url: ':memory:' });
   try {
-    await migrate(drizzle(client), { migrationsFolder: controlMigrations });
-    return renderForeignKeyRules({ control: await readForeignKeyRules(client) });
+    await prepare(client);
+    return await read(client);
   } finally {
     client.close();
   }
+}
+
+/** Applies the numbered workspace migrations in `folder`, as provisioning does. */
+export const migrateWorkspace = (folder: string) => (client: Client) =>
+  applyWorkspaceMigrations(client, { migrations: readWorkspaceMigrations(folder) });
+
+/** Migrates each schema into its own in-memory database and renders the rules of both. */
+export async function generateForeignKeyRules(
+  controlMigrations = CONTROL_MIGRATIONS,
+  workspaceMigrations = WORKSPACE_MIGRATIONS,
+): Promise<string> {
+  const migrateControl = (client: Client) =>
+    migrate(drizzle(client), { migrationsFolder: controlMigrations });
+  return renderForeignKeyRules({
+    control: await readMigrated(migrateControl, readForeignKeyRules),
+    workspace: await readMigrated(migrateWorkspace(workspaceMigrations), readForeignKeyRules),
+  });
 }
 
 if (import.meta.main) {
