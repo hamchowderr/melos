@@ -25,7 +25,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:fk-rules": "node src/server/db/fk-rules.ts",
-    "db:workspace-tables": "node src/server/db/workspace-tables.ts"
+    "db:workspace-tables": "node src/server/db/workspace-tables.ts",
+    "workspace:provision": "tsx --env-file-if-exists=.env.local scripts/workspace-provision.ts"
   },
   "dependencies": {
     "@ag-ui/client": "0.0.59",
@@ -67,6 +68,7 @@
     "drizzle-kit": "0.31.10",
     "postcss": "8.5.28",
     "tailwindcss": "4.3.3",
+    "tsx": "4.23.13",
     "typescript": "6.0.3",
     "vitest": "4.1.11"
   },

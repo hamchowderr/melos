@@ -39,6 +39,8 @@ export const workspaceRegistry = sqliteTable(
     statusDetail: text('status_detail'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    /** The provisioning attempt that holds the row's claim; only it writes the row (§7.2). */
+    attemptId: text('attempt_id'),
   },
   () => [
     check(

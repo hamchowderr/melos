@@ -1,5 +1,5 @@
 import { type Client, createClient } from '@libsql/client';
-import { eq, getTableColumns } from 'drizzle-orm';
+import { and, eq, getTableColumns, isNull, type SQL } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { controlDb } from '../db/client';
 import { controlAuditLog, workspaceRegistry } from '../db/schema/control';
@@ -46,14 +46,14 @@ function auditJson(row: WorkspaceRegistryRow): string {
   );
 }
 
-/** Step 1: the registry row and `workspace.provisioned`, in one melos-control transaction. */
-async function register(organizationId: string, actorUserId: string | null) {
+/** Step 1: the row, claimed by `attemptId`, and `workspace.provisioned`, in one transaction. */
+async function register(organizationId: string, attemptId: string, actorUserId: string | null) {
   const key = ulid();
   const at = now();
   // database_url is known once the host has created the database (step 2).
   const database = { databaseName: `melos-ws-${key}`, databaseUrl: '', dbTokenCiphertext: null };
   const row: WorkspaceRegistryRow = {
-    ...{ id: `ws_${key}`, organizationId, ...database, schemaVersion: 0 },
+    ...{ id: `ws_${key}`, organizationId, ...database, schemaVersion: 0, attemptId },
     ...{ status: 'provisioning', statusDetail: null, createdAt: at, updatedAt: at },
   };
   const audit = { id: `cad_${ulid()}`, actorUserId, organizationId, occurredAt: at };
@@ -89,30 +89,89 @@ async function seed(client: Client) {
   await client.batch([settings, ...templates], 'write');
 }
 
+/** A `provisioning` row whose attempt has written nothing for this long may be claimed (ADR-032). */
+export const STALE_CLAIM_MS = 15 * 60_000;
+
+const readRow = async (organizationId: string): Promise<WorkspaceRegistryRow | undefined> =>
+  (
+    await controlDb
+      .select()
+      .from(workspaceRegistry)
+      .where(eq(workspaceRegistry.organizationId, organizationId))
+  )[0];
+
 /**
- * docs/CONTRACT.md §7.2 for one organization; returns its `active` registry row as it is or once
- * provisioned. A `failed` row, or one a crash left `provisioning`, resumes on the database it names.
- * A failed step sets `failed` with the step and error code, then throws (P-23).
+ * One conditional UPDATE: writes `set` and returns the row only while `where` still matches, so it
+ * is atomic without holding a transaction. It sets no key column, so IntegrityGuard has no §4.4
+ * check to apply.
+ */
+async function writeIf(id: string, where: SQL | undefined, set: Partial<WorkspaceRegistryRow>) {
+  const matches = and(eq(workspaceRegistry.id, id), where);
+  const update = controlDb.update(workspaceRegistry).set({ ...set, updatedAt: now() });
+  const [row] = await update.where(matches).returning();
+  return row as WorkspaceRegistryRow | undefined;
+}
+
+/**
+ * Claims the organization's row for `attemptId` (ADR-032): registers a missing row, or moves a
+ * `failed` or stale `provisioning` row to `provisioning` under the attempt, only while the row is
+ * still the version read. Any other row comes back unclaimed.
+ */
+async function claim(organizationId: string, attemptId: string, actorUserId: string | null) {
+  const row = await readRow(organizationId);
+  if (!row) {
+    // The unique organization_id lets one of two overlapping registrations insert.
+    return register(organizationId, attemptId, actorUserId).catch(async (error: unknown) => {
+      const raced = await readRow(organizationId);
+      if (!raced) throw error;
+      return raced;
+    });
+  }
+  const silent = Date.parse(row.updatedAt) <= Date.now() - STALE_CLAIM_MS;
+  if (row.status !== 'failed' && !(row.status === 'provisioning' && silent)) return row;
+  const { status, updatedAt, attemptId: held } = workspaceRegistry;
+  const seen = and(
+    eq(status, row.status),
+    eq(updatedAt, row.updatedAt),
+    row.attemptId === null ? isNull(held) : eq(held, row.attemptId),
+  );
+  const claimed = await writeIf(row.id, seen, { status: 'provisioning', attemptId });
+  return claimed ?? (await readRow(organizationId)) ?? row;
+}
+
+/**
+ * docs/CONTRACT.md §7.2 for one organization. Returns its registry row: `active` as it is or once
+ * provisioned, or unchanged while another live attempt holds its claim (ADR-032). A `failed` row, or
+ * one whose attempt went silent, resumes on the database it names. A failed step sets `failed` with
+ * the step and error code, then throws (P-23); an attempt that lost its claim writes nothing.
  */
 export async function provisionWorkspace(
   organizationId: string,
   actorUserId: string | null = null,
 ): Promise<WorkspaceRegistryRow> {
-  const byOrganization = eq(workspaceRegistry.organizationId, organizationId);
-  const [existing] = await controlDb.select().from(workspaceRegistry).where(byOrganization);
-  if (existing?.status === 'active') return existing;
-  if (existing && existing.status !== 'failed' && existing.status !== 'provisioning') {
-    throw new Error(`Workspace ${existing.id} is ${existing.status} and cannot be provisioned`);
+  const attemptId = ulid();
+  const row = await claim(organizationId, attemptId, actorUserId);
+  if (row.attemptId !== attemptId) {
+    if (['active', 'provisioning', 'failed'].includes(row.status)) return row;
+    throw new Error(`Workspace ${row.id} is ${row.status} and cannot be provisioned`);
   }
-  const row = existing ?? (await register(organizationId, actorUserId));
+  const owned = and(
+    eq(workspaceRegistry.attemptId, attemptId),
+    eq(workspaceRegistry.status, 'provisioning'),
+  );
+  /** Writes as the claim's owner, renewing the claim; throws once another attempt holds it. */
+  const ownerWrite = async (set: Partial<WorkspaceRegistryRow>) => {
+    const written = await writeIf(row.id, owned, set);
+    if (!written) throw new Error('Workspace claim lost');
+    return written;
+  };
 
   const setting = getServerEnv().workspaceHost;
   let step = 'create_database';
   try {
     // Both hosts return the database an earlier attempt created (ADR-031).
     const { url, tokenCiphertext } = await createWorkspaceHost(setting).create(row.databaseName);
-    const created = { databaseUrl: url, dbTokenCiphertext: tokenCiphertext };
-    await updateRow(row.id, { ...created, status: 'provisioning', statusDetail: null });
+    await ownerWrite({ databaseUrl: url, dbTokenCiphertext: tokenCiphertext, statusDetail: null });
     const authToken =
       setting.kind === 'turso' && tokenCiphertext
         ? createTokenCipher(setting.tokenKey).decrypt(tokenCiphertext, row.databaseName)
@@ -120,18 +179,21 @@ export async function provisionWorkspace(
     const client = createClient({ url, authToken });
     try {
       step = 'migrate';
-      const { version } = await applyWorkspaceMigrations(client);
+      const onApplied = async () => void (await ownerWrite({}));
+      const { version } = await applyWorkspaceMigrations(client, { onApplied });
       step = 'seed';
       await seed(client);
       step = 'activate';
-      const active = { schemaVersion: version, status: 'active', statusDetail: null } as const;
-      return await updateRow(row.id, active);
+      return await ownerWrite({ schemaVersion: version, status: 'active', statusDetail: null });
     } finally {
       client.close();
     }
   } catch (error) {
     const statusDetail = `${step} failed: ${errorCode(error)}`;
-    await updateRow(row.id, { status: 'failed', statusDetail });
+    // Only the owner writes `failed`, so a superseded attempt never overwrites the new owner's row.
+    if (!(await writeIf(row.id, owned, { status: 'failed', statusDetail }))) {
+      return (await readRow(organizationId)) ?? row;
+    }
     throw new Error(`Workspace ${row.id} ${statusDetail}`);
   }
 }
