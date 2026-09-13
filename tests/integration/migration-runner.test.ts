@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { type Client, createClient, type Transaction, type TransactionMode } from '@libsql/client';
 import { and, eq, sql } from 'drizzle-orm';
@@ -501,5 +502,117 @@ describe('TEN-005: MigrationRunner migrates every active workspace in resumable 
     serverEnv.mockReturnValueOnce({ ...env.getServerEnv(), workspaceHost });
     await expect(run(3)).rejects.toMatchObject({ name: 'WorkspaceHostConfigError', missing });
     expect(await snapshot()).toEqual(before);
+  });
+});
+
+describe('npm run db:migrate-workspaces runs a batch from the command line (§7.2)', () => {
+  it('prints the batch and each workspace with versions, status and error code; exits 1 while one is not active, 2 for usage or an unconfigured host', async () => {
+    const { runMigrateCommand } = await import('../../scripts/migrate-workspaces');
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // A workspace one version behind whose database cannot be opened.
+    const behind = await createWorkspace('behind');
+    const databaseUrl = `file:${DATA_DIR}/${TOKEN}/${behind.databaseName}.db`;
+    const set = { databaseUrl, schemaVersion: base.length - 1 };
+    await control.update(workspaceRegistry).set(set).where(eq(workspaceRegistry.id, behind.id));
+    const lines: string[] = [];
+    expect(await runMigrateCommand([], (text) => lines.push(text))).toBe(1);
+    const [header, ...workspaces] = lines;
+    expect(header).toMatch(/^batch [0-9A-HJKMNP-TV-Z]{26}$/);
+    const skipped = workspaces.filter((text) => /^ws_\w{26} \d+ \d+ skipped -$/.test(text));
+    const failed = `${behind.id} ${base.length - 1} ${base.length} failed Error`;
+    const others = workspaces.filter((text) => !skipped.includes(text));
+    expect([skipped.length, others]).toEqual([6, [failed]]);
+    expect(await runMigrateCommand(['not-a-batch-id'], () => {})).toBe(2);
+
+    const workspaceHost = { kind: 'unconfigured' as const, missing: ['TURSO_ORG'] };
+    const unconfigured = { ...env.getServerEnv(), workspaceHost };
+    serverEnv.mockReturnValueOnce(unconfigured).mockReturnValueOnce(unconfigured);
+    const refused: string[] = [];
+    expect(await runMigrateCommand([], (text) => refused.push(text))).toBe(2);
+    const named = 'Workspace host is not configured: set TURSO_ORG';
+    expect([refused, logged.mock.lastCall]).toEqual([[], [named]]);
+    expect(JSON.stringify([lines, logged.mock.calls])).not.toContain(TOKEN);
+    logged.mockRestore();
+  });
+
+  it('runs as the npm script through tsx on a control database file and reruns a batch by its id (smoke)', async () => {
+    const [file, workspace] = ['control', 'workspace'].map(
+      (name) => `data/test-migrate-${name}.db`,
+    );
+    for (const path of [file, workspace]) {
+      for (const suffix of ['', '-shm', '-wal']) rmSync(`${path}${suffix}`, { force: true });
+    }
+    const db = drizzle(createClient({ url: `file:./${file}` }));
+    clients.push(db.$client);
+    await migrate(db, { migrationsFolder: CONTROL_MIGRATIONS });
+    const [key, at] = [ulid(), new Date().toISOString()];
+    await db.$client.batch([
+      "INSERT INTO organization (id, name, slug, created_at) VALUES ('org_cli', 'CLI', 'cli', 0)",
+      {
+        sql: "INSERT INTO workspace_registry (id, organization_id, database_name, database_url, status, created_at, updated_at) VALUES (?, 'org_cli', ?, ?, 'active', ?, ?)",
+        args: [`ws_${key}`, `melos-ws-${key}`, `file:./${workspace}`, at, at],
+      },
+    ]);
+    const script = JSON.parse(readFileSync('package.json', 'utf8')).scripts[
+      'db:migrate-workspaces'
+    ];
+    const [runner, ...args] = String(script).split(' ');
+    expect(runner).toBe('tsx');
+    const spawn = (url: string, ...batch: string[]) => {
+      const vars = { ...process.env, VERCEL: '', MELOS_CONTROL_DATABASE_URL: url };
+      const tsx = ['node_modules/tsx/dist/cli.mjs', ...args, ...batch];
+      return spawnSync(process.execPath, tsx, { env: vars, encoding: 'utf8', timeout: 50_000 });
+    };
+    const done = spawn(`file:./${file}`);
+    const [header, migrated] = done.stdout.split('\n');
+    const expected = `ws_${key} 0 ${base.length} succeeded -`;
+    expect([done.status, migrated], done.stderr).toEqual([0, expected]);
+    // Rerunning the batch by its id skips the workspace it migrated.
+    const batchId = header.slice('batch '.length);
+    const again = spawn(`file:./${file}`, batchId);
+    const skipped = `batch ${batchId}\nws_${key} ${base.length} ${base.length} skipped -\n`;
+    expect([again.status, again.stdout], again.stderr).toEqual([0, skipped]);
+    const registry = await rows(
+      db.$client,
+      'SELECT status, schema_version FROM workspace_registry',
+    );
+    expect(registry).toEqual([{ status: 'active', schema_version: base.length }]);
+    // A remote control database with the local workspace host is refused before any query.
+    const remote = spawn('http://127.0.0.1:9');
+    expect([remote.status, remote.stdout], remote.stderr).toEqual([2, '']);
+    // libSQL copies an invalid query value into its message; only the name and code are printed.
+    const marker = 'secret-looking-marker-never-printed';
+    const invalid = spawn(`file:./${file}?tls=${marker}`);
+    expect([invalid.status, invalid.stdout]).toEqual([2, '']);
+    expect(invalid.stderr).toMatch(/^Configuration error: LibsqlError URL_\w+$/m);
+    expect(invalid.stderr).not.toContain(marker);
+  });
+
+  it('exits 1 while a workspace stays unclaimed below the target, though it is still active', async () => {
+    const { runMigrateCommand } = await import('../../scripts/migrate-workspaces');
+    const held = await createWorkspace('held');
+    const byId = eq(workspaceRegistry.id, held.id);
+    await control
+      .update(workspaceRegistry)
+      .set({ schemaVersion: base.length - 1 })
+      .where(byId);
+    // Another writer touches the row before each transaction, so the claim that follows the
+    // runner's last read of `held`, the batch's last workspace, matches nothing.
+    const transaction = control.transaction.bind(control);
+    let touches = 0;
+    const touching = async (...args: Parameters<typeof transaction>) => {
+      touches += 1;
+      const updatedAt = new Date(Date.now() + touches).toISOString();
+      await control.update(workspaceRegistry).set({ updatedAt }).where(byId);
+      return transaction(...args);
+    };
+    const spy = vi.spyOn(control, 'transaction').mockImplementation(touching as typeof transaction);
+    const lines: string[] = [];
+    const print = (text: string) => lines.push(text);
+    const exitCode = await runMigrateCommand([], print).finally(() => spy.mockRestore());
+    const unclaimed = `${held.id} ${base.length - 1} ${base.length} unclaimed -`;
+    expect([exitCode, lines.at(-1)]).toEqual([1, unclaimed]);
+    const below = { status: 'active', schemaVersion: base.length - 1 };
+    expect(await rowOf(held.id)).toMatchObject(below);
   });
 });
