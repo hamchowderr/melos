@@ -24,7 +24,8 @@
     "auth:generate": "auth generate --config src/server/auth/auth.ts --output src/server/db/schema/auth.ts --yes",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:fk-rules": "node src/server/db/fk-rules.ts"
+    "db:fk-rules": "node src/server/db/fk-rules.ts",
+    "db:workspace-tables": "node src/server/db/workspace-tables.ts"
   },
   "dependencies": {
     "@ag-ui/client": "0.0.59",

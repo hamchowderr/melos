@@ -1,5 +1,4 @@
-import { appendFileSync, cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -8,17 +7,19 @@ import {
   generateForeignKeyRules,
 } from '../../src/server/db/fk-rules';
 import { FOREIGN_KEY_RULES } from '../../src/server/db/fk-rules.generated';
+import { WORKSPACE_MIGRATIONS } from '../../src/server/db/workspace-migrations';
+import { addPitchOwner, generateFromChangedCopy, replaceIn } from './changed-migrations';
 
 /** Generates from a copy of the control migrations that `change` edits first. */
-async function generateFromChangedMigrations(change: (folder: string) => void) {
-  const folder = mkdtempSync(join(tmpdir(), 'melos-fk-migrations-'));
-  try {
-    cpSync(CONTROL_MIGRATIONS, folder, { recursive: true });
-    change(folder);
-    return await generateForeignKeyRules(folder);
-  } finally {
-    rmSync(folder, { recursive: true, force: true });
-  }
+function generateFromChangedMigrations(change: (folder: string) => void) {
+  return generateFromChangedCopy(CONTROL_MIGRATIONS, change, generateForeignKeyRules);
+}
+
+/** Generates from a copy of the workspace migrations that `change` edits first. */
+function generateFromChangedWorkspace(change: (folder: string) => void) {
+  return generateFromChangedCopy(WORKSPACE_MIGRATIONS, change, (folder) =>
+    generateForeignKeyRules(CONTROL_MIGRATIONS, folder),
+  );
 }
 
 describe('DAT-001: foreign-key rules are generated from the migrated control schema', () => {
@@ -81,5 +82,60 @@ describe('DAT-001: foreign-key rules are generated from the migrated control sch
         "      onUpdate: 'NO ACTION',",
       ].join('\n'),
     );
+  });
+});
+
+describe('DAT-001: foreign-key rules are generated from the migrated workspace schema', () => {
+  const committed = readFileSync(FK_RULES_FILE, 'utf8');
+  const rule = (table: string, columns: string[], parentTable: string, onDelete: string) =>
+    [
+      `      table: '${table}',`,
+      `      columns: [${columns.map((column) => `'${column}'`).join(', ')}],`,
+      `      parentTable: '${parentTable}',`,
+      "      parentColumns: ['id'],",
+      `      onDelete: '${onDelete}',`,
+    ].join('\n');
+
+  it('covers every workspace table that declares a foreign key', () => {
+    const tables =
+      'agreements artist_aliases asset_credits composition_alt_titles composition_assets composition_contributor_roles composition_contributors composition_terms contact_methods contact_roles contacts external_references generated_report_items generated_reports import_issues import_runs licensing_contacts master_interests message_recipients messages organizations party_identifiers party_society_affiliations people pitch_events pitch_items pitches publishing_interests recording_artists recording_assets recording_contributors recording_links recording_terms recordings release_assets release_tracks releases workspace_self_parties';
+    expect(new Set(FOREIGN_KEY_RULES.workspace.map(({ table }) => table))).toEqual(
+      new Set(tables.split(' ')),
+    );
+  });
+
+  it('keeps the kind-checked writer key to parties as one composite rule', () => {
+    const writerParty = FOREIGN_KEY_RULES.workspace.filter(
+      ({ table, parentTable }) => table === 'composition_contributors' && parentTable === 'parties',
+    );
+    expect(writerParty).toEqual([
+      {
+        table: 'composition_contributors',
+        columns: ['party_id', 'party_kind'],
+        parentTable: 'parties',
+        parentColumns: ['id', 'party_kind'],
+        onDelete: 'RESTRICT',
+        onUpdate: 'NO ACTION',
+      },
+    ]);
+  });
+
+  it('drifts when a workspace migration adds a column with a foreign key', async () => {
+    const generated = await generateFromChangedWorkspace(addPitchOwner);
+    expect(generated).not.toBe(committed);
+    expect(generated).toContain(rule('pitches', ['owner_party_id'], 'parties', 'SET NULL'));
+  });
+
+  it('drifts when a workspace migration changes a foreign-key action', async () => {
+    const restrictContact =
+      /(contact_id\s+TEXT NOT NULL REFERENCES contacts\(id\) ON DELETE) RESTRICT/;
+    const change = replaceIn(
+      '0003_crm_pitches_messages_reports.sql',
+      restrictContact,
+      '$1 CASCADE',
+    );
+    const generated = await generateFromChangedWorkspace(change);
+    expect(generated).not.toBe(committed);
+    expect(generated).toContain(rule('pitches', ['contact_id'], 'contacts', 'CASCADE'));
   });
 });
