@@ -1,7 +1,45 @@
 import { rmSync } from 'node:fs';
 import { LLMock } from '@copilotkit/aimock';
+import { type Client, createClient } from '@libsql/client';
+import { sql } from 'drizzle-orm';
+import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
+import { expect } from 'vitest';
 
 export const BASE_URL = 'http://localhost:3100';
+
+type Transaction = Parameters<Parameters<LibSQLDatabase['transaction']>[0]>[0];
+
+/**
+ * DAT-INT-001: an in-memory database with foreign-key enforcement off, so IntegrityGuard and not
+ * SQLite keeps it consistent (CONTRACT §4.4). Its one connection carries the pragma into every
+ * transaction. `prepare` runs first, because drizzle's migrator turns enforcement back on.
+ */
+export async function openWithoutForeignKeys(
+  prepare: (db: LibSQLDatabase) => Promise<unknown>,
+): Promise<LibSQLDatabase & { $client: Client }> {
+  const db = drizzle(createClient({ url: ':memory:' }));
+  await prepare(db);
+  await db.run(sql`PRAGMA foreign_keys = OFF`);
+  return db;
+}
+
+/**
+ * DAT-INT-001: runs `operation` in one transaction, then expects PRAGMA foreign_key_check to report
+ * no rows, whether the transaction committed or a refusal rolled it back.
+ */
+export async function expectForeignKeysIntact<T>(
+  db: LibSQLDatabase,
+  operation: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  try {
+    return await db.transaction(async (tx) => {
+      expect(await tx.all(sql`PRAGMA foreign_keys`)).toEqual([{ foreign_keys: 0 }]);
+      return operation(tx);
+    });
+  } finally {
+    expect(await db.all(sql`PRAGMA foreign_key_check`)).toEqual([]);
+  }
+}
 
 type Handler = (request: Request) => Promise<Response> | Response;
 
