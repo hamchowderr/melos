@@ -24,7 +24,7 @@ Mastra agent, and a CopilotKit chat. Domain tables (catalog, rights, CRM) come l
 src/app                  routes; /api/auth/[...all] and /api/copilotkit/[[...slug]]
 src/mastra               agent, tools, request-context helper (must not import src/app)
 src/server/services      authorization and transactions (TenantContextResolver placeholder)
-src/server/db            control-plane client, Better Auth schema, migrations
+src/server/db            control-plane client, Better Auth and control schema, migrations/control
 src/server/auth          Better Auth instance
 src/server/env.ts        environment validation
 src/lib                  code shared with the browser (auth client, roles, agent contract)

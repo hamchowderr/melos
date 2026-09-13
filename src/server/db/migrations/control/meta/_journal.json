@@ -8,6 +8,13 @@
       "when": 1789259982241,
       "tag": "0000_better_auth_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789271722327,
+      "tag": "0001_control_plane_tables",
+      "breakpoints": true
     }
   ]
 }
