@@ -1,0 +1,16 @@
+# Store and check out text files with LF endings on every platform,
+# overriding a system-wide core.autocrlf=true. biome.json requires LF.
+* text=auto eol=lf
+
+# Binary files: never convert or diff as text.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
