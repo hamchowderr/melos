@@ -1,5 +1,6 @@
 import { closeSync, mkdirSync, openSync, rmSync } from 'node:fs';
 import { posix } from 'node:path';
+import { createClient } from '@libsql/client';
 import type { WorkspaceHostSetting } from '../env';
 import { createTokenCipher } from './token-cipher';
 
@@ -127,4 +128,25 @@ export function createWorkspaceHost(setting: WorkspaceHostSetting, fetchApi: Fet
   if (setting.kind === 'turso') return tursoWorkspaceHost(setting, fetchApi);
   const refuse = () => Promise.reject(new WorkspaceHostConfigError(setting.missing));
   return { kind: setting.kind, create: refuse, delete: refuse } satisfies WorkspaceHost;
+}
+
+type RegisteredDatabase = {
+  databaseName: string;
+  databaseUrl: string;
+  dbTokenCiphertext: string | null;
+};
+
+/**
+ * A client for a registered workspace database, for provisioning and MigrationRunner (§7.2): the
+ * Turso token decrypted with the server key, none for a local file. Throws WorkspaceHostConfigError
+ * while the host is unconfigured.
+ */
+export function openWorkspaceDatabase(setting: WorkspaceHostSetting, row: RegisteredDatabase) {
+  if (setting.kind === 'unconfigured') throw new WorkspaceHostConfigError(setting.missing);
+  const { databaseName, databaseUrl: url, dbTokenCiphertext: ciphertext } = row;
+  const authToken =
+    setting.kind === 'turso' && ciphertext
+      ? createTokenCipher(setting.tokenKey).decrypt(ciphertext, databaseName)
+      : undefined;
+  return createClient({ url, authToken });
 }
