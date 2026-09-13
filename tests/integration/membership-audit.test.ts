@@ -68,7 +68,8 @@ const seen = new Set<string>();
 
 /** The control_audit_log rows appended since the previous call. */
 async function newAuditRows() {
-  const fresh = (await controlDb.select().from(controlAuditLog)).filter((row) => !seen.has(row.id));
+  const rows = await controlDb.select().from(controlAuditLog);
+  const fresh = rows.filter((row) => !seen.has(row.id) && row.action !== 'workspace.provisioned');
   for (const row of fresh) seen.add(row.id);
   return fresh;
 }

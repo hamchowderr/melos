@@ -41,6 +41,8 @@ export default defineConfig({
         BETTER_AUTH_URL: baseURL,
         MELOS_CONTROL_DATABASE_URL: 'file:./data/e2e-control.db',
         MELOS_AGENT_DATABASE_URL: 'file:./data/e2e-agent.db',
+        // Every workspace created in the suite provisions a database file here, not in .data.
+        MELOS_WORKSPACE_DATA_DIR: 'data/e2e-workspaces',
         MELOS_LLM_BASE_URL: `http://127.0.0.1:${AIMOCK_PORT}/v1`,
       },
     },

@@ -1,11 +1,12 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
-import { organization } from 'better-auth/plugins/organization';
+import { type OrganizationOptions, organization } from 'better-auth/plugins/organization';
 import { ac, roles } from '../../lib/auth/permissions';
 import { controlDb } from '../db/client';
 import * as schema from '../db/schema/auth';
 import { getServerEnv } from '../env';
+import { provisionWorkspace } from '../services/workspace-provisioner';
 import { controlDeleteHooks, controlDeletesPlugin } from './control-deletes';
 import { sendAuthEmail } from './mailer';
 import { membershipAuditAfterHook, membershipAuditHooks } from './membership-audit';
@@ -26,6 +27,15 @@ const refuseInvitesWithoutMailer = createAuthMiddleware(async (ctx) => {
     message: 'Invitations are unavailable until email sending is set up.',
   });
 });
+
+/** Never fails organization creation: a failed registry row keeps its step for a retry (P-23). */
+const provisioningHooks = {
+  afterCreateOrganization: async ({ organization: { id }, user }) => {
+    await provisionWorkspace(id, user.id).catch(() => {
+      console.error(`Workspace provisioning failed for organization ${id}`);
+    });
+  },
+} satisfies NonNullable<OrganizationOptions['organizationHooks']>;
 
 export const auth = betterAuth({
   appName: 'Melos',
@@ -71,7 +81,8 @@ export const auth = betterAuth({
       ac,
       roles,
       creatorRole: 'owner',
-      organizationHooks: { ...membershipAuditHooks, ...controlDeleteHooks },
+      // No key repeats: membership audit has no afterCreateOrganization, deletes one before hook.
+      organizationHooks: { ...membershipAuditHooks, ...controlDeleteHooks, ...provisioningHooks },
       // Explicit, per GHSA-fmh4-wcc4-5jm3: the implicit default flips with ID generation.
       requireEmailVerificationOnInvitation: true,
       sendInvitationEmail: ({ id, email, role, organization: workspace, inviter }) => {
