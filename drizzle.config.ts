@@ -8,7 +8,7 @@ ensureLocalDatabaseDir(url);
 export default defineConfig({
   dialect: 'turso',
   schema: './src/server/db/schema/auth.ts',
-  out: './src/server/db/migrations',
+  out: './src/server/db/migrations/control',
   dbCredentials: {
     url,
     authToken: process.env.MELOS_CONTROL_DATABASE_AUTH_TOKEN || undefined,

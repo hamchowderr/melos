@@ -25,7 +25,7 @@ export async function prepareTestEnvironment(name: string): Promise<LLMock> {
 
   const { migrate } = await import('drizzle-orm/libsql/migrator');
   const { controlDb } = await import('../../src/server/db/client');
-  await migrate(controlDb, { migrationsFolder: './src/server/db/migrations' });
+  await migrate(controlDb, { migrationsFolder: './src/server/db/migrations/control' });
   return mock;
 }
 
