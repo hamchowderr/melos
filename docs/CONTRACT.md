@@ -1638,6 +1638,7 @@ Frontend AGUIMock fixtures emit tool-call and result events per renderer (TS §1
 | ADR-025 NEW | `IntegrityGuard` is the primary referential-integrity mechanism; declared foreign keys are defense in depth | Accepted | [SRC-093], [SRC-094], [SRC-095] (§6.18) |
 | ADR-026 NEW | Hosting on Vercel with Turso Cloud databases | Accepted | Owner decision 2026-09-12 |
 | ADR-027 NEW | The CopilotKit route allowlists `info`, `agent/run`, `agent/connect` and `agent/stop`; dynamic suggestions are off for the MVP: no dynamic suggestions config is registered and `agent/suggest` returns 404 | Accepted | [SRC-092]: `handlers/handle-suggest.mjs`, `core/fetch-handler.mjs`; [SRC-107] (§7.9) |
+| ADR-028 NEW | Services, tools and the importer authorize through `requirePermission(tenant, permissions)` in `src/server/services`, which evaluates the §6.2 role named by `workspaceRole` with `authorize()` in Melos code and returns `FORBIDDEN`. Better Auth 1.7.4 has no supported header-free check: `auth.api.hasPermission` requires session headers, and the exported `hasPermission` helper is typed to require an endpoint context; called without one, it grants a comma-separated role when any listed role allows the request (P-30 fails closed) and writes a process-wide role cache | Accepted; closes U-06; parity with `auth.api.hasPermission` proven by AUTH-INT-004 | [SRC-102]: `organization/organization.mjs` (`requireHeaders`, `orgSessionMiddleware`), `organization/has-permission.mjs`, `organization/permission.mjs` (§6.2) |
 
 ## 6. Conflict resolutions
 
@@ -1715,7 +1716,7 @@ Better Auth stores several roles on one member as a comma-separated string ([SRC
 | Change workspace roles | Better Auth default | Yes | Yes* | No | No | Cannot remove final owner; Better Auth permission. |
 | Delete workspace | Better Auth default | Yes | No | No | No | Destructive confirmation + control-plane audit. |
 
-Asterisks keep TS §13's meaning: the policy may change later. Services check the role resolved for this request (§7.1) against these definitions on every write (AUTH-004). A header-free Better Auth permission check inside a Mastra tool is U-06; until it is confirmed, services evaluate the same statement objects in Melos code. `auth.api.hasPermission({ headers, body: { permissions } })` is the verified request-bound check ([SRC-021](https://better-auth.com/docs/plugins/organization)).
+Asterisks keep TS §13's meaning: the policy may change later. Services check the role resolved for this request (§7.1) against these definitions on every write (AUTH-004). Better Auth has no supported header-free permission check (U-06, closed by ADR-028), so services, tools and the importer call `requirePermission`, which evaluates the same role objects in Melos code. `auth.api.hasPermission({ headers, body: { permissions } })` is the verified request-bound check ([SRC-021](https://better-auth.com/docs/plugins/organization)).
 
 ### 6.3 Approval for rights edits
 
@@ -2287,7 +2288,7 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | U-03 | How the `useRenderTool` render callback receives the tool result | Phase 6 |
 | U-04 | Frontend API that populates AG-UI `input.context` for Mastra | Phase 6 |
 | U-05 | Closed: custom roles override the predefined permissions; defaults are merged from `better-auth/plugins/organization/access` ([SRC-021], [SRC-102]) | — |
-| U-06 | A header-free Better Auth permission check usable inside tools | Phase 1 |
+| U-06 | Closed: Better Auth 1.7.4 has no supported header-free permission check; services use `requirePermission` (ADR-028, [SRC-102]) | — |
 | U-07 | Whether Turso remote connections enforce foreign keys by default; `IntegrityGuard` does not depend on the answer | Phase 2 |
 | U-08 | FTS5 availability in local libSQL files through `@libsql/client` | Phase 2 |
 | U-09 | Turso group tokens as an alternative to per-database tokens | Phase 2 |
