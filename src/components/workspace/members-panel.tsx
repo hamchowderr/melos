@@ -2,6 +2,22 @@
 
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
+import { PageCard } from '@/components/page-card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Separator } from '@/components/ui/separator';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { authClient } from '@/lib/auth/client';
 import { roles, type WorkspaceRole } from '@/lib/auth/permissions';
 
@@ -26,8 +42,10 @@ type Props = {
 };
 
 const org = authClient.organization;
-// Exactly the four workspace roles; a member holds one (P-30).
-const ROLE_OPTIONS = Object.keys(roles).map((role) => <option key={role}>{role}</option>);
+// Exactly the four workspace roles; a member holds one (P-30). A native select, so forms submit it.
+const ROLE_OPTIONS = Object.keys(roles).map((role) => (
+  <NativeSelectOption key={role}>{role}</NativeSelectOption>
+));
 
 /** Controls a role may not use are hidden for clarity only; Better Auth enforces (AUTH-004). */
 export function MembersPanel({
@@ -71,92 +89,124 @@ export function MembersPanel({
   }
 
   return (
-    <section className="auth-card members-card">
-      <h1>Members</h1>
-      <ul className="member-list">
-        {members.map(({ id, role, user }) => (
-          <li key={id}>
-            <span className="member-name">
-              <strong>{user.name}</strong> {user.email}
-            </span>
-            {canSetRole ? (
-              <select
-                aria-label={`Role for ${user.email}`}
-                value={role}
-                disabled={pending}
-                onChange={({ target }) => setRole(id, target.value as WorkspaceRole, user.email)}
-              >
-                {ROLE_OPTIONS}
-              </select>
-            ) : (
-              <span>{role}</span>
-            )}
+    <PageCard title="Members" className="max-w-2xl">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Member</TableHead>
+            <TableHead>Role</TableHead>
             {canRemove ? (
-              <button
-                type="button"
-                className="secondary"
-                aria-label={`Remove ${user.email}`}
-                disabled={pending}
-                onClick={() => remove(id, user.email)}
-              >
-                Remove
-              </button>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
             ) : null}
-          </li>
-        ))}
-      </ul>
-      {invitations.length > 0 ? (
-        <>
-          <h2>Pending invitations</h2>
-          <ul className="member-list" aria-label="Pending invitations">
-            {invitations.map(({ id, email, role, expires, invitedBy }) => (
-              <li key={id}>
-                <span className="member-name">
-                  <strong>{email}</strong> invited by {invitedBy}, expires {expires}
-                </span>
-                <span>{role}</span>
-                {canInvite ? (
-                  <button
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {members.map(({ id, role, user }) => (
+            <TableRow key={id}>
+              <TableCell>
+                <div className="font-medium">{user.name}</div>
+                <div className="text-muted-foreground">{user.email}</div>
+              </TableCell>
+              <TableCell>
+                {canSetRole ? (
+                  <NativeSelect
+                    size="sm"
+                    aria-label={`Role for ${user.email}`}
+                    value={role}
+                    disabled={pending}
+                    onChange={({ target }) =>
+                      setRole(id, target.value as WorkspaceRole, user.email)
+                    }
+                  >
+                    {ROLE_OPTIONS}
+                  </NativeSelect>
+                ) : (
+                  <Badge variant="secondary">{role}</Badge>
+                )}
+              </TableCell>
+              {canRemove ? (
+                <TableCell className="text-right">
+                  <Button
                     type="button"
-                    className="secondary"
+                    variant="outline"
+                    size="sm"
+                    aria-label={`Remove ${user.email}`}
+                    disabled={pending}
+                    onClick={() => remove(id, user.email)}
+                  >
+                    Remove
+                  </Button>
+                </TableCell>
+              ) : null}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {invitations.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <h2 className="font-medium">Pending invitations</h2>
+          <ul className="divide-y border-y" aria-label="Pending invitations">
+            {invitations.map(({ id, email, role, expires, invitedBy }) => (
+              <li key={id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                <span className="min-w-0 flex-1 text-muted-foreground">
+                  <strong className="font-medium text-foreground">{email}</strong> invited by{' '}
+                  {invitedBy}, expires {expires}
+                </span>
+                <Badge variant="secondary">{role}</Badge>
+                {canInvite ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
                     aria-label={`Cancel invitation to ${email}`}
                     disabled={pending}
                     onClick={() => cancel(id, email)}
                   >
                     Cancel
-                  </button>
+                  </Button>
                 ) : null}
               </li>
             ))}
           </ul>
-        </>
+        </section>
       ) : null}
+      {canInvite ? <Separator /> : null}
       {canInvite && invitationsUnavailable ? (
-        <p className="auth-switch">Invitations are unavailable until email sending is set up.</p>
+        <p className="text-muted-foreground">
+          Invitations are unavailable until email sending is set up.
+        </p>
       ) : null}
       {canInvite && !invitationsUnavailable ? (
-        <form className="member-invite" onSubmit={invite}>
-          <label>
-            Email
-            <input name="email" type="email" autoComplete="off" required />
-          </label>
-          <label>
-            Role
-            <select name="role" defaultValue="member">
-              {ROLE_OPTIONS}
-            </select>
-          </label>
-          <button type="submit" disabled={pending}>
-            Send invitation
-          </button>
+        <form onSubmit={invite}>
+          <FieldGroup>
+            <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
+              <Field>
+                <FieldLabel htmlFor="invite-email">Email</FieldLabel>
+                <Input id="invite-email" name="email" type="email" autoComplete="off" required />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="invite-role">Role</FieldLabel>
+                <NativeSelect id="invite-role" name="role" defaultValue="member">
+                  {ROLE_OPTIONS}
+                </NativeSelect>
+              </Field>
+            </div>
+            <Button type="submit" className="self-start" disabled={pending}>
+              Send invitation
+            </Button>
+          </FieldGroup>
         </form>
       ) : null}
       {notice?.error ? (
-        <p role="alert" className="form-error">
-          {notice.text}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{notice.text}</AlertDescription>
+        </Alert>
       ) : null}
-      {notice && !notice.error ? <output className="auth-switch">{notice.text}</output> : null}
-    </section>
+      {notice && !notice.error ? (
+        <output className="text-muted-foreground">{notice.text}</output>
+      ) : null}
+    </PageCard>
   );
 }

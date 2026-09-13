@@ -1,178 +1,46 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  --melos-ink: #18181b;
-  --melos-muted: #52525b;
-  --melos-line: #e4e4e7;
-  --melos-surface: #ffffff;
-  --melos-ground: #fafafa;
-  --melos-accent: #3f3cbb;
-  --melos-danger: #b42318;
   color-scheme: light;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
 }
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  color: var(--melos-ink);
-  background: var(--melos-ground);
-}
-
-.auth-page {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding-inline: 16px;
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 380px;
-  display: grid;
-  gap: 14px;
-  padding: 28px;
-  background: var(--melos-surface);
-  border: 1px solid var(--melos-line);
-  border-radius: 12px;
-}
-
-.auth-card h1 {
-  margin: 0 0 4px;
-  font-size: 1.25rem;
-}
-
-.auth-card label {
-  display: grid;
-  gap: 6px;
-  font-size: 0.875rem;
-  color: var(--melos-muted);
-}
-
-.auth-card input,
-.auth-card select {
-  font: inherit;
-  padding: 9px 11px;
-  border: 1px solid var(--melos-line);
-  border-radius: 8px;
-  color: var(--melos-ink);
-}
-
-.auth-card button {
-  font: inherit;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--melos-accent);
-  color: #fff;
-  cursor: pointer;
-}
-
-.auth-card button:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
-
-.form-error {
-  margin: 0;
-  color: var(--melos-danger);
-  font-size: 0.875rem;
-}
-
-.auth-switch {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--melos-muted);
-}
-
-.auth-card button.secondary {
-  background: transparent;
-  color: var(--melos-ink);
-  border: 1px solid var(--melos-line);
-}
-
-.settings-body {
-  display: grid;
-  justify-items: center;
-  padding: 24px 16px;
-}
-
-.auth-card.members-card {
-  max-width: 640px;
-}
-
-.members-card h2 {
-  margin: 8px 0 0;
-  font-size: 1rem;
-}
-
-.member-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.member-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  padding-block: 10px;
-  border-top: 1px solid var(--melos-line);
-  font-size: 0.875rem;
-}
-
-.member-name {
-  flex: 1 1 14rem;
-  overflow-wrap: anywhere;
-}
-
-.member-invite {
-  display: grid;
-  gap: 14px;
-}
-
-.chat-page {
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-}
-
-.chat-header {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--melos-line);
-  background: var(--melos-surface);
-  font-weight: 600;
-}
-
-.chat-header-workspace {
-  min-width: 0;
-  color: var(--melos-muted);
-  font-weight: 400;
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
-}
-
-.chat-header a {
-  margin-left: auto;
-  color: var(--melos-accent);
-  font-size: 0.875rem;
-}
-
-.chat-status {
-  padding: 16px;
-  color: var(--melos-muted);
-}
-
-.melos-chat {
-  flex: 1;
-  min-height: 0;
-}
-
+/* Tool and error cards CopilotKit renders inside its message list, on the shadcn theme tokens. */
 .chat-run-error {
   margin: 8px 0;
   padding: 12px 14px;
@@ -180,15 +48,15 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  border: 1px solid var(--melos-line);
-  border-radius: 10px;
-  background: var(--melos-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
 }
 
 .chat-run-error p {
   flex: 1 1 16rem;
   margin: 0;
-  color: var(--melos-danger);
+  color: var(--destructive);
   font-size: 0.875rem;
 }
 
@@ -197,18 +65,18 @@ body {
   font-size: 0.875rem;
   padding: 6px 12px;
   border: 0;
-  border-radius: 8px;
-  background: var(--melos-accent);
-  color: #fff;
+  border-radius: calc(var(--radius) * 0.8);
+  background: var(--primary);
+  color: var(--primary-foreground);
   cursor: pointer;
 }
 
 .ping-card {
   margin: 8px 0;
   padding: 12px 14px;
-  border: 1px solid var(--melos-line);
-  border-radius: 10px;
-  background: var(--melos-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
 }
 
 .ping-card p {
@@ -225,11 +93,100 @@ body {
 }
 
 .ping-card dt {
-  color: var(--melos-muted);
+  color: var(--muted-foreground);
 }
 
 .ping-card dd {
   margin: 0;
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   overflow-wrap: anywhere;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }

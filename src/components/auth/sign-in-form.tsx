@@ -2,6 +2,10 @@
 
 import Link from 'next/link';
 import { type FormEvent, useState } from 'react';
+import { PageCard } from '@/components/page-card';
+import { Button } from '@/components/ui/button';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { authClient } from '@/lib/auth/client';
 
 export function SignInForm() {
@@ -27,27 +31,34 @@ export function SignInForm() {
   }
 
   return (
-    <form className="auth-card" onSubmit={onSubmit}>
-      <h1>Sign in</h1>
-      <label>
-        Email
-        <input name="email" type="email" autoComplete="email" required />
-      </label>
-      <label>
-        Password
-        <input name="password" type="password" autoComplete="current-password" required />
-      </label>
-      {error ? (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      ) : null}
-      <button type="submit" disabled={pending}>
-        {pending ? 'Signing in...' : 'Sign in'}
-      </button>
-      <p className="auth-switch">
-        New to Melos? <Link href="/sign-up">Create an account</Link>
-      </p>
-    </form>
+    <PageCard title="Sign in">
+      <form onSubmit={onSubmit}>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="email">Email</FieldLabel>
+            <Input id="email" name="email" type="email" autoComplete="email" required />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="password">Password</FieldLabel>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+            />
+          </Field>
+          <FieldError>{error}</FieldError>
+          <Field>
+            <Button type="submit" disabled={pending}>
+              {pending ? 'Signing in...' : 'Sign in'}
+            </Button>
+            <FieldDescription className="text-center">
+              New to Melos? <Link href="/sign-up">Create an account</Link>
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
+      </form>
+    </PageCard>
   );
 }

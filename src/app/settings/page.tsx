@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { buttonVariants } from '@/components/ui/button';
 import { MembersPanel } from '@/components/workspace/members-panel';
 import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import type { WorkspacePermissions } from '@/lib/auth/permissions';
@@ -53,9 +54,11 @@ export default async function SettingsPage() {
   return (
     <main>
       <WorkspaceHeader workspaceName={workspace.name}>
-        <Link href="/">Chat</Link>
+        <Link href="/" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+          Chat
+        </Link>
       </WorkspaceHeader>
-      <div className="settings-body">
+      <div className="flex justify-center px-4 py-6">
         <MembersPanel
           members={list.members}
           invitations={pending}

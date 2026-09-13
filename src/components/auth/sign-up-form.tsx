@@ -3,6 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
+import { PageCard } from '@/components/page-card';
+import { Button } from '@/components/ui/button';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { authClient } from '@/lib/auth/client';
 
 export function SignUpForm() {
@@ -29,31 +33,39 @@ export function SignUpForm() {
   }
 
   return (
-    <form className="auth-card" onSubmit={onSubmit}>
-      <h1>Create your account</h1>
-      <label>
-        Name
-        <input name="name" autoComplete="name" required />
-      </label>
-      <label>
-        Email
-        <input name="email" type="email" autoComplete="email" required />
-      </label>
-      <label>
-        Password
-        <input name="password" type="password" autoComplete="new-password" minLength={8} required />
-      </label>
-      {error ? (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      ) : null}
-      <button type="submit" disabled={pending}>
-        {pending ? 'Creating account...' : 'Create account'}
-      </button>
-      <p className="auth-switch">
-        Already have an account? <Link href="/sign-in">Sign in</Link>
-      </p>
-    </form>
+    <PageCard title="Create your account">
+      <form onSubmit={onSubmit}>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="name">Name</FieldLabel>
+            <Input id="name" name="name" autoComplete="name" required />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="email">Email</FieldLabel>
+            <Input id="email" name="email" type="email" autoComplete="email" required />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="password">Password</FieldLabel>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+          </Field>
+          <FieldError>{error}</FieldError>
+          <Field>
+            <Button type="submit" disabled={pending}>
+              {pending ? 'Creating account...' : 'Create account'}
+            </Button>
+            <FieldDescription className="text-center">
+              Already have an account? <Link href="/sign-in">Sign in</Link>
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
+      </form>
+    </PageCard>
   );
 }

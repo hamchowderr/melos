@@ -34,6 +34,9 @@
     "lineWidth": 100,
     "lineEnding": "lf"
   },
+  "css": {
+    "parser": { "tailwindDirectives": true }
+  },
   "javascript": {
     "formatter": {
       "quoteStyle": "single",
@@ -51,6 +54,15 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["src/components/ui/**"],
+      "linter": {
+        "rules": {
+          "a11y": { "noLabelWithoutControl": "off", "useSemanticElements": "off" },
+          "suspicious": { "noArrayIndexKey": "off", "noDoubleEquals": "off" }
+        }
+      }
+    },
     {
       "includes": ["src/mastra/**"],
       "linter": {
