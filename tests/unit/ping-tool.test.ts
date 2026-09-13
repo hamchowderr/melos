@@ -7,15 +7,18 @@ type Execute = (input: object, context: { requestContext: RequestContext }) => P
 const execute = pingTool.execute as unknown as Execute;
 
 describe('ping tool', () => {
-  it('returns the workspace and user from the request context', async () => {
+  it('returns the workspace, user and role from the request context', async () => {
     const requestContext = createAgentRequestContext({
       userId: 'user_1',
-      activeOrganizationId: 'org_1',
+      organizationId: 'org_1',
+      workspaceRole: 'member',
+      requestId: 'req_1',
     });
     await expect(execute({}, { requestContext })).resolves.toEqual({
       status: 'ok',
-      workspaceId: 'org_1',
+      organizationId: 'org_1',
       userId: 'user_1',
+      workspaceRole: 'member',
     });
   });
 

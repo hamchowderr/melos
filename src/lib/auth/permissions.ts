@@ -68,6 +68,11 @@ export const roles = { owner, admin, member, viewer };
 
 export type WorkspaceRole = keyof typeof roles;
 
+/** True only for one of the four role names; a comma-separated or inherited name is not a role. */
+export function isWorkspaceRole(value: unknown): value is WorkspaceRole {
+  return typeof value === 'string' && Object.hasOwn(roles, value);
+}
+
 /** A permission request: resource to the actions it needs, e.g. `{ catalog: ['update'] }`. */
 export type WorkspacePermissions = {
   [Resource in keyof typeof statement]?: (typeof statement)[Resource][number][];

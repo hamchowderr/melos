@@ -2,21 +2,20 @@ import { MastraAgent } from '@ag-ui/mastra';
 import { CopilotRuntime, createCopilotRuntimeHandler } from '@copilotkit/runtime/v2';
 import { mastra } from '@/mastra';
 import { createAgentRequestContext, memoryResourceId } from '@/mastra/request-context';
-import { sessionTenantContextResolver } from '@/server/services/tenant-context';
+import { tenantContextResolver } from '@/server/services/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * CopilotKit v2 (GET /info, POST /agent/:id/run, ...) -> AG-UI -> embedded Mastra agents.
- * The tenant comes from the server-side session on every request, never from the browser.
+ * The tenant comes from the session and member row on every request, never from the browser.
  */
 async function handle(request: Request): Promise<Response> {
-  const tenant = await sessionTenantContextResolver.resolve(request.headers);
-  if (tenant.status === 'unauthenticated') {
-    return Response.json({ error: 'unauthenticated' }, { status: 401 });
-  }
-  if (tenant.status === 'no-active-workspace') {
-    return Response.json({ error: 'no_active_workspace' }, { status: 403 });
+  const tenant = await tenantContextResolver.resolve(request.headers);
+  // 401 without a valid session, 403 for every other failure; no agent is built or run.
+  if (tenant.status !== 'ok') {
+    const status = tenant.status === 'unauthenticated' ? 401 : 403;
+    return Response.json({ error: tenant.status }, { status });
   }
 
   const runtime = new CopilotRuntime({

@@ -8,8 +8,9 @@ export const pingInputSchema = z.object({});
 
 export const pingResultSchema = z.object({
   status: z.literal('ok'),
-  workspaceId: z.string(),
+  organizationId: z.string(),
   userId: z.string(),
+  workspaceRole: z.string(),
 });
 
 export type PingResult = z.infer<typeof pingResultSchema>;

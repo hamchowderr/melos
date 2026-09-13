@@ -5,21 +5,22 @@ import {
   pingInputSchema,
   pingResultSchema,
 } from '../../lib/agent/contract';
-import { readAgentTenantContext } from '../request-context';
+import { readTenantContext } from '../request-context';
 
 /** Placeholder read tool: proves the tool sees the caller's workspace from the server session. */
 export const pingTool = createTool({
   id: PING_TOOL_NAME,
   description:
-    'Check the connection. Returns the active workspace id and the user id this chat runs as.',
+    'Check the connection. Returns the active workspace id, the user id and the workspace role this chat runs as.',
   inputSchema: pingInputSchema,
   outputSchema: pingResultSchema,
   execute: async (_input, context): Promise<PingResult> => {
-    const tenant = readAgentTenantContext(context?.requestContext);
+    const tenant = readTenantContext(context?.requestContext);
     return {
       status: 'ok',
-      workspaceId: tenant.activeOrganizationId,
+      organizationId: tenant.organizationId,
       userId: tenant.userId,
+      workspaceRole: tenant.workspaceRole,
     };
   },
 });
