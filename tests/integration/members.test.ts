@@ -1,9 +1,12 @@
 import type { LLMock } from '@copilotkit/aimock';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { WorkspacePermissions, WorkspaceRole } from '../../src/lib/auth/permissions';
+import type { AuthEmail } from '../../src/server/auth/mailer';
+import { controlAuditLog } from '../../src/server/db/schema/control';
 import { requirePermission } from '../../src/server/services/permissions';
 import { ROLES } from '../permission-matrix';
-import { prepareTestEnvironment, TestClient } from './support';
+import { BASE_URL, prepareTestEnvironment, TestClient } from './support';
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -16,11 +19,14 @@ const CONTROLS: WorkspacePermissions[] = [
 const stamp = Date.now();
 const password = 'integration-password-123';
 let mock: LLMock;
-let authRoute: { POST: Handler };
+let authRoute: { GET: Handler; POST: Handler };
 let auth: typeof import('../../src/server/auth/auth').auth;
+let controlDb: typeof import('../../src/server/db/client').controlDb;
+let readOutbox: () => readonly AuthEmail[];
 let workspaceId = '';
 const clients = {} as Record<WorkspaceRole, TestClient>;
 const memberIds = {} as Record<WorkspaceRole, string>;
+const userIds = {} as Record<WorkspaceRole, string>;
 
 async function post(client: TestClient, path: string, body: object) {
   const response = await client.call(authRoute.POST, 'POST', `/api/auth${path}`, body);
@@ -37,10 +43,19 @@ async function storedRole(memberId: string) {
   return members.find((member) => member.id === memberId)?.role;
 }
 
+/** The workspace's pending invitations, as /settings reads them. */
+async function pendingInvitations() {
+  const query = { organizationId: workspaceId };
+  const all = await auth.api.listInvitations({ headers: clients.owner.headers(), query });
+  return all.filter((invitation) => invitation.status === 'pending');
+}
+
 beforeAll(async () => {
   mock = await prepareTestEnvironment('members');
   authRoute = await import('../../src/app/api/auth/[...all]/route');
   ({ auth } = await import('../../src/server/auth/auth'));
+  ({ controlDb } = await import('../../src/server/db/client'));
+  ({ readMemoryOutbox: readOutbox } = await import('../../src/server/auth/mailer'));
 
   for (const role of ROLES) {
     const email = `${role}-${stamp}@example.test`;
@@ -55,6 +70,7 @@ beforeAll(async () => {
     }
     await post(client, '/organization/set-active', { organizationId: workspaceId });
     clients[role] = client;
+    userIds[role] = user.id;
     memberIds[role] = String((await auth.api.getActiveMember({ headers: client.headers() }))?.id);
   }
 });
@@ -109,5 +125,62 @@ describe('AUTH-002: the server enforces member management from /settings (AUTH-0
     const removeByAdmin = await post(clients.admin, '/organization/remove-member', removal);
     expect([demoteByAdmin.status, removeByAdmin.status]).toEqual([403, 400]);
     expect(await storedRole(memberId)).toBe('owner');
+  });
+
+  it('lists a pending invitation that an owner cancels and members and viewers cannot', async () => {
+    // A verified invitee, so only the cancellation can stop them from accepting.
+    const email = `pending-${stamp}@example.test`;
+    const invitee = new TestClient();
+    expect(
+      (await post(invitee, '/sign-up/email', { email, password, name: 'Invitee' })).status,
+    ).toBe(200);
+    expect((await post(invitee, '/sign-in/email', { email, password })).status).toBe(200);
+    const verification = readOutbox().findLast((s) => s.kind === 'verify-email' && s.to === email);
+    const verifyPath = String(verification?.link).slice(BASE_URL.length);
+    expect((await invitee.call(authRoute.GET, 'GET', verifyPath)).status).toBe(302);
+
+    const invite = await post(clients.owner, '/organization/invite-member', {
+      email,
+      role: 'member',
+    });
+    const invitationId = String(invite.body.id);
+    const listed = { id: invitationId, email, role: 'member', inviterId: userIds.owner };
+    expect(await pendingInvitations()).toContainEqual(expect.objectContaining(listed));
+
+    // Better Auth 1.7.4 checks invitation:cancel and refuses with 403.
+    for (const role of ['member', 'viewer'] as const) {
+      const refused = await post(clients[role], '/organization/cancel-invitation', {
+        invitationId,
+      });
+      expect(refused.status, role).toBe(403);
+    }
+    expect(await pendingInvitations()).toContainEqual(expect.objectContaining(listed));
+
+    const canceled = await post(clients.owner, '/organization/cancel-invitation', { invitationId });
+    expect(canceled.status).toBe(200);
+    expect((await pendingInvitations()).map(({ id }) => id)).not.toContain(invitationId);
+
+    // The emailed link no longer opens the invitation (/invitations/[id]) or accepts it.
+    const query = { id: invitationId };
+    const opened = auth.api.getInvitation({ headers: invitee.headers(), query });
+    await expect(opened).rejects.toThrow('Invitation not found!');
+    expect(await post(invitee, '/organization/accept-invitation', { invitationId })).toMatchObject({
+      status: 400,
+      body: { code: 'INVITATION_NOT_FOUND' },
+    });
+
+    // One audit row, from the owner's cancellation; the refused attempts wrote none (ADR-029).
+    const byAction = and(
+      eq(controlAuditLog.targetId, invitationId),
+      eq(controlAuditLog.action, 'invitation.canceled'),
+    );
+    expect(await controlDb.select().from(controlAuditLog).where(byAction)).toMatchObject([
+      {
+        actorUserId: userIds.owner,
+        organizationId: workspaceId,
+        targetType: 'invitation',
+        beforeJson: JSON.stringify({ role: 'member' }),
+      },
+    ]);
   });
 });

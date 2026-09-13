@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 import {
   AUTH_REDIRECT,
+  createWorkspace,
   pingInChat,
   readOutboxLink,
   signIn,
@@ -71,4 +72,30 @@ test('AUTH-E2E-002: an owner invites a member, changes their role and removes th
   await expect(role).toHaveCount(0);
   expect((await inviteePage.request.get('/api/copilotkit/info')).status()).toBe(403);
   await inviteePage.close();
+});
+
+test('AUTH-E2E-002: an owner sees a pending invitation and cancels it', async ({ page }) => {
+  const owner = await signUp(page, 'Canceler');
+  await signIn(page, owner);
+  await createWorkspace(page, `Canceler Records ${Date.now()}`);
+  const email = `pending-${Date.now()}@example.test`;
+
+  await page.getByRole('link', { name: 'Settings' }).click();
+  const inviteForm = page.locator('form');
+  await inviteForm.getByLabel('Email').fill(email);
+  await inviteForm.getByLabel('Role').selectOption('admin');
+  await inviteForm.getByRole('button', { name: 'Send invitation' }).click();
+  await expect(page.getByRole('status')).toHaveText(`Invitation sent to ${email}.`);
+
+  const invitations = page.getByRole('list', { name: 'Pending invitations' });
+  const row = invitations.getByRole('listitem').filter({ hasText: email });
+  await expect(row).toContainText(`invited by ${owner.email}, expires `);
+  await expect(row).toContainText('admin');
+  await row.getByRole('button', { name: `Cancel invitation to ${email}` }).click();
+  await expect(page.getByRole('status')).toHaveText(`Canceled the invitation to ${email}.`);
+  await expect(row).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Members' })).toBeVisible();
+  await expect(row).toHaveCount(0);
 });
