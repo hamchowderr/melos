@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { type Client, createClient } from '@libsql/client';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/libsql';
@@ -36,6 +36,7 @@ let control: Awaited<ReturnType<typeof openWithoutForeignKeys>>;
 let authRoute: { POST: Handler };
 let provisionWorkspace: Provisioner['provisionWorkspace'];
 let STALE_CLAIM_MS: Provisioner['STALE_CLAIM_MS'];
+let deleteWorkspaceDatabase: Provisioner['deleteWorkspaceDatabase'];
 let runProvisionCommand: Command['runProvisionCommand'];
 let hosts: Hosts;
 let migrations: Migrations;
@@ -69,7 +70,7 @@ beforeAll(async () => {
   });
   authRoute = await import('../../src/app/api/auth/[...all]/route');
   const provisioner = await import('../../src/server/services/workspace-provisioner');
-  ({ provisionWorkspace, STALE_CLAIM_MS } = provisioner);
+  ({ provisionWorkspace, STALE_CLAIM_MS, deleteWorkspaceDatabase } = provisioner);
   ({ runProvisionCommand } = await import('../../scripts/workspace-provision'));
 
   const credentials = { email: 'owner@example.test', password: 'integration-password-123' };
@@ -242,6 +243,13 @@ function holdNextCreate(): () => void {
   return release;
 }
 
+/** Makes the row's claim stale, as if its attempt had written nothing for STALE_CLAIM_MS. */
+const backdate = (id: string) =>
+  control
+    .update(workspaceRegistry)
+    .set({ updatedAt: new Date(Date.now() - STALE_CLAIM_MS).toISOString() })
+    .where(eq(workspaceRegistry.id, id));
+
 describe('melos-75e.14: provisioning claims and the operator retry command (§7.2, ADR-032)', () => {
   it('lets exactly one of two overlapping attempts provision; the row ends active, never failed', async () => {
     const { organizationId } = await createFailed('overlap');
@@ -265,17 +273,63 @@ describe('melos-75e.14: provisioning claims and the operator retry command (§7.
     const slow = provisionWorkspace(organizationId);
     await vi.waitFor(() => expect(createHost).toHaveBeenCalledTimes(1));
     // The slow attempt has written nothing for STALE_CLAIM_MS, so a retry may claim the row.
-    const silent = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
-    await control
-      .update(workspaceRegistry)
-      .set({ updatedAt: silent })
-      .where(eq(workspaceRegistry.id, id));
+    await backdate(id);
     const taken = await provisionWorkspace(organizationId);
     expect(taken).toMatchObject({ status: 'active', statusDetail: null });
     release();
     // Its database_url write, and then its `failed` write, match no row: the claim is not its own.
     expect(await slow).toEqual(taken);
     expect(await rowOf(organizationId)).toEqual(taken);
+  });
+
+  it('keeps the database of a retry that took over a stale claim when the silent attempt resumes', async () => {
+    const { id, organizationId, databaseName } = await createFailed('stale-held');
+    createHost.mockClear();
+    const releaseSilent = holdNextCreate();
+    const silent = provisionWorkspace(organizationId);
+    await vi.waitFor(() => expect(createHost).toHaveBeenCalledTimes(1));
+    await backdate(id);
+    const releaseRetry = holdNextCreate();
+    const retry = provisionWorkspace(organizationId);
+    await vi.waitFor(() => expect(createHost).toHaveBeenCalledTimes(2));
+    releaseSilent();
+    // The retry holds the row under its own attempt id and uses the same database, which stays.
+    expect(await silent).toEqual(await rowOf(organizationId));
+    expect(await rowOf(organizationId)).toMatchObject({ status: 'provisioning' });
+    expect(existsSync(`${DATA_DIR}/${databaseName}.db`)).toBe(true);
+    releaseRetry();
+    const active = await retry;
+    expect(active).toMatchObject({ status: 'active', schemaVersion: latest() });
+    expect(await seedRows(await openWorkspace(active))).toEqual(SEED);
+  });
+
+  it('refuses a delete while a retry holds a live claim; the retry then provisions', async () => {
+    const { organizationId } = await createFailed('delete-live');
+    createHost.mockClear();
+    const release = holdNextCreate();
+    const attempt = provisionWorkspace(organizationId);
+    await vi.waitFor(() => expect(createHost).toHaveBeenCalledTimes(1));
+    const claimed = await rowOf(organizationId);
+    const refusal = { name: 'WorkspaceDeleteError', step: 'provisioning_in_progress' };
+    await expect(deleteWorkspaceDatabase(organizationId)).rejects.toMatchObject(refusal);
+    expect(await rowOf(organizationId)).toEqual(claimed);
+    release();
+    expect(await attempt).toMatchObject({ status: 'active', statusDetail: null });
+  });
+
+  it('deletes past a stale claim; the attempt then deletes the database its create made', async () => {
+    const { id, organizationId, databaseName } = await createFailed('delete-stale');
+    createHost.mockClear();
+    const release = holdNextCreate();
+    const attempt = provisionWorkspace(organizationId);
+    await vi.waitFor(() => expect(createHost).toHaveBeenCalledTimes(1));
+    await backdate(id);
+    expect((await post('/organization/delete', { organizationId })).status).toBe(200);
+    expect(await rowOf(organizationId)).toBeUndefined();
+    release();
+    // The create makes the file after the delete; the attempt, finding no row, deletes it.
+    await expect(attempt).rejects.toThrow('was deleted while it was provisioning');
+    expect(existsSync(`${DATA_DIR}/${databaseName}.db`)).toBe(false);
   });
 
   it('workspace:provision -- <organizationId> activates a failed workspace', async () => {
