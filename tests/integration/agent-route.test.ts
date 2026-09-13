@@ -80,8 +80,9 @@ describe('agent route: session -> tenant context -> Mastra tool (AIMock model)',
     const toolResult = events.find((event) => event.type === 'TOOL_CALL_RESULT');
     expect(JSON.parse(toolResult?.content ?? '{}')).toEqual({
       status: 'ok',
-      workspaceId,
+      organizationId: workspaceId,
       userId,
+      workspaceRole: 'owner',
     });
     expect(types).toContain('RUN_FINISHED');
     // Both model turns (tool call, then the reply) were served by AIMock.

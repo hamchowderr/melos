@@ -32,12 +32,15 @@ export async function prepareTestEnvironment(name: string): Promise<LLMock> {
 /** A browser-like client for route handlers: keeps cookies across calls. */
 export class TestClient {
   cookie = '';
+  /** Sent with every call; cannot replace the origin, content type or cookie. */
+  extraHeaders: Record<string, string> = {};
 
   async call(handler: Handler, method: string, path: string, body?: unknown): Promise<Response> {
     const response = await handler(
       new Request(`${BASE_URL}${path}`, {
         method,
         headers: {
+          ...this.extraHeaders,
           origin: BASE_URL,
           'content-type': 'application/json',
           ...(this.cookie ? { cookie: this.cookie } : {}),

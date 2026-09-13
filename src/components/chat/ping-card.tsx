@@ -6,9 +6,11 @@ export function PingCard({ result }: { result: PingResult }) {
       <p>Workspace connected</p>
       <dl>
         <dt>Workspace</dt>
-        <dd data-testid="ping-workspace-id">{result.workspaceId}</dd>
+        <dd data-testid="ping-workspace-id">{result.organizationId}</dd>
         <dt>User</dt>
         <dd data-testid="ping-user-id">{result.userId}</dd>
+        <dt>Role</dt>
+        <dd data-testid="ping-workspace-role">{result.workspaceRole}</dd>
       </dl>
     </section>
   );
