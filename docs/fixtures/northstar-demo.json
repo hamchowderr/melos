@@ -15,7 +15,7 @@
     "organization": "organization:NORTHSTAR",
     "workspace": "ws_NORTHSTAR"
   },
-  "dateShift": "Every timestamp in this file is anchored on demo.date. A seeder that runs on another day adds (seed date - demo.date) whole days to every ISO timestamp in workspace and control rows and to every Better Auth epoch-millisecond value; ids keep their values. EXPECTED.md then holds for the seed date. No follow-up time lies within two hours of a local midnight, so a DST change inside the shift does not move a cell across a day.",
+  "dateShift": "Every timestamp and date in this file is anchored on demo.date. A live seed computes dateShift as the whole number of days from demo.date to the seed date in demo.timezone (CONTRACT §8 phase 3) and adds it to every ISO timestamp, calendar date and Better Auth epoch-millisecond value in workspace and control rows; ids keep their values. EXPECTED.md then holds for the seed date. No follow-up time lies within two hours of a local midnight, so a DST change inside the shift does not move a cell across a day.",
   "provisionerOwned": {
     "tables": [
       "control.workspace_registry",
