@@ -505,7 +505,7 @@ A seeded or imported song is a composition plus one recording with the same titl
 
 ## 4. Canonical DDL
 
-SQLite/libSQL dialect. Control-plane migrations live in `src/server/db/migrations/control` (drizzle-kit); workspace migrations are numbered SQL files in `src/server/db/migrations/workspace` (§1.5). Turso Multi-DB Schemas is not used: it is deprecated for new users ([SRC-013](https://docs.turso.tech/features/multi-db-schemas), fetched 2026-09-12).
+SQLite/libSQL dialect. Control-plane migrations live in `src/server/db/migrations/control` (drizzle-kit); workspace migrations are numbered SQL files in `src/server/db/migrations/workspace` (§1.5). Each file is `NNNN_<name>.sql`, numbered from `0001` without gaps or duplicates, its statements separated by `--> statement-breakpoint`. Each version runs in one `client.migrate()` call together with its `schema_migrations` row, whose `name` is the part after the number: one transaction per version (§7.2). That transaction also creates `schema_migrations` when it is missing, so no migration file declares it and version 0 is an empty database. Turso Multi-DB Schemas is not used: it is deprecated for new users ([SRC-013](https://docs.turso.tech/features/multi-db-schemas), fetched 2026-09-12).
 
 ### 4.1 Control plane (`melos-control`) and agent runtime (`melos-agent-runtime`)
 
