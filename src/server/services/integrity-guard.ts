@@ -83,6 +83,22 @@ function columnsOf(table: SQLiteTable) {
 const bind = (value: unknown, column: SQLiteColumn): SQL =>
   is(value, SQL) ? value : sql`${sql.param(value, column)}`;
 
+/**
+ * The values drizzle stores: a column a write leaves undefined takes its default, default function
+ * or update function on insert, and its update function on update. Resolved once and then written,
+ * so checks see the stored key and a defaulted key column is never taken for NULL (rule 1).
+ */
+function stored<V extends object>(table: SQLiteTable, values: V, insert: boolean): V {
+  const row = { ...values } as Record<string, unknown>;
+  for (const [key, column] of Object.entries(getTableColumns(table))) {
+    if (row[key] !== undefined) continue;
+    if (insert && column.default != null) row[key] = column.default;
+    else if (insert && column.defaultFn) row[key] = column.defaultFn();
+    else if (column.onUpdateFn) row[key] = column.onUpdateFn();
+  }
+  return row as V;
+}
+
 /** True when `key` matches a parent row that is not soft-deleted (`deleted_at` set; rule 1). */
 async function parentExists(tx: GuardTransaction, rule: ForeignKeyRule, key: SQL[]): Promise<SQL> {
   const where = rule.parentColumns.map((column, i) => sql`parent.${id(column)} = ${key[i]}`);
@@ -148,9 +164,10 @@ export function createIntegrityGuard(rules: readonly ForeignKeyRule[]): Integrit
     async insert(tx, table, rows) {
       const name = getTableName(table);
       const column = columnsOf(table);
+      const written = rows.map((row) => stored(table, row, true));
       const missing: Counts = {};
       for (const rule of rules.filter((candidate) => candidate.table === name)) {
-        for (const row of rows as Record<string, unknown>[]) {
+        for (const row of written as Record<string, unknown>[]) {
           const values = rule.columns.map((key) => row[column(key).key]);
           if (values.some((value) => value === null || value === undefined)) continue;
           const key = values.map((value, i) => bind(value, column(rule.columns[i]).column));
@@ -159,15 +176,16 @@ export function createIntegrityGuard(rules: readonly ForeignKeyRule[]): Integrit
         }
       }
       if (Object.keys(missing).length) throw new IntegrityError('NOT_FOUND', name, missing);
-      await tx.insert(table).values(rows);
+      await tx.insert(table).values(written);
     },
 
     async update(tx, table, set, where) {
       const name = getTableName(table);
       const column = columnsOf(table);
+      const written = stored(table, set, false);
       const assigned = (columnName: string) => {
         const { key, column: target } = column(columnName);
-        const value = (set as Record<string, unknown>)[key];
+        const value = (written as Record<string, unknown>)[key];
         return value === undefined ? undefined : bind(value, target);
       };
 
@@ -196,7 +214,7 @@ export function createIntegrityGuard(rules: readonly ForeignKeyRule[]): Integrit
         tally(missing, rule.parentTable, await count(tx, orphans));
       }
       if (Object.keys(missing).length) throw new IntegrityError('NOT_FOUND', name, missing);
-      await tx.update(table).set(set).where(where);
+      await tx.update(table).set(written).where(where);
     },
 
     async delete(tx, table, where) {
