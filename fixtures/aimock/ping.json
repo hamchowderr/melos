@@ -1,0 +1,14 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "ping", "hasToolResult": false },
+      "response": {
+        "toolCalls": [{ "name": "ping", "arguments": "{}" }]
+      }
+    },
+    {
+      "match": { "userMessage": "ping", "hasToolResult": true },
+      "response": { "content": "Pong. Your workspace is connected." }
+    }
+  ]
+}
