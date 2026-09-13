@@ -23,7 +23,8 @@
       "!**/.claude",
       "!**/.codex",
       "!**/.cursor",
-      "!**/.agents"
+      "!**/.agents",
+      "!**/docs/source"
     ]
   },
   "formatter": {
