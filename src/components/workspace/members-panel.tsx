@@ -6,14 +6,38 @@ import { authClient } from '@/lib/auth/client';
 import { roles, type WorkspaceRole } from '@/lib/auth/permissions';
 
 type MemberRow = { id: string; role: string; user: { name: string; email: string } };
-type Props = { members: MemberRow[]; canInvite: boolean; canSetRole: boolean; canRemove: boolean };
+/** A pending, unexpired invitation; the server formats `expires`, so hydration matches. */
+type InvitationRow = {
+  id: string;
+  email: string;
+  role: string;
+  expires: string;
+  invitedBy: string;
+};
+type Props = {
+  members: MemberRow[];
+  invitations: InvitationRow[];
+  /** Shows the invite form and each invitation's Cancel button. */
+  canInvite: boolean;
+  /** MELOS_AUTH_MAILER=disabled: the server refuses every invitation (INVITATIONS_UNAVAILABLE). */
+  invitationsUnavailable: boolean;
+  canSetRole: boolean;
+  canRemove: boolean;
+};
 
 const org = authClient.organization;
 // Exactly the four workspace roles; a member holds one (P-30).
 const ROLE_OPTIONS = Object.keys(roles).map((role) => <option key={role}>{role}</option>);
 
 /** Controls a role may not use are hidden for clarity only; Better Auth enforces (AUTH-004). */
-export function MembersPanel({ members, canInvite, canSetRole, canRemove }: Props) {
+export function MembersPanel({
+  members,
+  invitations,
+  canInvite,
+  invitationsUnavailable,
+  canSetRole,
+  canRemove,
+}: Props) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<{ error: boolean; text: string } | null>(null);
@@ -33,6 +57,8 @@ export function MembersPanel({ members, canInvite, canSetRole, canRemove }: Prop
     run(() => org.updateMemberRole({ memberId, role }), `${email} is now ${role}.`);
   const remove = (memberIdOrEmail: string, email: string) =>
     run(() => org.removeMember({ memberIdOrEmail }), `Removed ${email}.`);
+  const cancel = (invitationId: string, email: string) =>
+    run(() => org.cancelInvitation({ invitationId }), `Canceled the invitation to ${email}.`);
 
   async function invite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,7 +105,36 @@ export function MembersPanel({ members, canInvite, canSetRole, canRemove }: Prop
           </li>
         ))}
       </ul>
-      {canInvite ? (
+      {invitations.length > 0 ? (
+        <>
+          <h2>Pending invitations</h2>
+          <ul className="member-list" aria-label="Pending invitations">
+            {invitations.map(({ id, email, role, expires, invitedBy }) => (
+              <li key={id}>
+                <span className="member-name">
+                  <strong>{email}</strong> invited by {invitedBy}, expires {expires}
+                </span>
+                <span>{role}</span>
+                {canInvite ? (
+                  <button
+                    type="button"
+                    className="secondary"
+                    aria-label={`Cancel invitation to ${email}`}
+                    disabled={pending}
+                    onClick={() => cancel(id, email)}
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {canInvite && invitationsUnavailable ? (
+        <p className="auth-switch">Invitations are unavailable until email sending is set up.</p>
+      ) : null}
+      {canInvite && !invitationsUnavailable ? (
         <form className="member-invite" onSubmit={invite}>
           <label>
             Email
