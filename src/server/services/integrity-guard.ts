@@ -219,8 +219,7 @@ export function createIntegrityGuard(rules: readonly ForeignKeyRule[]): Integrit
       }
       if (Object.keys(missing).length) throw new IntegrityError('NOT_FOUND', name, missing);
       if (name === 'pitch_items') {
-        const cells = written as Record<string, unknown>[];
-        const conflicts = await pitchCellConflicts(tx, table, cells);
+        const conflicts = await pitchCellConflicts(tx, table, written as Record<string, unknown>[]);
         if (conflicts) throw new IntegrityError('SONG_LEVEL_CONFLICT', name, { [name]: conflicts });
       }
       await tx.insert(table).values(written);
@@ -288,10 +287,8 @@ export function createIntegrityGuard(rules: readonly ForeignKeyRule[]): Integrit
       const referenced = await referencing(tx, name, sql`${id(name)} WHERE ${live}`);
       if (Object.keys(referenced).length) throw new IntegrityError('REFERENCED', name, referenced);
       const now = new Date().toISOString();
-      await tx
-        .update(table)
-        .set({ [deletedAt.key]: now, [updatedAt.key]: now })
-        .where(live);
+      const stamps = { [deletedAt.key]: now, [updatedAt.key]: now };
+      await tx.update(table).set(stamps).where(live);
     },
   };
 }

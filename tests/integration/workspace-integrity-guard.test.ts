@@ -9,9 +9,7 @@ import {
   compositions,
   masterInterests,
   parties,
-  partyIdentifiers,
   pitchItems,
-  recordingArtists,
   recordings,
 } from '../../src/server/db/schema/workspace.generated';
 import { applyWorkspaceMigrations } from '../../src/server/db/workspace-migrations';
@@ -57,9 +55,8 @@ describe('DAT-INT-001: workspaceIntegrityGuard keeps a workspace consistent with
     const db = await seeded();
     await expectForeignKeysIntact(db, async (tx) => {
       await guard.delete(tx, compositionContributors, eq(compositionContributors.id, 'ctr_alex'));
-      expect(await tx.select().from(compositionContributorRoles)).toEqual([
-        { contributorId: 'ctr_jordan', role: 'songwriter' },
-      ]);
+      const roles = await tx.select().from(compositionContributorRoles);
+      expect(roles).toEqual([{ contributorId: 'ctr_jordan', role: 'songwriter' }]);
     });
   });
 
@@ -67,31 +64,22 @@ describe('DAT-INT-001: workspaceIntegrityGuard keeps a workspace consistent with
     const db = await seeded();
     await expectForeignKeysIntact(db, async (tx) => {
       await guard.delete(tx, artistAliases, eq(artistAliases.id, 'ali_jt'));
-      const credited = { id: recordingArtists.id, alias: recordingArtists.artistAliasId };
-      expect(await tx.select(credited).from(recordingArtists)).toEqual([
+      const aliases = sql`SELECT id, artist_alias_id AS alias FROM recording_artists UNION ALL SELECT id, artist_alias_id FROM party_identifiers`;
+      const cleared = [
         { id: 'ra_ocean', alias: null },
-      ]);
-      const identified = { id: partyIdentifiers.id, alias: partyIdentifiers.artistAliasId };
-      expect(await tx.select(identified).from(partyIdentifiers)).toEqual([
         { id: 'pid_jt', alias: null },
-      ]);
+      ];
+      expect(await tx.all(aliases)).toEqual(cleared);
     });
   });
 
   it('refuses changing parties.party_kind for a party that is still a writer', async () => {
     const db = await seeded();
     await expectForeignKeysIntact(db, async (tx) => {
-      const change = guard.update(
-        tx,
-        parties,
-        { partyKind: 'organization' },
-        eq(parties.id, 'pty_jordan'),
-      );
-      await expect(change).rejects.toMatchObject({
-        code: 'REFERENCED',
-        table: 'parties',
-        counts: { composition_contributors: 1 },
-      });
+      const jordan = eq(parties.id, 'pty_jordan');
+      const change = guard.update(tx, parties, { partyKind: 'organization' }, jordan);
+      const counts = { composition_contributors: 1 };
+      await expect(change).rejects.toMatchObject({ code: 'REFERENCED', table: 'parties', counts });
     });
   });
 
@@ -109,16 +97,10 @@ describe('DAT-INT-001: workspaceIntegrityGuard keeps a workspace consistent with
     const db = await seeded();
     await expectForeignKeysIntact(db, async (tx) => {
       const northstar = eq(parties.id, 'pty_northstar');
-      await expect(guard.softDelete(tx, parties, northstar)).rejects.toMatchObject({
-        code: 'REFERENCED',
-        table: 'parties',
-        counts: { master_interests: 1 },
-      });
-      const [row] = await tx
-        .select({ deletedAt: parties.deletedAt })
-        .from(parties)
-        .where(northstar);
-      expect(row).toEqual({ deletedAt: null });
+      const refusal = { code: 'REFERENCED', table: 'parties', counts: { master_interests: 1 } };
+      await expect(guard.softDelete(tx, parties, northstar)).rejects.toMatchObject(refusal);
+      const rows = await tx.all(sql`SELECT deleted_at FROM parties WHERE id = 'pty_northstar'`);
+      expect(rows).toEqual([{ deleted_at: null }]);
     });
   });
 
@@ -139,17 +121,9 @@ describe('DAT-INT-001: workspaceIntegrityGuard keeps a workspace consistent with
 });
 
 describe('DAT-INT-001: workspaceIntegrityGuard holds a song at one level per pitch (§4.4 rule 3)', () => {
-  const cell = (id: string, pitchId: string, target: object) => ({
-    id,
-    pitchId,
-    ...target,
-    ...STAMPS,
-  });
-  const conflict = (table: string) => ({
-    code: 'SONG_LEVEL_CONFLICT',
-    table,
-    counts: { [table]: 1 },
-  });
+  const cell = (id: string, pitchId: string, at: object) => ({ id, pitchId, ...at, ...STAMPS });
+  const conflict = (table: string) => ({ code: 'SONG_LEVEL_CONFLICT', counts: { [table]: 1 } });
+  const cellConflict = conflict('pitch_items');
 
   it('refuses a composition cell in a pitch holding one of its recordings, and the reverse, before the triggers', async () => {
     const db = await seeded();
@@ -157,26 +131,19 @@ describe('DAT-INT-001: workspaceIntegrityGuard holds a song at one level per pit
       const composition = cell('pti_1_cmp', 'pit_1', { compositionId: 'cmp_ocean' });
       const recording = cell('pti_2_rec', 'pit_2', { recordingId: 'rec_ocean' });
       for (const refused of [[composition], [recording]]) {
-        await expect(guard.insert(tx, pitchItems, refused)).rejects.toMatchObject(
-          conflict('pitch_items'),
-        );
+        await expect(guard.insert(tx, pitchItems, refused)).rejects.toMatchObject(cellConflict);
       }
       // Both levels in one insert: the second cell conflicts with the first.
       const both = [
         cell('pti_1_night', 'pit_1', { compositionId: 'cmp_night' }),
         cell('pti_1_demo', 'pit_1', { recordingId: 'rec_demo' }),
       ];
-      await expect(guard.insert(tx, pitchItems, both)).rejects.toMatchObject(
-        conflict('pitch_items'),
-      );
+      await expect(guard.insert(tx, pitchItems, both)).rejects.toMatchObject(cellConflict);
       await guard.insert(tx, pitchItems, both.slice(0, 1));
-      const ids = await tx.select({ id: pitchItems.id }).from(pitchItems);
-      expect(ids.map((row) => row.id).sort()).toEqual([
-        'pti_1_night',
-        'pti_1_ocean',
-        'pti_2_demo',
-        'pti_2_ocean',
-      ]);
+      const ids = await tx.all(
+        sql`SELECT id FROM pitch_items WHERE pitch_id = 'pit_1' ORDER BY id`,
+      );
+      expect(ids).toEqual([{ id: 'pti_1_night' }, { id: 'pti_1_ocean' }]);
     });
   });
 
@@ -187,11 +154,8 @@ describe('DAT-INT-001: workspaceIntegrityGuard holds a song at one level per pit
       const move = guard.update(tx, recordings, { compositionId: 'cmp_ocean' }, demo);
       await expect(move).rejects.toMatchObject(conflict('recordings'));
       await guard.update(tx, recordings, { compositionId: 'cmp_spare' }, demo);
-      const [row] = await tx
-        .select({ compositionId: recordings.compositionId })
-        .from(recordings)
-        .where(demo);
-      expect(row).toEqual({ compositionId: 'cmp_spare' });
+      const moved = await tx.all(sql`SELECT composition_id FROM recordings WHERE id = 'rec_demo'`);
+      expect(moved).toEqual([{ composition_id: 'cmp_spare' }]);
     });
   });
 });
