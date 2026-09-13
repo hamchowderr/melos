@@ -1,4 +1,4 @@
-import { type SQL, sql } from 'drizzle-orm';
+import { eq, type SQL, sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/libsql/migrator';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
@@ -81,16 +81,14 @@ async function createWorkspace(slug: string, owner: Person, members: Person[] = 
   return id;
 }
 
-/** Seeds a registry row and a migration run directly, as WorkspaceProvisioner will (§7.2). */
+/** Adds a migration run to the workspace that creating the organization provisioned (§7.2). */
 async function register(organizationId: string) {
-  const workspaceId = `ws_${organizationId}`;
-  const databaseName = `melos-${workspaceId}`;
-  const row = { id: workspaceId, organizationId, databaseName, databaseUrl: 'file:./unused.db' };
+  const provisioned = eq(workspaceRegistry.organizationId, organizationId);
+  const [{ id: workspaceId }] = await control.select().from(workspaceRegistry).where(provisioned);
   const run = { id: `mig_${organizationId}`, batchId: 'b1', workspaceId, fromVersion: 0 };
-  await expectForeignKeysIntact(control, async (tx) => {
-    await guard.insert(tx, workspaceRegistry, [{ ...row, createdAt: iso, updatedAt: iso }]);
-    await guard.insert(tx, migrationRuns, [{ ...run, toVersion: 1, status: 'succeeded' }]);
-  });
+  await expectForeignKeysIntact(control, (tx) =>
+    guard.insert(tx, migrationRuns, [{ ...run, toVersion: 1, status: 'succeeded' }]),
+  );
 }
 
 async function countRows(conditions: Record<string, SQL>) {
@@ -109,7 +107,7 @@ const referencing = (id: string) =>
     invitation: sql`organization_id = ${id}`,
     workspace_member_settings: sql`organization_id = ${id}`,
     workspace_registry: sql`organization_id = ${id}`,
-    migration_runs: sql`workspace_id = ${`ws_${id}`}`,
+    migration_runs: sql`id = ${`mig_${id}`}`,
     session: sql`active_organization_id = ${id}`,
     control_audit_log: sql`organization_id = ${id}`,
   });
@@ -152,10 +150,11 @@ describe('DAT-INT-001: Better Auth organization and user deletes with foreign ke
     await register(doomed);
     const rows = { organization: 1, member: 2, invitation: 1, workspace_member_settings: 2 };
     const more = { workspace_registry: 1, migration_runs: 1, session: 2 };
-    expect(await referencing(doomed)).toEqual({ ...rows, ...more, control_audit_log: 3 });
+    // Two member.added, member.invited and workspace.provisioned.
+    expect(await referencing(doomed)).toEqual({ ...rows, ...more, control_audit_log: 4 });
 
     expect((await deleteWorkspace(owner, doomed)).status).toBe(200);
-    const left = { ...none({ ...rows, ...more }), control_audit_log: 3 };
+    const left = { ...none({ ...rows, ...more }), control_audit_log: 4 };
     expect(await referencing(doomed)).toEqual(left);
   });
 
@@ -174,14 +173,15 @@ describe('DAT-INT-001: Better Auth organization and user deletes with foreign ke
     expect(await belongingTo(leaving.userId)).toEqual({
       ...rows,
       workspace_member_settings: 2,
-      control_audit_log: 2,
+      // member.added, member.invited and workspace.provisioned for leaving-own.
+      control_audit_log: 3,
     });
 
     // /delete-user, its callback and any admin removal all delete through this adapter call.
     const { internalAdapter } = await auth.$context;
     await expectIntactAfter(() => internalAdapter.deleteUser(leaving.userId));
     // Audit rows keep the actor id of a deleted user (§4.1).
-    const left = { ...none({ ...rows, workspace_member_settings: 2 }), control_audit_log: 2 };
+    const left = { ...none({ ...rows, workspace_member_settings: 2 }), control_audit_log: 3 };
     expect(await belongingTo(leaving.userId)).toEqual(left);
     expect(await belongingTo(owner.userId)).toEqual(owners);
   });

@@ -17,6 +17,7 @@ export default defineConfig({
       MELOS_LLM_BASE_URL: 'http://127.0.0.1:4010/v1',
       MELOS_CONTROL_DATABASE_URL: 'file:./data/test-control.db',
       MELOS_AGENT_DATABASE_URL: 'file:./data/test-agent.db',
+      MELOS_WORKSPACE_DATA_DIR: 'data/test-workspaces',
       MELOS_AUTH_MAILER: 'memory',
     },
     testTimeout: 60_000,

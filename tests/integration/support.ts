@@ -60,6 +60,9 @@ export async function prepareTestEnvironment(name: string): Promise<LLMock> {
   }
   process.env.MELOS_CONTROL_DATABASE_URL = `file:./${control}`;
   process.env.MELOS_AGENT_DATABASE_URL = `file:./${agent}`;
+  const workspaces = `data/test-${name}-workspaces`;
+  rmSync(workspaces, { recursive: true, force: true });
+  process.env.MELOS_WORKSPACE_DATA_DIR = workspaces;
 
   const { migrate } = await import('drizzle-orm/libsql/migrator');
   const { controlDb } = await import('../../src/server/db/client');
