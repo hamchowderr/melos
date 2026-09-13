@@ -390,5 +390,11 @@ describe('melos-75e.14: provisioning claims and the operator retry command (§7.
     // A remote control database with the local workspace host is refused before any query.
     const refused = run('http://127.0.0.1:9');
     expect([refused.status, refused.stdout], refused.stderr).toEqual([2, '']);
+    // libSQL copies an invalid query value into its message; only the name and code are printed.
+    const marker = 'secret-looking-marker-never-printed';
+    const invalid = run(`file:./${file}?tls=${marker}`);
+    expect([invalid.status, invalid.stdout]).toEqual([2, '']);
+    expect(invalid.stderr).toMatch(/^Configuration error: LibsqlError URL_\w+$/m);
+    expect(invalid.stderr).not.toContain(marker);
   });
 });
