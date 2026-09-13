@@ -11,12 +11,14 @@ describe('ping tool', () => {
     const requestContext = createAgentRequestContext({
       userId: 'user_1',
       organizationId: 'org_1',
+      workspaceId: 'ws_1',
       workspaceRole: 'member',
       requestId: 'req_1',
     });
     await expect(execute({}, { requestContext })).resolves.toEqual({
       status: 'ok',
       organizationId: 'org_1',
+      workspaceId: 'ws_1',
       userId: 'user_1',
       workspaceRole: 'member',
     });

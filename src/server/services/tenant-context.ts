@@ -3,18 +3,31 @@ import { isWorkspaceRole, type WorkspaceRole } from '../../lib/auth/permissions'
 import { auth } from '../auth/auth';
 import { controlDb } from '../db/client';
 import { member } from '../db/schema/auth';
+import { type WORKSPACE_STATUSES, workspaceRegistry } from '../db/schema/control';
 
 /** Who is calling, in which workspace, with which role (docs/CONTRACT.md §7.1 step 2.4). */
 export type TenantContext = {
   userId: string;
   organizationId: string;
+  workspaceId: string;
   workspaceRole: WorkspaceRole;
   requestId: string;
 };
 
+/** A registry status that serves no request: provisioning, migrating, failed, suspended, deleting. */
+export type UnavailableWorkspaceStatus = Exclude<(typeof WORKSPACE_STATUSES)[number], 'active'>;
+
 export type TenantResolution =
   | { status: 'ok'; context: TenantContext }
-  | { status: 'unauthenticated' | 'no-active-workspace' | 'not-a-member' | 'invalid-role' };
+  | {
+      status:
+        | 'unauthenticated'
+        | 'no-active-workspace'
+        | 'not-a-member'
+        | 'invalid-role'
+        | 'workspace-not-provisioned';
+    }
+  | { status: 'workspace-unavailable'; workspaceStatus: UnavailableWorkspaceStatus };
 
 /** Derives who is calling and which workspace they act in. Never trusts client input. */
 export interface TenantContextResolver {
@@ -22,10 +35,10 @@ export interface TenantContextResolver {
 }
 
 /**
- * docs/CONTRACT.md §7.1 steps 1, 2.1, 2.2 and 2.4. The session and the member row are read on
- * every request and never cached, so a removed member or a changed role applies to the next
- * request. A null active workspace is never defaulted to another workspace. The
- * workspace_registry lookup and workspaceId (step 2.3) arrive with WorkspaceProvisioner.
+ * docs/CONTRACT.md §7.1 step 1 and steps 2.1 to 2.4. The session, the member row and the
+ * workspace_registry row are read on every request and never cached, so a removed member, a
+ * changed role or a workspace leaving `active` applies to the next request. A null active
+ * workspace is never defaulted to another workspace.
  */
 export const tenantContextResolver: TenantContextResolver = {
   async resolve(headers) {
@@ -53,9 +66,21 @@ export const tenantContextResolver: TenantContextResolver = {
       return { status: 'invalid-role' };
     }
 
+    // Only the id and status: db_token_ciphertext and status_detail never leave the control plane.
+    const [workspace] = await controlDb
+      .select({ id: workspaceRegistry.id, status: workspaceRegistry.status })
+      .from(workspaceRegistry)
+      .where(eq(workspaceRegistry.organizationId, organizationId))
+      .limit(1);
+    if (!workspace) return { status: 'workspace-not-provisioned' };
+    if (workspace.status !== 'active') {
+      return { status: 'workspace-unavailable', workspaceStatus: workspace.status };
+    }
+
+    const workspaceRole = membership.role;
     return {
       status: 'ok',
-      context: { userId, organizationId, workspaceRole: membership.role, requestId },
+      context: { userId, organizationId, workspaceId: workspace.id, workspaceRole, requestId },
     };
   },
 };
