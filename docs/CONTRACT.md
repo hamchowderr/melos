@@ -2300,7 +2300,7 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | U-05 | Closed: custom roles override the predefined permissions; defaults are merged from `better-auth/plugins/organization/access` ([SRC-021], [SRC-102]) | — |
 | U-06 | Closed: Better Auth 1.7.4 has no supported header-free permission check; services use `requirePermission` (ADR-028, [SRC-102]) | — |
 | U-07 | Whether Turso remote connections enforce foreign keys by default; `IntegrityGuard` does not depend on the answer | Phase 2 |
-| U-08 | FTS5 availability in local libSQL files through `@libsql/client` | Phase 2 |
+| U-08 | Closed: `@libsql/client` 0.18.0 bundles SQLite 3.45.1 built with `ENABLE_FTS5`, so local libSQL files support FTS5. In a local file migrated to workspace version 2, a prefix `MATCH` on `catalog_search` built as §3.5 describes returns the inserted row (`tests/integration/workspace-schema.test.ts`) | — |
 | U-09 | Closed: workspace databases use per-database tokens, because a Turso group token opens every database in its group (ADR-031) | — |
 | U-10 | Airtable Web API endpoints, pagination and rate limits | Phase 10 |
 | U-11 | UPC (12-digit) and EAN (13-digit) length rules | Phase 4 |
