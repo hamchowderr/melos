@@ -9,7 +9,11 @@ import {
   controlIntegrityGuard as guard,
   IntegrityError,
 } from '../services/integrity-guard';
-import { deleteWorkspaceDatabase, removeWorkspace } from '../services/workspace-provisioner';
+import {
+  deleteWorkspaceDatabase,
+  removeWorkspace,
+  WorkspaceDeleteError,
+} from '../services/workspace-provisioner';
 
 /** One melos-control transaction; an IntegrityGuard refusal rolls it back and answers 409. */
 async function inControlTransaction(work: (tx: GuardTransaction) => Promise<void>): Promise<void> {
@@ -31,7 +35,11 @@ export const controlDeleteHooks = {
   beforeDeleteOrganization: async ({ organization: { id }, user: actor }) => {
     // Committed before the transaction: after a failure or crash the organization keeps a deleting
     // registry row, and deleting the organization again resumes.
-    const workspace = await deleteWorkspaceDatabase(id).catch(() => {
+    const workspace = await deleteWorkspaceDatabase(id).catch((error: unknown) => {
+      // Ids, the step and the error code only: a message or status_detail may hold a token.
+      const { step, code } =
+        error instanceof WorkspaceDeleteError ? error : { step: 'unknown', code: 'unknown' };
+      console.error(`Workspace delete failed for organization ${id} at ${step}: ${code}`);
       throw APIError.from('SERVICE_UNAVAILABLE', {
         code: 'WORKSPACE_DELETE_FAILED',
         message: 'The workspace database could not be deleted. Try again.',

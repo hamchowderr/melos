@@ -261,31 +261,64 @@ describe('DAT-INT-001: Better Auth organization and user deletes with foreign ke
     expect(await workspaceOf(kept)).toMatchObject({ status: 'deleting', statusDetail: null });
   });
 
-  it('keeps the organization and a deleting row without a token when the host delete fails; deleting again completes', async () => {
+  it('keeps the organization and a deleting row when the host delete fails, logging ids only; deleting again completes', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     const unlucky = await createWorkspace('unlucky', owner);
     const workspace = await workspaceOf(unlucky);
     const local = hosts.createWorkspaceHost({ kind: 'local', dataDir: DATA_DIR });
     createHost.mockReturnValueOnce({ ...local, delete: () => Promise.reject(new Error(TOKEN)) });
-    // The database exists, so an unconfigured host refuses too.
-    const missing = ['TURSO_API_TOKEN'];
-    createHost.mockReturnValueOnce(hosts.createWorkspaceHost({ kind: 'unconfigured', missing }));
-    for (const error of ['Error', 'WorkspaceHostConfigError']) {
-      const failed = await deleteWorkspace(owner, unlucky);
-      const body = await failed.text();
-      expect([failed.status, JSON.parse(body).code]).toEqual([503, 'WORKSPACE_DELETE_FAILED']);
-      const row = await workspaceOf(unlucky);
-      const detail = `delete_database failed: ${error}`;
-      expect(row).toMatchObject({ status: 'deleting', statusDetail: detail });
-      expect(JSON.stringify([row, body])).not.toContain(TOKEN);
-      const still = { organization: 1, member: 1, workspace_registry: 1 };
-      expect(await referencing(unlucky)).toMatchObject(still);
-    }
+    const failed = await deleteWorkspace(owner, unlucky);
+    const body = await failed.text();
+    expect([failed.status, JSON.parse(body).code]).toEqual([503, 'WORKSPACE_DELETE_FAILED']);
+    const row = await workspaceOf(unlucky);
+    const detail = 'delete_database failed: Error';
+    expect(row).toMatchObject({ status: 'deleting', statusDetail: detail });
+    const still = { organization: 1, member: 1, workspace_registry: 1 };
+    expect(await referencing(unlucky)).toMatchObject(still);
     expect(existsSync(fileOf(workspace))).toBe(true);
+    // The organization id, the step and the error code; never the message or status_detail.
+    const log = `Workspace delete failed for organization ${unlucky} at delete_database: Error`;
+    expect(logged).toHaveBeenCalledWith(log);
+    expect(JSON.stringify([row, body, logged.mock.calls])).not.toContain(TOKEN);
+    expect(JSON.stringify(logged.mock.calls)).not.toContain(detail);
+    logged.mockRestore();
 
     expect((await deleteWorkspace(owner, unlucky)).status).toBe(200);
     expect(await referencing(unlucky)).toMatchObject({ organization: 0, workspace_registry: 0 });
     expect(existsSync(fileOf(workspace))).toBe(false);
     await expectDeletedAudit(workspace, owner.userId);
+  });
+
+  it('refuses with 503 and leaves the row unchanged when the host is unconfigured and a database may exist', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const local = hosts.createWorkspaceHost({ kind: 'local', dataDir: DATA_DIR });
+    // A Turso create that made the database but got no token back leaves database_url empty.
+    const badResponse = new hosts.TursoApiError('create token', 200, 'bad_response');
+    createHost.mockReturnValueOnce({ ...local, create: () => Promise.reject(badResponse) });
+    const tokenless = await createWorkspace('token-failed', owner);
+    const detail = 'create_database failed: TursoApiError bad_response';
+    const failed = { status: 'failed', databaseUrl: '', statusDetail: detail };
+    expect(await workspaceOf(tokenless)).toMatchObject(failed);
+    const active = await createWorkspace('still-active', owner);
+    expect(await workspaceOf(active)).toMatchObject({ status: 'active', statusDetail: null });
+
+    const missing = ['TURSO_API_TOKEN'];
+    for (const organizationId of [tokenless, active]) {
+      const [row, counts] = [await workspaceOf(organizationId), await referencing(organizationId)];
+      createHost.mockReturnValueOnce(hosts.createWorkspaceHost({ kind: 'unconfigured', missing }));
+      const refused = await deleteWorkspace(owner, organizationId);
+      const answer = [refused.status, (await refused.json()).code];
+      expect(answer).toEqual([503, 'WORKSPACE_DELETE_FAILED']);
+      expect(await workspaceOf(organizationId)).toEqual(row);
+      // Better Auth clears the caller's active organization before the hook, on a 503 too (ADR-030).
+      expect(await referencing(organizationId)).toEqual({ ...counts, session: 0 });
+      const at = 'at delete_database: WorkspaceHostConfigError';
+      expect(logged).toHaveBeenCalledWith(
+        `Workspace delete failed for organization ${organizationId} ${at}`,
+      );
+    }
+    expect(JSON.stringify(logged.mock.calls)).not.toContain(detail);
+    logged.mockRestore();
   });
 
   it('deletes an organization whose workspace never got a database while the host is unconfigured (production today)', async () => {
