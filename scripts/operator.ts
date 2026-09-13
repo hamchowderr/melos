@@ -6,9 +6,16 @@ import { errorCode } from '../src/server/error-code';
 
 type ControlModule = typeof import('../src/server/db/client');
 export type Control = { env: ServerEnv; controlDb: ControlModule['controlDb'] };
+type Command = (args: string[]) => Promise<number>;
 
-/** The control client an operator script opened, closed by `runAsMain`. */
+/** The control client an operator script opened, closed by `runOperatorCommand`. */
 let opened: Client | undefined;
+
+/** Prints a failure as its error name and code, never its message or stack; returns exit code 1. */
+function reportFailure(error: unknown): number {
+  console.error(`Failed: ${errorCode(error)}`);
+  return 1;
+}
 
 /**
  * Runs an operator script's `work` against melos-control. The app modules load only here, after
@@ -30,20 +37,42 @@ export async function withControl(work: (control: Control) => Promise<number>): 
   try {
     return await work(control);
   } catch (error) {
-    console.error(`Failed: ${errorCode(error)}`);
-    return 1;
+    return reportFailure(error);
   }
 }
 
-/** Runs `command` when `moduleUrl` is the script node started, then closes a client it opened. */
-export async function runAsMain(
-  moduleUrl: string,
-  command: (args: string[]) => Promise<number>,
-): Promise<void> {
-  if (resolve(process.argv[1] ?? '') !== fileURLToPath(moduleUrl)) return;
-  process.exitCode = await command(process.argv.slice(2)).catch((error: unknown) => {
-    console.error(`Failed: ${errorCode(error)}`);
-    return 1;
-  });
-  opened?.close();
+/**
+ * Runs `command`, then `close` (by default, of a control client `withControl` opened), and returns
+ * the exit code without ever rejecting. A throw from either prints only its error name and code; a
+ * failed close turns exit code 0 into 1 and keeps any other.
+ */
+export async function runOperatorCommand(
+  args: string[],
+  command: Command,
+  close: () => void = () => opened?.close(),
+): Promise<number> {
+  let exitCode: number;
+  try {
+    exitCode = await command(args);
+  } catch (error) {
+    exitCode = reportFailure(error);
+  }
+  try {
+    close();
+  } catch (error) {
+    reportFailure(error);
+    if (exitCode === 0) exitCode = 1;
+  }
+  return exitCode;
+}
+
+/** Runs `command` through `runOperatorCommand` when `moduleUrl` is the script node started. */
+export async function runAsMain(moduleUrl: string, command: Command): Promise<void> {
+  let main = false;
+  try {
+    main = resolve(process.argv[1] ?? '') === fileURLToPath(moduleUrl);
+  } catch (error) {
+    process.exitCode = reportFailure(error);
+  }
+  if (main) process.exitCode = await runOperatorCommand(process.argv.slice(2), command);
 }
