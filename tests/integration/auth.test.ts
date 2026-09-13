@@ -76,7 +76,7 @@ describe('Better Auth: sign-up, sign-in, workspaces and roles', () => {
   it('gives the owner every workspace permission', async () => {
     const result = await auth.api.hasPermission({
       headers: owner.headers(),
-      body: { permissions: { workspaceData: ['delete'], organization: ['delete'] } },
+      body: { permissions: { catalog: ['delete'], organization: ['delete'] } },
     });
     expect(result.success).toBe(true);
   });
@@ -95,13 +95,13 @@ describe('Better Auth: sign-up, sign-in, workspaces and roles', () => {
 
     const canRead = await auth.api.hasPermission({
       headers: viewer.headers(),
-      body: { permissions: { workspaceData: ['read'] } },
+      body: { permissions: { catalog: ['read'] } },
     });
     expect(canRead.success).toBe(true);
 
     const canCreate = await auth.api.hasPermission({
       headers: viewer.headers(),
-      body: { permissions: { workspaceData: ['create'] } },
+      body: { permissions: { catalog: ['create'] } },
     });
     expect(canCreate.success).toBe(false);
   });

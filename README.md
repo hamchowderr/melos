@@ -37,7 +37,7 @@ fixtures/aimock          AIMock fixtures
 
 ## Local development
 
-Requires Node 22.13 or newer.
+Requires Node 24.
 
 ```bash
 npm ci

@@ -1,5 +1,6 @@
 import type { LLMock } from '@copilotkit/aimock';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { toChatRunError } from '../../src/lib/agent/run-error';
 import { prepareTestEnvironment, readAgUiEvents, TestClient } from './support';
 
 type Handler = (request: Request) => Promise<Response>;
@@ -85,6 +86,33 @@ describe('agent route: session -> tenant context -> Mastra tool (AIMock model)',
     expect(types).toContain('RUN_FINISHED');
     // Both model turns (tool call, then the reply) were served by AIMock.
     expect(mock.getRequests().length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('ends the run with RUN_ERROR when the model provider rejects it', async () => {
+    const response = await client.call(
+      copilotRoute.POST,
+      'POST',
+      '/api/copilotkit/agent/melos/run',
+      {
+        threadId: `thread-error-${stamp}`,
+        runId: `run-error-${stamp}`,
+        messages: [
+          { id: 'msg-error-1', role: 'user', content: 'simulate a provider credits error' },
+        ],
+        tools: [],
+        context: [],
+        state: {},
+        forwardedProps: {},
+      },
+    );
+    expect(response.status).toBe(200);
+
+    const runError = (await readAgUiEvents(response)).find((event) => event.type === 'RUN_ERROR');
+    expect(runError).toBeDefined();
+    // The chat classifies the provider's text but never renders it.
+    expect(toChatRunError('agent_run_error_event', { message: runError?.message }).kind).toBe(
+      'credits',
+    );
   });
 
   it('stores memory under <organizationId>:<userId>', async () => {

@@ -1,0 +1,19 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "simulate a provider credits error", "sequenceIndex": 0 },
+      "response": {
+        "status": 402,
+        "error": {
+          "message": "Insufficient credits. This account has no credits left for this request.",
+          "type": "insufficient_quota",
+          "code": "insufficient_credits"
+        }
+      }
+    },
+    {
+      "match": { "userMessage": "simulate a provider credits error", "sequenceIndex": 1 },
+      "response": { "content": "Recovered. The provider answered on retry." }
+    }
+  ]
+}

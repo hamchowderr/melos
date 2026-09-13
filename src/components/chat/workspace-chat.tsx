@@ -2,12 +2,15 @@
 
 import {
   CopilotChat,
+  CopilotChatMessageView,
   CopilotKitProvider,
+  useAgent,
   useCopilotKit,
   useRenderTool,
 } from '@copilotkit/react-core/v2';
 import '@copilotkit/react-core/v2/styles.css';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { ChatRunErrorNotice } from '@/components/chat/chat-run-error';
 import { PingCard } from '@/components/chat/ping-card';
 import {
   PING_TOOL_NAME,
@@ -15,6 +18,7 @@ import {
   pingResultSchema,
   WORKSPACE_AGENT_ID,
 } from '@/lib/agent/contract';
+import { type ChatRunError, isChatRunErrorCode, toChatRunError } from '@/lib/agent/run-error';
 
 // CopilotChat throws if the agent is not registered yet; registration follows the
 // provider's async /info sync, so wait for it.
@@ -32,6 +36,40 @@ function useAgentReady(agentId: string): boolean {
   return ready;
 }
 
+// A failed run otherwise ends silently; keep one plain-language, retryable error for the turn.
+function useChatRunError(agentId: string) {
+  const { agent } = useAgent({ agentId });
+  const { copilotkit } = useCopilotKit();
+  const [runError, setRunError] = useState<ChatRunError | null>(null);
+
+  // Every new run, a send or a retry, starts without the previous run's error.
+  useEffect(() => {
+    const subscription = agent.subscribe({ onRunInitialized: () => setRunError(null) });
+    return () => subscription.unsubscribe();
+  }, [agent]);
+
+  // CopilotChat's onError prop is typed together with the div's DOM onError, hence `object`.
+  const onError = useCallback((event: object) => {
+    if (!('code' in event) || typeof event.code !== 'string' || !isChatRunErrorCode(event.code)) {
+      return;
+    }
+    const next = toChatRunError(event.code, 'error' in event ? event.error : undefined);
+    // One failure reports several codes; a generic one never replaces a specific one.
+    setRunError((current) => (current && next.kind === 'unknown' ? current : next));
+  }, []);
+
+  const retry = useCallback(() => {
+    const lastUserIndex = agent.messages.map((message) => message.role).lastIndexOf('user');
+    if (lastUserIndex < 0) return;
+    // Drop what the failed run left after the user's message, then send that message again.
+    agent.setMessages(agent.messages.slice(0, lastUserIndex + 1));
+    setRunError(null);
+    void copilotkit.runAgent({ agent });
+  }, [agent, copilotkit]);
+
+  return { runError, onError, retry };
+}
+
 function parsePingResult(result: string) {
   try {
     const parsed = pingResultSchema.safeParse(JSON.parse(result));
@@ -39,6 +77,37 @@ function parsePingResult(result: string) {
   } catch {
     return null;
   }
+}
+
+function ReadyChat() {
+  const { runError, onError, retry } = useChatRunError(WORKSPACE_AGENT_ID);
+
+  return (
+    <CopilotChat
+      agentId={WORKSPACE_AGENT_ID}
+      className="melos-chat"
+      onError={onError}
+      messageView={{
+        children: ({ messageElements, interruptElement, isRunning }) => (
+          <div
+            data-testid="copilot-message-list"
+            className="copilotKitMessages cpk:flex cpk:flex-col"
+          >
+            {messageElements}
+            {interruptElement}
+            {isRunning ? (
+              <div className="cpk:mt-2">
+                <CopilotChatMessageView.Cursor />
+              </div>
+            ) : null}
+            {runError && !isRunning ? (
+              <ChatRunErrorNotice error={runError} onRetry={retry} />
+            ) : null}
+          </div>
+        ),
+      }}
+    />
+  );
 }
 
 function Chat() {
@@ -66,7 +135,7 @@ function Chat() {
   );
 
   if (!ready) return <div className="chat-status">Connecting to the agent...</div>;
-  return <CopilotChat agentId={WORKSPACE_AGENT_ID} className="melos-chat" />;
+  return <ReadyChat />;
 }
 
 export function WorkspaceChat() {

@@ -11,7 +11,7 @@ type Handler = (request: Request) => Promise<Response> | Response;
  */
 export async function prepareTestEnvironment(name: string): Promise<LLMock> {
   const mock = new LLMock({ port: 0 });
-  mock.loadFixtureFile('fixtures/aimock/ping.json');
+  mock.loadFixtureDir('fixtures/aimock');
   const url = await mock.start();
   process.env.MELOS_LLM_BASE_URL = `${url.replace(/\/$/, '')}/v1`;
 
@@ -70,7 +70,7 @@ export class TestClient {
   }
 }
 
-type AgUiEvent = { type: string; content?: string; toolCallName?: string };
+type AgUiEvent = { type: string; content?: string; toolCallName?: string; message?: string };
 
 /** Parses the AG-UI server-sent event stream returned by the CopilotKit runtime. */
 export async function readAgUiEvents(response: Response): Promise<AgUiEvent[]> {

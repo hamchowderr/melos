@@ -5,7 +5,7 @@
   "description": "Melos: music catalog, rights/splits and pitching CRM with an agent-native chat UI.",
   "type": "module",
   "engines": {
-    "node": ">=22.13.0"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "next dev -p 3100",
@@ -56,5 +56,11 @@
     "drizzle-kit": "0.31.10",
     "typescript": "6.0.3",
     "vitest": "4.1.11"
+  },
+  "allowScripts": {
+    "esbuild@0.18.20": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "@scarf/scarf": false
   }
 }
