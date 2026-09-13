@@ -6,6 +6,7 @@ import { ac, roles } from '../../lib/auth/permissions';
 import { controlDb } from '../db/client';
 import * as schema from '../db/schema/auth';
 import { getServerEnv } from '../env';
+import { controlDeleteHooks, controlDeletesPlugin } from './control-deletes';
 import { sendAuthEmail } from './mailer';
 import { membershipAuditAfterHook, membershipAuditHooks } from './membership-audit';
 
@@ -69,7 +70,7 @@ export const auth = betterAuth({
       ac,
       roles,
       creatorRole: 'owner',
-      organizationHooks: membershipAuditHooks,
+      organizationHooks: { ...membershipAuditHooks, ...controlDeleteHooks },
       // Explicit, per GHSA-fmh4-wcc4-5jm3: the implicit default flips with ID generation.
       requireEmailVerificationOnInvitation: true,
       sendInvitationEmail: ({ id, email, role, organization: workspace, inviter }) => {
@@ -83,6 +84,8 @@ export const auth = betterAuth({
         });
       },
     }),
+    // Organization and user deletes go through IntegrityGuard first (DAT-001, ADR-030).
+    controlDeletesPlugin,
   ],
 });
 
