@@ -1,0 +1,2 @@
+# The drift test compares generated files byte for byte, so keep them LF on every checkout.
+src/server/db/fk-rules.generated.ts text eol=lf
