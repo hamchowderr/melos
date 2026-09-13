@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { WorkspaceChat } from '@/components/chat/workspace-chat';
 import { WorkspaceHeader } from '@/components/workspace/workspace-header';
@@ -24,7 +25,9 @@ export default async function HomePage() {
 
   return (
     <main className="chat-page">
-      <WorkspaceHeader workspaceName={workspace.name} />
+      <WorkspaceHeader workspaceName={workspace.name}>
+        <Link href="/settings">Settings</Link>
+      </WorkspaceHeader>
       <WorkspaceChat />
     </main>
   );

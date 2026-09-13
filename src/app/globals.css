@@ -50,7 +50,8 @@ body {
   color: var(--melos-muted);
 }
 
-.auth-card input {
+.auth-card input,
+.auth-card select {
   font: inherit;
   padding: 9px 11px;
   border: 1px solid var(--melos-line);
@@ -91,6 +92,42 @@ body {
   border: 1px solid var(--melos-line);
 }
 
+.settings-body {
+  display: grid;
+  justify-items: center;
+  padding: 24px 16px;
+}
+
+.auth-card.members-card {
+  max-width: 640px;
+}
+
+.member-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-block: 10px;
+  border-top: 1px solid var(--melos-line);
+  font-size: 0.875rem;
+}
+
+.member-name {
+  flex: 1 1 14rem;
+  overflow-wrap: anywhere;
+}
+
+.member-invite {
+  display: grid;
+  gap: 14px;
+}
+
 .chat-page {
   height: 100dvh;
   display: flex;
@@ -113,6 +150,12 @@ body {
   font-weight: 400;
   font-size: 0.875rem;
   overflow-wrap: anywhere;
+}
+
+.chat-header a {
+  margin-left: auto;
+  color: var(--melos-accent);
+  font-size: 0.875rem;
 }
 
 .chat-status {
