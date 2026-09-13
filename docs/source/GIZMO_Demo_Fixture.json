@@ -1,0 +1,41 @@
+{
+  "fixtureNotice": "All names, companies, domains, phone numbers, songs, identifiers, and business activity in this file are fictional test data.",
+  "workspace": {
+    "name": "Northstar Demo Catalog",
+    "slug": "northstar-demo"
+  },
+  "icps": [
+    {"id":"ICP-01","name":"Jordan Taylor","profile":"Independent singer-songwriter","company":"Silverline Songs","email":"jordan@silverline.example","phone":"+1 213-555-0101"},
+    {"id":"ICP-02","name":"Alex Ramirez","profile":"Producer / co-writer","company":"Nightshift Audio","email":"alex@nightshift.example","phone":"+1 323-555-0112"},
+    {"id":"ICP-03","name":"Rebecca Carter","profile":"Sync licensing agent","company":"Carter Sync Agency","email":"rebecca@cartersync.example","phone":"+1 310-555-0127"},
+    {"id":"ICP-04","name":"Malik Johnson","profile":"Independent label operator","company":"NextWave Records","email":"malik@nextwave.example","phone":"+1 424-555-0134"},
+    {"id":"ICP-05","name":"Sophia Lee","profile":"Artist manager / pitching operator","company":"Northstar Management","email":"sophia@northstar.example","phone":"+1 818-555-0149"}
+  ],
+  "contacts": [
+    {"name":"Rebecca Carter","type":"Licensing Agent","company":"Carter Sync Agency","email":"rebecca@cartersync.example"},
+    {"name":"Maya Chen","type":"Music Supervisor","company":"Northlight Pictures","email":"maya@northlight.example"},
+    {"name":"Malik Johnson","type":"Record Label","company":"NextWave Records","email":"malik@nextwave.example"},
+    {"name":"Theo Grant","type":"Music Supervisor","company":"Blue Lantern Studios","email":"theo@bluelantern.example"}
+  ],
+  "catalog": [
+    {"title":"Midnight Drive","artist":"Jordan Taylor","writersTotal":100,"publishingTotal":100,"masterTotal":100,"isrc":"US-DMO-26-00001","iswc":"T-900.000.001-0","oneStopReady":true,"listenUrl":"https://media.example/midnight-drive","previewStart":"00:42"},
+    {"title":"Ocean Blue","artist":"Jordan Taylor","featuring":["Alex Ramirez"],"writersTotal":100,"publishingTotal":85,"masterTotal":100,"isrc":null,"iswc":"T-900.000.002-0","oneStopReady":false,"listenUrl":"https://media.example/ocean-blue","previewStart":"00:35"},
+    {"title":"Neon Static","artist":"Alex Ramirez","featuring":["Jordan Taylor"],"writersTotal":100,"publishingTotal":100,"masterTotal":75,"isrc":"US-DMO-26-00003","iswc":"T-900.000.003-0","oneStopReady":false,"listenUrl":"https://media.example/neon-static","previewStart":"00:28"},
+    {"title":"Home Again","artist":"Jordan Taylor","writersTotal":100,"publishingTotal":100,"masterTotal":100,"isrc":"US-DMO-26-00004","iswc":"T-900.000.004-0","oneStopReady":true,"licensingContact":null,"listenUrl":"https://media.example/home-again","previewStart":"00:51"},
+    {"title":"Paper Planes at 2AM","altTitle":"Paper Planes","artist":"Jordan Taylor","writersTotal":100,"publishingTotal":100,"masterTotal":100,"isrc":"US-DMO-26-00005","iswc":"T-900.000.005-0","oneStopReady":true,"listenUrl":"https://media.example/paper-planes-2am","previewStart":"01:03"}
+  ],
+  "rightsExamples": [
+    {"song":"Ocean Blue","writers":[{"party":"Jordan Taylor","percent":60},{"party":"Alex Ramirez","percent":40}],"publishers":[{"party":"Silverline Songs","percent":60},{"party":"Nightshift Audio","percent":25}],"masterOwners":[{"party":"Silverline Songs","percent":100}]},
+    {"song":"Neon Static","writers":[{"party":"Alex Ramirez","percent":50},{"party":"Jordan Taylor","percent":50}],"publishers":[{"party":"Nightshift Audio","percent":50},{"party":"Silverline Songs","percent":50}],"masterOwners":[{"party":"Nightshift Audio","percent":75}]}
+  ],
+  "pitches": [
+    {"song":"Midnight Drive","contact":"Rebecca Carter","status":"Currently Pitching"},
+    {"song":"Midnight Drive","contact":"Maya Chen","status":"Awaiting Reply"},
+    {"song":"Paper Planes at 2AM","contact":"Rebecca Carter","status":"Awaiting Reply"},
+    {"song":"Paper Planes at 2AM","contact":"Malik Johnson","status":"Passed On It"},
+    {"song":"Neon Static","contact":"Malik Johnson","status":"Currently Pitching"},
+    {"song":"Home Again","contact":"Maya Chen","status":"Hasn't Heard"},
+    {"song":"Home Again","contact":"Theo Grant","status":"Hasn't Heard"},
+    {"song":"Ocean Blue","contact":"Theo Grant","status":"Hasn't Heard"}
+  ]
+}
