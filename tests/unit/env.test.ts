@@ -3,6 +3,7 @@ import { parseServerEnv, ServerEnvError, TEST_CHAT_MODEL_ID } from '../../src/se
 
 const SECRET = 'unit-test-secret-value-that-is-long-enough';
 const TEST_MODEL = { BETTER_AUTH_SECRET: SECRET, MELOS_LLM_BASE_URL: 'http://127.0.0.1:4010/v1' };
+const TOKEN_KEY = Buffer.alloc(32, 7).toString('base64');
 
 function problemsOf(source: Record<string, string | undefined>) {
   try {
@@ -34,6 +35,7 @@ describe('parseServerEnv', () => {
       url: 'file:./data/agent.db',
       authToken: undefined,
     });
+    expect(env.workspaceHost).toEqual({ kind: 'local', dataDir: '.data' });
     expect(env.chatModel).toEqual({
       provider: 'router',
       id: 'mastra/anthropic/claude-haiku-4.5',
@@ -63,6 +65,15 @@ describe('parseServerEnv', () => {
     ]);
     expect(error.message).toContain('BETTER_AUTH_SECRET');
     expect(error.message).not.toContain('short-secret-value');
+  });
+
+  it('places workspace files in MELOS_WORKSPACE_DATA_DIR and refuses a bad token key by name', () => {
+    const env = parseServerEnv({ ...TEST_MODEL, MELOS_WORKSPACE_DATA_DIR: '.data/dev' });
+    expect(env.workspaceHost).toEqual({ kind: 'local', dataDir: '.data/dev' });
+    const shortKey = Buffer.alloc(16, 7).toString('base64');
+    const error = problemsOf({ ...TEST_MODEL, MELOS_WORKSPACE_TOKEN_KEY: shortKey });
+    expect(error.message).toContain('MELOS_WORKSPACE_TOKEN_KEY must be 32 bytes encoded as base64');
+    expect(error.message).not.toContain(shortKey);
   });
 
   it('requires the gateway key for a Mastra Gateway model', () => {
@@ -117,12 +128,13 @@ describe('parseServerEnv', () => {
     ).toEqual(['owner@example.com']);
   });
 
-  it('refuses local files and the test model endpoint on Vercel', () => {
+  it('refuses local files, the local workspace host and the test model endpoint on Vercel', () => {
     const error = problemsOf({
       VERCEL: '1',
       VERCEL_URL: 'melos-abc123.vercel.app',
       BETTER_AUTH_SECRET: SECRET,
       MELOS_CONTROL_DATABASE_URL: 'file:./data/control.db',
+      MELOS_WORKSPACE_DATA_DIR: '.data/workspaces',
       MELOS_LLM_BASE_URL: 'http://127.0.0.1:4010/v1',
     });
     expect(error.problems.map((p) => p.name).sort()).toEqual([
@@ -131,8 +143,10 @@ describe('parseServerEnv', () => {
       'MELOS_CONTROL_DATABASE_AUTH_TOKEN',
       'MELOS_CONTROL_DATABASE_URL',
       'MELOS_LLM_BASE_URL',
+      'MELOS_WORKSPACE_DATA_DIR',
     ]);
     expect(error.message).not.toContain('file:./data/control.db');
+    expect(error.message).not.toContain('.data/workspaces');
   });
 
   it('derives the auth URL and trusted origins from Vercel system variables', () => {
@@ -153,6 +167,23 @@ describe('parseServerEnv', () => {
       VERCEL_BRANCH_URL: 'melos-git-feat-otaku.vercel.app',
     });
     expect(branch.onVercel).toBe(true);
+    // Vercel starts without the Turso variables; the host names the missing ones when used.
+    const missing = ['TURSO_API_TOKEN', 'TURSO_ORG', 'MELOS_WORKSPACE_TOKEN_KEY'];
+    expect(branch.workspaceHost).toEqual({ kind: 'unconfigured', missing });
+    const turso = { ...vercel, TURSO_API_TOKEN: 'api-token-for-test', TURSO_ORG: 'example-org' };
+    expect(parseServerEnv(turso).workspaceHost).toEqual({
+      kind: 'unconfigured',
+      missing: [missing[2]],
+    });
+    expect(
+      parseServerEnv({ ...turso, MELOS_WORKSPACE_TOKEN_KEY: TOKEN_KEY }).workspaceHost,
+    ).toEqual({
+      kind: 'turso',
+      apiToken: 'api-token-for-test',
+      organization: 'example-org',
+      group: 'default',
+      tokenKey: TOKEN_KEY,
+    });
     expect(branch.auth.baseURL).toBe('https://melos-git-feat-otaku.vercel.app');
     expect(branch.auth.trustedOrigins).toEqual([
       'https://melos-git-feat-otaku.vercel.app',

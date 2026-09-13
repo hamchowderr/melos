@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { LOCAL_AGENT_DATABASE_URL, LOCAL_CONTROL_DATABASE_URL } from './db/local-database';
+import { isTokenKey } from './db/token-cipher';
 
 const LOCAL_BASE_URL = 'http://localhost:3100';
+const LOCAL_WORKSPACE_DATA_DIR = '.data';
 
 /** Model id sent to the OpenAI-compatible endpoint named by MELOS_LLM_BASE_URL (AIMock). */
 export const TEST_CHAT_MODEL_ID = 'openai/gpt-4o-mini';
@@ -30,6 +32,14 @@ const rawEnvSchema = z.object({
   MELOS_CONTROL_DATABASE_AUTH_TOKEN: optionalText,
   MELOS_AGENT_DATABASE_URL: optionalText,
   MELOS_AGENT_DATABASE_AUTH_TOKEN: optionalText,
+  MELOS_WORKSPACE_DATA_DIR: optionalText,
+  TURSO_API_TOKEN: optionalText,
+  TURSO_ORG: optionalText,
+  MELOS_TURSO_GROUP: z.preprocess(blankToUndefined, z.string().default('default')),
+  MELOS_WORKSPACE_TOKEN_KEY: z.preprocess(
+    blankToUndefined,
+    z.string().refine(isTokenKey, { error: 'must be 32 bytes encoded as base64' }).optional(),
+  ),
   MELOS_CHAT_MODEL: optionalText,
   MASTRA_GATEWAY_API_KEY: optionalText,
   MELOS_LLM_BASE_URL: optionalUrl,
@@ -67,6 +77,9 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
       }
       if (!env[tokenName]) flag(tokenName, 'is required on Vercel');
     }
+    if (env.MELOS_WORKSPACE_DATA_DIR) {
+      flag('MELOS_WORKSPACE_DATA_DIR', 'must not be set on Vercel (local files are not allowed)');
+    }
     if (env.MELOS_LLM_BASE_URL) {
       flag('MELOS_LLM_BASE_URL', 'is test-only and must not be set on Vercel');
     }
@@ -91,6 +104,12 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
 
 export type DatabaseSetting = { url: string; authToken?: string };
 
+/** Local files off Vercel; Turso Cloud on Vercel, `unconfigured` until its variables are set. */
+export type WorkspaceHostSetting =
+  | { kind: 'local'; dataDir: string }
+  | { kind: 'turso'; apiToken: string; organization: string; group: string; tokenKey: string }
+  | { kind: 'unconfigured'; missing: string[] };
+
 export type ChatModelSetting =
   | { provider: 'router'; id: string }
   | { provider: 'openai-compatible'; id: string; url: string };
@@ -100,6 +119,7 @@ export type ServerEnv = {
   auth: { secret: string; baseURL: string; trustedOrigins: string[] };
   controlDatabase: DatabaseSetting;
   agentDatabase: DatabaseSetting;
+  workspaceHost: WorkspaceHostSetting;
   chatModel: ChatModelSetting;
   emailTransport: 'sandbox';
   authMailer: 'outbox' | 'memory' | 'disabled';
@@ -159,6 +179,20 @@ function parseSignUpAllowlist(env: RawEnv): string[] | null {
     .filter(Boolean);
 }
 
+/** Missing Turso variables fail provisioning, not startup, so a deploy without them still runs. */
+function resolveWorkspaceHost(env: RawEnv): WorkspaceHostSetting {
+  if (!env.VERCEL) {
+    return { kind: 'local', dataDir: env.MELOS_WORKSPACE_DATA_DIR ?? LOCAL_WORKSPACE_DATA_DIR };
+  }
+  const { TURSO_API_TOKEN: apiToken, TURSO_ORG: organization } = env;
+  const tokenKey = env.MELOS_WORKSPACE_TOKEN_KEY;
+  if (apiToken && organization && tokenKey) {
+    return { kind: 'turso', apiToken, organization, group: env.MELOS_TURSO_GROUP, tokenKey };
+  }
+  const names = ['TURSO_API_TOKEN', 'TURSO_ORG', 'MELOS_WORKSPACE_TOKEN_KEY'] as const;
+  return { kind: 'unconfigured', missing: names.filter((name) => !env[name]) };
+}
+
 /** Parses an environment record. Throws ServerEnvError listing variable names, never values. */
 export function parseServerEnv(source: Record<string, string | undefined>): ServerEnv {
   const result = envSchema.safeParse(source);
@@ -183,6 +217,7 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
       url: env.MELOS_AGENT_DATABASE_URL ?? LOCAL_AGENT_DATABASE_URL,
       authToken: env.MELOS_AGENT_DATABASE_AUTH_TOKEN,
     },
+    workspaceHost: resolveWorkspaceHost(env),
     chatModel: env.MELOS_LLM_BASE_URL
       ? {
           provider: 'openai-compatible',
