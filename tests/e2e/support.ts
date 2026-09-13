@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
+import { createClient } from '@libsql/client';
 import { expect, type Page } from '@playwright/test';
 
 // The first auth request after `next start` hashes a password on a cold server; 5s is too tight.
@@ -55,6 +56,32 @@ export async function activeOrganizationId(page: Page): Promise<string> {
   const { session } = await (await page.request.get('/api/auth/get-session')).json();
   expect(session.activeOrganizationId).toBeTruthy();
   return session.activeOrganizationId;
+}
+
+/** Runs one statement on the server's control database (MELOS_CONTROL_DATABASE_URL in playwright.config.ts). */
+async function controlQuery(sql: string, args: string[]) {
+  const client = createClient({ url: 'file:./data/e2e-control.db' });
+  try {
+    return (await client.execute({ sql, args })).rows;
+  } finally {
+    client.close();
+  }
+}
+
+/** The registry workspace id of an organization whose workspace is active. */
+export async function activeWorkspaceId(organizationId: string): Promise<string> {
+  const where = "organization_id = ? AND status = 'active'";
+  const rows = await controlQuery(`SELECT id FROM workspace_registry WHERE ${where}`, [
+    organizationId,
+  ]);
+  expect(rows).toHaveLength(1);
+  return String(rows[0].id);
+}
+
+/** Moves an organization's registry row to another status, as a failed provisioning would. */
+export async function setWorkspaceStatus(organizationId: string, status: string): Promise<void> {
+  const sql = 'UPDATE workspace_registry SET status = ? WHERE organization_id = ?';
+  await controlQuery(sql, [status, organizationId]);
 }
 
 /** Sends "ping" (fixtures/aimock/ping.json) and waits for the ping tool's card. */

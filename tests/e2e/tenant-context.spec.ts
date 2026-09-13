@@ -1,5 +1,12 @@
-import { expect, test } from '@playwright/test';
-import { activeOrganizationId, createWorkspace, pingInChat, signUpWithWorkspace } from './support';
+import { expect, type Page, test } from '@playwright/test';
+import {
+  activeOrganizationId,
+  activeWorkspaceId,
+  createWorkspace,
+  pingInChat,
+  setWorkspaceStatus,
+  signUpWithWorkspace,
+} from './support';
 
 test('AUTH-E2E-001: signed out, / redirects and the agent answers 401', async ({
   page,
@@ -18,6 +25,15 @@ test('AUTH-E2E-001: signed out, / redirects and the agent answers 401', async ({
   }
 });
 
+/** The ping card names the organization, its registry workspace id and the role. */
+async function expectPing(page: Page, organizationId: string): Promise<void> {
+  await pingInChat(page);
+  await expect(page.getByTestId('ping-organization-id')).toHaveText(organizationId);
+  const workspaceId = await activeWorkspaceId(organizationId);
+  await expect(page.getByTestId('ping-workspace-id')).toHaveText(workspaceId);
+  await expect(page.getByTestId('ping-workspace-role')).toHaveText('owner');
+}
+
 test('AUTH-E2E-003: tool results follow the newly active workspace', async ({ page }) => {
   const firstName = await signUpWithWorkspace(page, 'Switch');
   const firstId = await activeOrganizationId(page);
@@ -27,9 +43,8 @@ test('AUTH-E2E-003: tool results follow the newly active workspace', async ({ pa
   await createWorkspace(page, secondName);
   const secondId = await activeOrganizationId(page);
   expect(secondId).not.toBe(firstId);
-  await pingInChat(page);
-  await expect(page.getByTestId('ping-workspace-id')).toHaveText(secondId);
-  await expect(page.getByTestId('ping-workspace-role')).toHaveText('owner');
+  expect(await activeWorkspaceId(secondId)).not.toBe(await activeWorkspaceId(firstId));
+  await expectPing(page, secondId);
 
   // No workspace switcher exists yet; switch through the endpoint the auth client calls.
   // Better Auth refuses a cookie-bearing POST without an Origin header.
@@ -40,7 +55,25 @@ test('AUTH-E2E-003: tool results follow the newly active workspace', async ({ pa
   expect(switched.ok()).toBe(true);
   await page.reload();
   await expect(page.getByTestId('active-workspace-name')).toHaveText(firstName);
-  await pingInChat(page);
-  await expect(page.getByTestId('ping-workspace-id')).toHaveText(firstId);
-  await expect(page.getByTestId('ping-workspace-role')).toHaveText('owner');
+  await expectPing(page, firstId);
+});
+
+test('TEN-002: a member of a failed workspace is told why, not sent to /workspaces/new', async ({
+  page,
+}) => {
+  await signUpWithWorkspace(page, 'Failed');
+  await setWorkspaceStatus(await activeOrganizationId(page), 'failed');
+  const home = `${new URL(page.url()).origin}/`;
+
+  for (const path of ['/', '/settings']) {
+    await page.goto(path);
+    await expect(page).toHaveURL(home);
+    await expect(
+      page.getByRole('heading', { name: 'Your workspace could not be set up' }),
+    ).toBeVisible();
+    await expect(page.getByTestId('workspace-not-ready')).toHaveAttribute('data-status', 'failed');
+    await expect(page.getByRole('textbox')).toHaveCount(0);
+  }
+  const info = await page.request.get('/api/copilotkit/info');
+  expect([info.status(), await info.json()]).toEqual([403, { error: 'workspace-unavailable' }]);
 });

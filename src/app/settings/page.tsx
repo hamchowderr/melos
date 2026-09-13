@@ -23,6 +23,10 @@ export default async function SettingsPage() {
   const requestHeaders = await headers();
   const tenant = await tenantContextResolver.resolve(requestHeaders);
   if (tenant.status === 'unauthenticated') redirect('/sign-in');
+  // The home page explains a workspace without an active database.
+  if (tenant.status === 'workspace-unavailable' || tenant.status === 'workspace-not-provisioned') {
+    redirect('/');
+  }
   if (tenant.status !== 'ok') redirect('/workspaces/new');
 
   // Membership lives only in Better Auth (docs/CONTRACT.md §6.1), which checks the caller.
