@@ -18,17 +18,23 @@ export interface WorkspaceHost {
   delete(databaseName: string): Promise<void>;
 }
 
-type TursoErrorCode = 'conflict' | 'not_found' | 'http_error' | 'unreachable' | 'bad_response';
-
 /**
- * A failed Platform API call: the operation, the HTTP status (0 when no response arrived) and a
- * code. Turso's error text, tokens and request headers are never copied into it (ADR-031).
+ * Thrown by `create` and `delete` on Vercel while Turso variables are unset, so a deploy without
+ * them still starts (ADR-031). Names the missing variables, never values.
  */
+export class WorkspaceHostConfigError extends Error {
+  constructor(readonly missing: readonly string[]) {
+    super(`Workspace host is not configured: set ${missing.join(', ')}`);
+    this.name = 'WorkspaceHostConfigError';
+  }
+}
+
+/** A failed Platform API call (status 0: no response). Holds no Turso error text, token or header. */
 export class TursoApiError extends Error {
   constructor(
     readonly operation: string,
     readonly status: number,
-    readonly code: TursoErrorCode,
+    readonly code: 'conflict' | 'not_found' | 'http_error' | 'unreachable' | 'bad_response',
   ) {
     super(`Turso API ${operation} failed: ${code} (HTTP ${status})`);
     this.name = 'TursoApiError';
@@ -52,12 +58,10 @@ function localWorkspaceHost(dataDir: string): WorkspaceHost {
     async create(databaseName) {
       const file = path(databaseName);
       mkdirSync(dataDir, { recursive: true });
-      // An empty file is an empty SQLite database. No libSQL client is opened here: on Windows a
-      // file stays locked after close() until the client's statements are garbage-collected.
+      // An empty file is an empty database. On Windows a libSQL client would lock it until GC.
       closeSync(openSync(file, 'a'));
       return { url: `file:${file}`, tokenCiphertext: null };
     },
-    // Windows refuses to delete a file that a libSQL client in this process has used (see create).
     async delete(databaseName) {
       const file = path(databaseName);
       for (const suffix of ['', '-shm', '-wal']) rmSync(`${file}${suffix}`, { force: true });
@@ -70,10 +74,8 @@ function tursoWorkspaceHost(setting: TursoSetting, fetchApi: Fetch): WorkspaceHo
   const cipher = createTokenCipher(setting.tokenKey);
   const organization = encodeURIComponent(setting.organization);
   const databases = `${TURSO_API_URL}/v1/organizations/${organization}/databases`;
-  const headers = {
-    authorization: `Bearer ${setting.apiToken}`,
-    'content-type': 'application/json',
-  };
+  const bearer = `Bearer ${setting.apiToken}`;
+  const headers = { authorization: bearer, 'content-type': 'application/json' };
   // Turso names allow only lowercase letters, numbers and dashes; ULIDs are case-insensitive.
   const tursoName = (databaseName: string) => checkName(databaseName).toLowerCase();
 
@@ -88,7 +90,6 @@ function tursoWorkspaceHost(setting: TursoSetting, fetchApi: Fetch): WorkspaceHo
     return (await response.json().catch(() => null)) as Payload;
   }
 
-  /** A string field of a successful response, or `bad_response`. */
   function read(operation: string, value: unknown): string {
     if (typeof value === 'string') return value;
     throw new TursoApiError(operation, 200, 'bad_response');
@@ -123,5 +124,7 @@ function tursoWorkspaceHost(setting: TursoSetting, fetchApi: Fetch): WorkspaceHo
 /** The host for `getServerEnv().workspaceHost`. Tests inject `fetchApi` to stub the Platform API. */
 export function createWorkspaceHost(setting: WorkspaceHostSetting, fetchApi: Fetch = fetch) {
   if (setting.kind === 'local') return localWorkspaceHost(setting.dataDir);
-  return tursoWorkspaceHost(setting, fetchApi);
+  if (setting.kind === 'turso') return tursoWorkspaceHost(setting, fetchApi);
+  const refuse = () => Promise.reject(new WorkspaceHostConfigError(setting.missing));
+  return { kind: setting.kind, create: refuse, delete: refuse } satisfies WorkspaceHost;
 }

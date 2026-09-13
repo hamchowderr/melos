@@ -144,9 +144,6 @@ describe('parseServerEnv', () => {
       'MELOS_CONTROL_DATABASE_URL',
       'MELOS_LLM_BASE_URL',
       'MELOS_WORKSPACE_DATA_DIR',
-      'MELOS_WORKSPACE_TOKEN_KEY',
-      'TURSO_API_TOKEN',
-      'TURSO_ORG',
     ]);
     expect(error.message).not.toContain('file:./data/control.db');
     expect(error.message).not.toContain('.data/workspaces');
@@ -160,9 +157,6 @@ describe('parseServerEnv', () => {
       MELOS_CONTROL_DATABASE_AUTH_TOKEN: 'control-token-for-test',
       MELOS_AGENT_DATABASE_URL: 'libsql://agent-example.turso.io',
       MELOS_AGENT_DATABASE_AUTH_TOKEN: 'agent-token-for-test',
-      TURSO_API_TOKEN: 'platform-token-for-test',
-      TURSO_ORG: 'example-org',
-      MELOS_WORKSPACE_TOKEN_KEY: TOKEN_KEY,
       MELOS_CHAT_MODEL: 'mastra/anthropic/claude-haiku-4.5',
       MASTRA_GATEWAY_API_KEY: 'gateway-key-for-test',
       VERCEL_URL: 'melos-abc123-otaku.vercel.app',
@@ -173,9 +167,19 @@ describe('parseServerEnv', () => {
       VERCEL_BRANCH_URL: 'melos-git-feat-otaku.vercel.app',
     });
     expect(branch.onVercel).toBe(true);
-    expect(branch.workspaceHost).toEqual({
+    // Vercel starts without the Turso variables; the host names the missing ones when used.
+    const missing = ['TURSO_API_TOKEN', 'TURSO_ORG', 'MELOS_WORKSPACE_TOKEN_KEY'];
+    expect(branch.workspaceHost).toEqual({ kind: 'unconfigured', missing });
+    const turso = { ...vercel, TURSO_API_TOKEN: 'api-token-for-test', TURSO_ORG: 'example-org' };
+    expect(parseServerEnv(turso).workspaceHost).toEqual({
+      kind: 'unconfigured',
+      missing: [missing[2]],
+    });
+    expect(
+      parseServerEnv({ ...turso, MELOS_WORKSPACE_TOKEN_KEY: TOKEN_KEY }).workspaceHost,
+    ).toEqual({
       kind: 'turso',
-      apiToken: 'platform-token-for-test',
+      apiToken: 'api-token-for-test',
       organization: 'example-org',
       group: 'default',
       tokenKey: TOKEN_KEY,

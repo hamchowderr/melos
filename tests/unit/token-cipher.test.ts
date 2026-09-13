@@ -31,9 +31,7 @@ describe('createTokenCipher', () => {
     }
     expect(() => createTokenCipher(newKey()).decrypt(ciphertext, NAME)).toThrow(TokenCipherError);
     expect(() => cipher.decrypt(ciphertext, OTHER_NAME)).toThrow(TokenCipherError);
-    expect(() => cipher.decrypt(`v2:${ciphertext.slice(3)}`, NAME)).toThrow(
-      'unsupported ciphertext format',
-    );
+    expect(() => cipher.decrypt(`v2:${ciphertext.slice(3)}`, NAME)).toThrow('unsupported');
   });
 
   it('refuses a key that is not 32 bytes of base64 without printing it', () => {

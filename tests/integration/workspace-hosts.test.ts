@@ -16,7 +16,7 @@ type Call = { method: string; url: string; authorization: string; body: unknown 
 type Reply = [status: number, payload: unknown];
 type Respond = (call: Call) => Reply;
 
-/** A Turso Platform API stub behind an injected fetch: no request leaves the process. */
+/** A Turso Platform API stub behind an injected fetch; status 0 rejects like a network failure. */
 function stubTurso(respond: Respond) {
   const calls: Call[] = [];
   const setting = { apiToken: API_TOKEN, organization: 'example-org', group: 'default' };
@@ -28,6 +28,7 @@ function stubTurso(respond: Respond) {
       const call = { method: String(init.method), url, authorization, body };
       calls.push(call);
       const [status, payload] = respond(call);
+      if (status === 0) throw new Error(`fetch failed with ${API_TOKEN}`);
       return Response.json(payload, { status });
     },
   );
@@ -114,12 +115,7 @@ describe('Turso workspace host', () => {
       [() => [401, { error: API_TOKEN }], 'create database 401 http_error'],
       [onToken([500, { error: JWT }]), 'create token 500 http_error'],
       [onToken([200, {}]), 'create token 200 bad_response'],
-      [
-        () => {
-          throw new Error(API_TOKEN);
-        },
-        'create database 0 unreachable',
-      ],
+      [() => [0, null], 'create database 0 unreachable'],
     ];
 
     for (const [respond, expected] of scenarios) {
@@ -132,5 +128,16 @@ describe('Turso workspace host', () => {
     }
     for (const log of logs) expect(log).not.toHaveBeenCalled();
     vi.restoreAllMocks();
+  });
+
+  it('refuses create and delete without the Turso variables, naming them and calling nothing', async () => {
+    const fetchApi = vi.fn(async () => Response.json({}));
+    const missing = ['TURSO_ORG', 'MELOS_WORKSPACE_TOKEN_KEY'];
+    const host = createWorkspaceHost({ kind: 'unconfigured', missing }, fetchApi);
+    const message = 'Workspace host is not configured: set TURSO_ORG, MELOS_WORKSPACE_TOKEN_KEY';
+    const refused = { name: 'WorkspaceHostConfigError', missing, message };
+    await expect(host.create(newName())).rejects.toMatchObject(refused);
+    await expect(host.delete(newName())).rejects.toMatchObject(refused);
+    expect(fetchApi).not.toHaveBeenCalled();
   });
 });

@@ -63,13 +63,6 @@ const DATABASES = [
   ['MELOS_AGENT_DATABASE_URL', 'MELOS_AGENT_DATABASE_AUTH_TOKEN'],
 ] as const;
 
-/** Workspace databases on Vercel live on Turso Cloud with encrypted tokens (ADR-031). */
-const TURSO_WORKSPACE_SETTINGS = [
-  'TURSO_API_TOKEN',
-  'TURSO_ORG',
-  'MELOS_WORKSPACE_TOKEN_KEY',
-] as const;
-
 const envSchema = rawEnvSchema.superRefine((env, ctx) => {
   const flag = (name: keyof RawEnv, message: string) =>
     ctx.addIssue({ code: 'custom', path: [name], message });
@@ -83,9 +76,6 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
         flag(urlName, 'must be a remote libSQL URL on Vercel (local files are not allowed)');
       }
       if (!env[tokenName]) flag(tokenName, 'is required on Vercel');
-    }
-    for (const name of TURSO_WORKSPACE_SETTINGS) {
-      if (!env[name]) flag(name, 'is required on Vercel');
     }
     if (env.MELOS_WORKSPACE_DATA_DIR) {
       flag('MELOS_WORKSPACE_DATA_DIR', 'must not be set on Vercel (local files are not allowed)');
@@ -114,10 +104,11 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
 
 export type DatabaseSetting = { url: string; authToken?: string };
 
-/** Local libSQL files off Vercel; Turso Cloud databases with encrypted tokens on Vercel (ADR-031). */
+/** Local files off Vercel; Turso Cloud on Vercel, `unconfigured` until its variables are set. */
 export type WorkspaceHostSetting =
   | { kind: 'local'; dataDir: string }
-  | { kind: 'turso'; apiToken: string; organization: string; group: string; tokenKey: string };
+  | { kind: 'turso'; apiToken: string; organization: string; group: string; tokenKey: string }
+  | { kind: 'unconfigured'; missing: string[] };
 
 export type ChatModelSetting =
   | { provider: 'router'; id: string }
@@ -188,6 +179,20 @@ function parseSignUpAllowlist(env: RawEnv): string[] | null {
     .filter(Boolean);
 }
 
+/** Missing Turso variables fail provisioning, not startup, so a deploy without them still runs. */
+function resolveWorkspaceHost(env: RawEnv): WorkspaceHostSetting {
+  if (!env.VERCEL) {
+    return { kind: 'local', dataDir: env.MELOS_WORKSPACE_DATA_DIR ?? LOCAL_WORKSPACE_DATA_DIR };
+  }
+  const { TURSO_API_TOKEN: apiToken, TURSO_ORG: organization } = env;
+  const tokenKey = env.MELOS_WORKSPACE_TOKEN_KEY;
+  if (apiToken && organization && tokenKey) {
+    return { kind: 'turso', apiToken, organization, group: env.MELOS_TURSO_GROUP, tokenKey };
+  }
+  const names = ['TURSO_API_TOKEN', 'TURSO_ORG', 'MELOS_WORKSPACE_TOKEN_KEY'] as const;
+  return { kind: 'unconfigured', missing: names.filter((name) => !env[name]) };
+}
+
 /** Parses an environment record. Throws ServerEnvError listing variable names, never values. */
 export function parseServerEnv(source: Record<string, string | undefined>): ServerEnv {
   const result = envSchema.safeParse(source);
@@ -212,15 +217,7 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
       url: env.MELOS_AGENT_DATABASE_URL ?? LOCAL_AGENT_DATABASE_URL,
       authToken: env.MELOS_AGENT_DATABASE_AUTH_TOKEN,
     },
-    workspaceHost: env.VERCEL
-      ? {
-          kind: 'turso',
-          apiToken: env.TURSO_API_TOKEN ?? '',
-          organization: env.TURSO_ORG ?? '',
-          group: env.MELOS_TURSO_GROUP,
-          tokenKey: env.MELOS_WORKSPACE_TOKEN_KEY ?? '',
-        }
-      : { kind: 'local', dataDir: env.MELOS_WORKSPACE_DATA_DIR ?? LOCAL_WORKSPACE_DATA_DIR },
+    workspaceHost: resolveWorkspaceHost(env),
     chatModel: env.MELOS_LLM_BASE_URL
       ? {
           provider: 'openai-compatible',
