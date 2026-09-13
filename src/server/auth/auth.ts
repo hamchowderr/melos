@@ -9,6 +9,7 @@ import { getServerEnv } from '../env';
 import { controlDeleteHooks, controlDeletesPlugin } from './control-deletes';
 import { sendAuthEmail } from './mailer';
 import { membershipAuditAfterHook, membershipAuditHooks } from './membership-audit';
+import { singleRolePlugin } from './single-role';
 
 const env = getServerEnv();
 const mailerDisabled = env.authMailer === 'disabled';
@@ -86,6 +87,8 @@ export const auth = betterAuth({
     }),
     // Organization and user deletes go through IntegrityGuard first (DAT-001, ADR-030).
     controlDeletesPlugin,
+    // A member role or invitation names exactly one role (P-30).
+    singleRolePlugin,
   ],
 });
 
