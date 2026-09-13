@@ -79,7 +79,7 @@ describe('DAT-001: workspace Drizzle tables are generated from the migrated work
 });
 
 describe('DAT-INT-001: IntegrityGuard writes workspace rows through the generated tables', () => {
-  it('refuses a writer whose party is an organization and inserts one whose party is a person', async () => {
+  it('refuses a writer whose party is an organization, with party_kind given or left to its default, and inserts one whose party is a person', async () => {
     const db = await openWithoutForeignKeys((fresh) =>
       // drizzle() hands back its client as $client, which the LibSQLDatabase type leaves out.
       applyWorkspaceMigrations((fresh as LibSQLDatabase & { $client: Client }).$client),
@@ -92,26 +92,28 @@ describe('DAT-INT-001: IntegrityGuard writes workspace rows through the generate
         { id: 'pty_label', partyKind: 'organization', displayName: 'Northstar', ...STAMPS },
       ]);
       await guard.insert(tx, compositions, [{ id: 'cmp_song', title: 'Ocean Blue', ...STAMPS }]);
-      // party_kind is set, not left to its default: the composite key is checked only when complete.
+      // party_kind is left to its default, 'person', which the guard checks as the stored key.
       const writer = (id: string, partyId: string) => ({
         id,
         compositionId: 'cmp_song',
         partyId,
-        partyKind: 'person',
         writerShareBp: 10000,
         ...STAMPS,
       });
-      const refused = guard.insert(tx, compositionContributors, [writer('ctr_label', 'pty_label')]);
-      await expect(refused).rejects.toMatchObject({
+      const label = writer('ctr_label', 'pty_label');
+      const refusal = {
         code: 'NOT_FOUND',
         table: 'composition_contributors',
         counts: { parties: 1 },
-      });
+      };
+      for (const refused of [label, { ...label, partyKind: 'person' }]) {
+        const insert = guard.insert(tx, compositionContributors, [refused]);
+        await expect(insert).rejects.toMatchObject(refusal);
+      }
       await guard.insert(tx, compositionContributors, [writer('ctr_writer', 'pty_writer')]);
-      const writers = await tx
-        .select({ id: compositionContributors.id, partyId: compositionContributors.partyId })
-        .from(compositionContributors);
-      expect(writers).toEqual([{ id: 'ctr_writer', partyId: 'pty_writer' }]);
+      const { id, partyId, partyKind } = compositionContributors;
+      const writers = await tx.select({ id, partyId, partyKind }).from(compositionContributors);
+      expect(writers).toEqual([{ id: 'ctr_writer', partyId: 'pty_writer', partyKind: 'person' }]);
     });
   });
 });
