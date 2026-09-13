@@ -7,7 +7,7 @@ import { createTokenCipher } from '../db/token-cipher';
 import { createWorkspaceHost } from '../db/workspace-hosts';
 import { applyWorkspaceMigrations } from '../db/workspace-migrations';
 import { getServerEnv } from '../env';
-import { controlIntegrityGuard as guard } from './integrity-guard';
+import { type GuardTransaction, controlIntegrityGuard as guard } from './integrity-guard';
 
 export type WorkspaceRegistryRow = typeof workspaceRegistry.$inferSelect;
 
@@ -134,4 +134,68 @@ export async function provisionWorkspace(
     await updateRow(row.id, { status: 'failed', statusDetail });
     throw new Error(`Workspace ${row.id} ${statusDetail}`);
   }
+}
+
+/** A workspace delete stopped at `step`; `code` holds the error name and code, never a message. */
+export class WorkspaceDeleteError extends Error {
+  constructor(
+    readonly step: string,
+    readonly code: string,
+  ) {
+    super(`Workspace delete failed at ${step}: ${code}`);
+    this.name = 'WorkspaceDeleteError';
+  }
+}
+
+/** Recorded when an unconfigured host refused the create, which therefore never reached a host. */
+const CREATE_NEVER_REACHED_HOST = 'create_database failed: WorkspaceHostConfigError';
+
+/**
+ * §7.2 organization delete, steps 1 and 2: commits `deleting`, then deletes the database. Returns
+ * the row for `removeWorkspace`, or undefined when there is none. A failed host delete keeps the
+ * row `deleting` with the step and error code; deleting again resumes. Throws WorkspaceDeleteError.
+ */
+export async function deleteWorkspaceDatabase(
+  organizationId: string,
+): Promise<WorkspaceRegistryRow | undefined> {
+  let step = 'read_registry';
+  try {
+    const byOrganization = eq(workspaceRegistry.organizationId, organizationId);
+    const [existing] = await controlDb.select().from(workspaceRegistry).where(byOrganization);
+    if (!existing) return undefined;
+    const host = createWorkspaceHost(getServerEnv().workspaceHost);
+    const { databaseName, databaseUrl, statusDetail } = existing;
+    // Without a host, only a create that never reached one proves no database exists. Any other row
+    // is refused before it is marked (an unconfigured delete throws), so it keeps its status.
+    step = 'delete_database';
+    const neverCreated = databaseUrl === '' && statusDetail === CREATE_NEVER_REACHED_HOST;
+    if (host.kind === 'unconfigured' && !neverCreated) await host.delete(databaseName);
+    step = 'mark_deleting';
+    const row = await updateRow(existing.id, { status: 'deleting' });
+    if (host.kind === 'unconfigured') return row;
+    step = 'delete_database';
+    try {
+      await host.delete(databaseName);
+    } catch (error) {
+      await updateRow(row.id, { statusDetail: `delete_database failed: ${errorCode(error)}` });
+      throw error;
+    }
+    return row;
+  } catch (error) {
+    throw new WorkspaceDeleteError(step, errorCode(error));
+  }
+}
+
+/** §7.2 organization delete, step 3, in the transaction that deletes the organization (ADR-030). */
+export async function removeWorkspace(
+  tx: GuardTransaction,
+  row: WorkspaceRegistryRow,
+  actorUserId: string | null,
+): Promise<void> {
+  const { id, organizationId } = row;
+  const audit = { id: `cad_${ulid()}`, actorUserId, organizationId, occurredAt: now() };
+  const target = { action: 'workspace.deleted', targetType: 'workspace', targetId: id };
+  await guard.insert(tx, controlAuditLog, [{ ...audit, ...target, beforeJson: auditJson(row) }]);
+  // Its migration_runs rows cascade.
+  await guard.delete(tx, workspaceRegistry, eq(workspaceRegistry.id, id));
 }
