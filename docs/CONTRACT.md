@@ -559,6 +559,8 @@ CREATE TABLE control_audit_log (
   actor_user_id    TEXT,
   organization_id  TEXT,
   action           TEXT NOT NULL,   -- member.invited, member.role_changed, member.removed,
+                                    -- member.added, member.left, invitation.accepted,
+                                    -- invitation.rejected, invitation.canceled,
                                     -- workspace.provisioned, workspace.deleted, migration.batch_started
   target_type      TEXT NOT NULL,
   target_id        TEXT NOT NULL,
@@ -572,6 +574,8 @@ BEGIN SELECT RAISE(ABORT, 'control_audit_log is append-only'); END;
 CREATE TRIGGER control_audit_log_no_delete BEFORE DELETE ON control_audit_log
 BEGIN SELECT RAISE(ABORT, 'control_audit_log is append-only'); END;
 ```
+
+Membership rows (AUTH-005, ADR-029) name the acting user in `actor_user_id`, NULL for a server call without a session, and hold `{"role": ...}` in `before_json` and `after_json`, NULL where the target had no role. `member.invited`, `invitation.rejected` and `invitation.canceled` target the invitation (`target_type` `invitation`); `member.added`, `invitation.accepted`, `member.role_changed`, `member.removed` and `member.left` target the member row (`target_type` `member`). Creating an organization appends `member.added` for its creator; accepting an invitation appends only `invitation.accepted`.
 
 `melos-agent-runtime` holds Mastra storage, created by `@mastra/libsql`, plus the runner tables below (§7.9). It is a Turso Cloud database in every deployed environment (P-33).
 
@@ -1424,7 +1428,7 @@ Requirement IDs from TS are kept verbatim and never renumbered. Requirement text
 | AUTH-002 | Melos workspace membership is represented by Better Auth Organization membership or an explicitly mapped equivalent. | USER-DECISION + [SRC-021](https://better-auth.com/docs/plugins/organization) | ctl `member` | `TenantContextResolver` | `/settings` | AUTH-E2E-002 | L4 |
 | AUTH-003 | The active organization determines the Melos workspace context. | DOC-VERIFIED: `session.activeOrganizationId` ([SRC-021](https://better-auth.com/docs/plugins/organization)) | ctl `session`, `workspace_registry` | `TenantContextResolver` | all | AUTH-E2E-003 | L4 |
 | AUTH-004 | Authorization is enforced server-side at Melos service boundaries; hiding UI controls is not authorization. | Security requirement | — | every service | all write tools | AUTH-INT-004 | L4 |
-| AUTH-005 | Organization/workspace invitations, roles and membership changes are auditable. | PROPOSED but recommended (TS) | ctl `control_audit_log` | `TenantContextResolver` hooks (U-15) | `/settings` | AUTH-INT-005 | L3 |
+| AUTH-005 | Organization/workspace invitations, roles and membership changes are auditable. | PROPOSED but recommended (TS); hooks verified in `better-auth` 1.7.4 (ADR-029) | ctl `control_audit_log` | Better Auth `organizationHooks` and `hooks.after` in `src/server/auth` (ADR-029) | `/settings` | AUTH-INT-005 | L3 |
 | AUTH-006 | Better Auth schema migrations are managed separately from per-workspace Melos migrations. | Architecture decision | ctl, ws | drizzle-kit (control plane); `MigrationRunner` (workspaces) | — | AUTH-INT-006 | L3 |
 | AUTH-007 NEW | A `viewer` role exists as a custom access-control role with the read-only permissions in §6.2; custom roles keep Better Auth's default organization permissions by merging them. | [SRC-021](https://better-auth.com/docs/plugins/organization) custom roles | ctl `member.role` | all services | all write tools reject viewer | AUTH-INT-007 | L4 |
 | AUTH-008 NEW | Tenant context (`userId`, `organizationId`, `workspaceId`, `workspaceRole`) is resolved server-side from the verified session and the `member` row on every agent request. Client-supplied context never sets identity or workspace. | §7.1 | ctl | `TenantContextResolver` | CopilotKit endpoint | AUTH-INT-008, AUTH-E2E-008 | L4 |
@@ -1639,6 +1643,7 @@ Frontend AGUIMock fixtures emit tool-call and result events per renderer (TS §1
 | ADR-026 NEW | Hosting on Vercel with Turso Cloud databases | Accepted | Owner decision 2026-09-12 |
 | ADR-027 NEW | The CopilotKit route allowlists `info`, `agent/run`, `agent/connect` and `agent/stop`; dynamic suggestions are off for the MVP: no dynamic suggestions config is registered and `agent/suggest` returns 404 | Accepted | [SRC-092]: `handlers/handle-suggest.mjs`, `core/fetch-handler.mjs`; [SRC-107] (§7.9) |
 | ADR-028 NEW | Services, tools and the importer authorize through `requirePermission(tenant, permissions)` in `src/server/services`, which evaluates the §6.2 role named by `workspaceRole` with `authorize()` in Melos code and returns `FORBIDDEN`. Better Auth 1.7.4 has no supported header-free check: `auth.api.hasPermission` requires session headers, and the exported `hasPermission` helper is typed to require an endpoint context; called without one, it grants a comma-separated role when any listed role allows the request (P-30 fails closed) and writes a process-wide role cache | Accepted; closes U-06; parity with `auth.api.hasPermission` proven by AUTH-INT-004 | [SRC-102]: `organization/organization.mjs` (`requireHeaders`, `orgSessionMiddleware`), `organization/has-permission.mjs`, `organization/permission.mjs` (§6.2) |
+| ADR-029 NEW | Membership changes are audited from Better Auth hooks that run after the change is written: the organization plugin's `afterCreateInvitation`, `afterAcceptInvitation`, `afterRejectInvitation`, `afterCancelInvitation`, `afterAddMember`, `afterUpdateMemberRole` and `afterRemoveMember`, plus a `hooks.after` handler for `/organization/leave`, which calls no organization hook. Each appends one `control_audit_log` row (§4.1). Better Auth 1.7.4 has no transaction-bound hook: the `before*` and `after*` hooks run outside `runWithTransaction` and receive no adapter, and Melos leaves the Drizzle adapter's `transaction` option off, so `runWithTransaction` runs its callback without a database transaction. A crash between the membership write and the audit insert loses the row, and a failed insert fails the request with the change already applied. Rows are never written before the change succeeds, so a refused change appends none. `afterAddMember`, `afterUpdateMemberRole` and `afterRemoveMember` do not name the actor; it is read from the request session through `tryGetCurrentAuthEndpointContext` (`@better-auth/core/context`) and is NULL for a server call without one | Accepted; closes the hook half of U-15; proven by AUTH-INT-005 | [SRC-102]: `organization/types.d.mts` (`organizationHooks`), `organization/routes/crud-invites.mjs`, `crud-members.mjs` (`leaveOrganization`), `crud-org.mjs` (`createOrganization`); [SRC-108]: `context/transaction.mjs`, `context/endpoint-context.mjs`, `db/adapter/factory.mjs` (`createAsIsTransaction`) (§4.1) |
 
 ## 6. Conflict resolutions
 
@@ -2230,6 +2235,7 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | SRC-105 | Next.js `after` | https://nextjs.org/docs/app/api-reference/functions/after | — | — | — | yes |
 | SRC-106 | Vercel `@vercel/functions` reference (`waitUntil`; `after` recommended for Next.js 15.1+) | https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package | — | — | — | yes |
 | SRC-107 | `@copilotkit/core` 1.71.1 installed package (`isDynamicSuggestionsConfig` gates suggestion generation) | Gate A worktree `node_modules/@copilotkit/core/dist/index.mjs` | — | — | — | yes |
+| SRC-108 | `@better-auth/core` and `@better-auth/drizzle-adapter` 1.7.4 installed packages (`runWithTransaction`, endpoint context, adapter `transaction` option) | Melos `node_modules/@better-auth/core/dist/`, `node_modules/@better-auth/drizzle-adapter/dist/index.mjs` | — | — | — | yes |
 
 ## 10. Index of PROPOSED defaults and UNVERIFIED claims
 
@@ -2296,7 +2302,7 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | U-11 | UPC (12-digit) and EAN (13-digit) length rules | Phase 4 |
 | U-12 | Closed: Better Auth table names are in the Gate A schema (§11, [SRC-103]) | — |
 | U-13, U-14 | Withdrawn: they applied only to the standalone server topology | — |
-| U-15 | Better Auth hooks for invitation, member and role events (for AUTH-005), and which dependent rows its adapter deletes itself when an organization or user is deleted (for DAT-001) | Phase 1 |
+| U-15 | Hook half closed: Better Auth 1.7.4 hooks for invitation, member and role events have no transaction-bound variant, and leaving calls none (ADR-029). Open: which dependent rows its adapter deletes itself when an organization or user is deleted (for DAT-001) | Phase 1 |
 | U-16 | Lifetime of Airtable attachment URLs | Phase 10 |
 | U-17 | How the Airtable API represents percent fields (fraction or whole number) | Phase 10 |
 | U-18, U-19 | Unassigned | — |

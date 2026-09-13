@@ -6,6 +6,7 @@ import { controlDb } from '../db/client';
 import * as schema from '../db/schema/auth';
 import { getServerEnv } from '../env';
 import { sendAuthEmail } from './mailer';
+import { membershipAuditAfterHook, membershipAuditHooks } from './membership-audit';
 
 const env = getServerEnv();
 
@@ -29,11 +30,14 @@ export const auth = betterAuth({
         link: url,
       }),
   },
+  // Invitations, role changes and removals are audited (AUTH-005, ADR-029).
+  hooks: { after: membershipAuditAfterHook },
   plugins: [
     organization({
       ac,
       roles,
       creatorRole: 'owner',
+      organizationHooks: membershipAuditHooks,
       // Explicit, per GHSA-fmh4-wcc4-5jm3: the implicit default flips with ID generation.
       requireEmailVerificationOnInvitation: true,
       sendInvitationEmail: ({ id, email, role, organization: workspace, inviter }) => {
