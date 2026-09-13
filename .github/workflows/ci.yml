@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COPILOTKIT_TELEMETRY_DISABLED: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  biome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run check
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run typecheck
+
+  vitest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      # Unit + integration. Agent tests start an in-process AIMock; no model key.
+      - run: npm test
+
+  playwright:
+    runs-on: ubuntu-latest
+    needs: [typecheck, vitest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start AIMock
+        run: |
+          docker run -d --name aimock \
+            -p 4010:4010 \
+            -v ${{ github.workspace }}/fixtures/aimock:/fixtures \
+            ghcr.io/copilotkit/aimock -h 0.0.0.0 -f /fixtures
+          echo "Waiting for AIMock on port 4010..."
+          for i in $(seq 1 30); do
+            curl -s http://127.0.0.1:4010/ > /dev/null 2>&1 && echo "AIMock ready" && exit 0
+            sleep 1
+          done
+          echo "=== AIMock logs ===" && docker logs aimock
+          echo "AIMock failed to start" && exit 1
+      # playwright.config.ts builds and starts the app with a keyless env pointed at AIMock.
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
