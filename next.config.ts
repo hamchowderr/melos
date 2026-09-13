@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
     '@copilotkit/runtime',
     '@ag-ui/mastra',
   ],
+  // `next dev` logs full request URLs; auth email links carry a verification token or an
+  // invitation id, and neither may reach server logs.
+  logging: { incomingRequests: { ignore: [/\/api\/auth\/verify-email/, /\/invitations\//] } },
 };
 
 export default nextConfig;
