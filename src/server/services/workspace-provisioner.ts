@@ -1,10 +1,9 @@
-import { type Client, createClient } from '@libsql/client';
+import type { Client } from '@libsql/client';
 import { and, eq, getTableColumns, isNull, type SQL } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { controlDb } from '../db/client';
 import { controlAuditLog, workspaceRegistry } from '../db/schema/control';
-import { createTokenCipher } from '../db/token-cipher';
-import { createWorkspaceHost } from '../db/workspace-hosts';
+import { createWorkspaceHost, openWorkspaceDatabase } from '../db/workspace-hosts';
 import { applyWorkspaceMigrations } from '../db/workspace-migrations';
 import { getServerEnv } from '../env';
 import { errorCode } from '../error-code';
@@ -88,7 +87,11 @@ const readRow = async (organizationId: string): Promise<WorkspaceRegistryRow | u
  * is atomic without holding a transaction. It sets no key column, so IntegrityGuard has no §4.4
  * check to apply.
  */
-async function writeIf(id: string, where: SQL | undefined, set: Partial<WorkspaceRegistryRow>) {
+export async function writeIf(
+  id: string,
+  where: SQL | undefined,
+  set: Partial<WorkspaceRegistryRow>,
+) {
   const matches = and(eq(workspaceRegistry.id, id), where);
   const update = controlDb.update(workspaceRegistry).set({ ...set, updatedAt: now() });
   const [row] = await update.where(matches).returning();
@@ -96,7 +99,7 @@ async function writeIf(id: string, where: SQL | undefined, set: Partial<Workspac
 }
 
 /** Matches the row only while it keeps the `status`, `updated_at` and `attempt_id` read. */
-function unchanged(row: WorkspaceRegistryRow): SQL | undefined {
+export function unchanged(row: WorkspaceRegistryRow): SQL | undefined {
   const { status, updatedAt, attemptId } = workspaceRegistry;
   const held = row.attemptId === null ? isNull(attemptId) : eq(attemptId, row.attemptId);
   return and(eq(status, row.status), eq(updatedAt, row.updatedAt), held);
@@ -161,11 +164,8 @@ export async function provisionWorkspace(
     // Both hosts return the database an earlier attempt created (ADR-031).
     const { url, tokenCiphertext } = await host.create(row.databaseName);
     await ownerWrite({ databaseUrl: url, dbTokenCiphertext: tokenCiphertext, statusDetail: null });
-    const authToken =
-      setting.kind === 'turso' && tokenCiphertext
-        ? createTokenCipher(setting.tokenKey).decrypt(tokenCiphertext, row.databaseName)
-        : undefined;
-    const client = createClient({ url, authToken });
+    const database = { databaseUrl: url, dbTokenCiphertext: tokenCiphertext };
+    const client = openWorkspaceDatabase(setting, { ...row, ...database });
     try {
       step = 'migrate';
       const onApplied = async () => void (await ownerWrite({}));
