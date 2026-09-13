@@ -23,7 +23,8 @@
     "aimock": "aimock -c aimock.json",
     "auth:generate": "auth generate --config src/server/auth/auth.ts --output src/server/db/schema/auth.ts --yes",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:fk-rules": "node src/server/db/fk-rules.ts"
   },
   "dependencies": {
     "@ag-ui/client": "0.0.59",
