@@ -22,6 +22,7 @@ const rawEnvSchema = z.object({
   ),
   BETTER_AUTH_URL: optionalUrl,
   VERCEL: optionalText,
+  VERCEL_ENV: optionalText,
   VERCEL_URL: optionalText,
   VERCEL_BRANCH_URL: optionalText,
   VERCEL_PROJECT_PRODUCTION_URL: optionalText,
@@ -35,6 +36,10 @@ const rawEnvSchema = z.object({
   MELOS_EMAIL_TRANSPORT: z.preprocess(
     blankToUndefined,
     z.enum(['sandbox'], { error: 'must be one of: sandbox' }).default('sandbox'),
+  ),
+  MELOS_AUTH_MAILER: z.preprocess(
+    blankToUndefined,
+    z.enum(['outbox', 'memory'], { error: 'must be one of: outbox, memory' }).default('outbox'),
   ),
 });
 
@@ -64,6 +69,11 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
     }
   }
 
+  // Both mailers are development mailers; production gets one when phase 8 wires Resend.
+  if (env.VERCEL_ENV === 'production') {
+    flag('MELOS_AUTH_MAILER', 'selects a development mailer, which production refuses');
+  }
+
   if (!env.MELOS_LLM_BASE_URL) {
     if (!env.MELOS_CHAT_MODEL) {
       flag('MELOS_CHAT_MODEL', 'is required (tests set MELOS_LLM_BASE_URL instead)');
@@ -86,6 +96,7 @@ export type ServerEnv = {
   agentDatabase: DatabaseSetting;
   chatModel: ChatModelSetting;
   emailTransport: 'sandbox';
+  authMailer: 'outbox' | 'memory';
 };
 
 export type EnvProblem = { name: string; reason: string };
@@ -161,6 +172,7 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
         }
       : { provider: 'router', id: env.MELOS_CHAT_MODEL ?? '' },
     emailTransport: env.MELOS_EMAIL_TRANSPORT,
+    authMailer: env.MELOS_AUTH_MAILER,
   };
 }
 

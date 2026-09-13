@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
     '@copilotkit/runtime',
     '@ag-ui/mastra',
   ],
+  // `next dev` logs request URLs; auth email links (token, invitation id) must not reach logs.
+  logging: { incomingRequests: { ignore: [/\/api\/auth\/verify-email/, /\/invitations\//] } },
 };
 
 export default nextConfig;

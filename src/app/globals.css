@@ -85,6 +85,12 @@ body {
   color: var(--melos-muted);
 }
 
+.auth-card button.secondary {
+  background: transparent;
+  color: var(--melos-ink);
+  border: 1px solid var(--melos-line);
+}
+
 .chat-page {
   height: 100dvh;
   display: flex;

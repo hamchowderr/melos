@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseServerEnv, ServerEnvError, TEST_CHAT_MODEL_ID } from '../../src/server/env';
 
 const SECRET = 'unit-test-secret-value-that-is-long-enough';
@@ -11,6 +11,10 @@ function problemsOf(source: Record<string, string | undefined>) {
   }
   throw new Error('expected a ServerEnvError');
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe('parseServerEnv', () => {
   it('uses local file databases and localhost when nothing else is set', () => {
@@ -68,6 +72,16 @@ describe('parseServerEnv', () => {
     expect(error.problems.map((p) => p.name)).toEqual(['MASTRA_GATEWAY_API_KEY']);
   });
 
+  it('fails production startup while a development mailer is selected', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('NEXT_RUNTIME', 'nodejs');
+    vi.resetModules();
+    const { register } = await import('../../src/instrumentation');
+    const failure = (await register().catch((error: unknown) => error)) as ServerEnvError;
+    expect(failure.problems.map((p) => p.name)).toEqual(['MELOS_AUTH_MAILER']);
+    expect(failure.message).toContain('development mailer, which production refuses');
+  });
+
   it('refuses local files and the test model endpoint on Vercel', () => {
     const error = problemsOf({
       VERCEL: '1',
@@ -109,6 +123,7 @@ describe('parseServerEnv', () => {
       'https://melos-git-feat-otaku.vercel.app',
       'https://melos-abc123-otaku.vercel.app',
     ]);
+    expect(parseServerEnv({ ...vercel, VERCEL_ENV: 'preview' }).authMailer).toBe('outbox');
 
     expect(parseServerEnv(vercel).auth.baseURL).toBe('https://melos-abc123-otaku.vercel.app');
 
