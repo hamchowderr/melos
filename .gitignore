@@ -1,4 +1,17 @@
 
+# App
+node_modules/
+.next/
+.mastra/
+next-env.d.ts
+*.tsbuildinfo
+data/
+test-results/
+playwright-report/
+.env
+.env.local
+.env.*.local
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
