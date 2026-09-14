@@ -235,6 +235,27 @@ test('melos-g4u: a sign-out that fails on the network shows its error and can be
   await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
 });
 
+test('melos-g4u: on a phone, the workspace header fits, with or without a sign-out error', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await signUpWithWorkspace(page, 'Phone');
+  await page.route('**/api/auth/sign-out', (route) => route.abort());
+  const signOut = page.getByRole('button', { name: 'Sign out' });
+
+  for (const failed of [false, true]) {
+    if (failed) await signOut.click();
+    if (failed) await expect(signOutError(page)).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId('active-workspace-name')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Switch workspace' })).toBeInViewport({ ratio: 1 });
+    await expect(signOut).toBeInViewport({ ratio: 1 });
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  }
+});
+
 test('TEN-002: a member of a failed workspace is told why, not sent to /workspaces/new', async ({
   page,
 }) => {
