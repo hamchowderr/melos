@@ -188,6 +188,8 @@ describe('parseServerEnv', () => {
     const keyed = { BETTER_AUTH_SECRET: SECRET, AI_GATEWAY_API_KEY: 'gateway-key-for-test' };
     const routerSpellings = [
       'mastra/anthropic/claude-haiku-4.5',
+      'vercel/anthropic/claude-haiku-4.5',
+      'Anthropic/claude-haiku-4.5',
       'anthropic/claude-haiku-4-5',
       'anthropic/claude-sonnet-4-5-20250929',
       'claude-haiku-4.5',
@@ -207,11 +209,18 @@ describe('parseServerEnv', () => {
       });
     }
 
-    // A blank key is refused, not ignored: the gateway provider would send it (model.test.ts).
+    // A blank key is refused, not ignored: the gateway provider would send it (model.test.ts). Off
+    // Vercel only a real chat model needs the key; on Vercel any key would override OIDC.
     for (const key of ['', '   ']) {
-      expect(problemsOf({ ...keyed, AI_GATEWAY_API_KEY: key }).problems).toEqual([
-        { name: 'AI_GATEWAY_API_KEY', reason: 'must not be blank' },
-      ]);
+      const blank = {
+        ...keyed,
+        MELOS_CHAT_MODEL: 'anthropic/claude-haiku-4.5',
+        AI_GATEWAY_API_KEY: key,
+      };
+      expect(parseServerEnv(blank).chatModel).toEqual({
+        provider: 'unconfigured',
+        problems: [{ name: 'AI_GATEWAY_API_KEY', reason: 'must not be blank' }],
+      });
       expect(
         problemsOf({ ...keyed, VERCEL: '1', AI_GATEWAY_API_KEY: key }).problems,
       ).toContainEqual({

@@ -124,8 +124,6 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
         'must not be set on Vercel (the OIDC token authenticates the gateway)',
       );
     }
-  } else if (env.AI_GATEWAY_API_KEY?.trim() === '') {
-    flag('AI_GATEWAY_API_KEY', 'must not be blank');
   }
 
   // outbox and memory are development mailers; production gets one when phase 8 wires Resend.
@@ -232,8 +230,11 @@ function resolveWorkspaceHost(env: RawEnv): WorkspaceHostSetting {
   return { kind: 'unconfigured', missing: names.filter((name) => !env[name]) };
 }
 
-/** Mastra router spellings the gateway does not serve: `mastra/…`, and `claude-haiku-4-5`-style ids. */
-const ROUTER_MODEL_ID = /^(?:mastra\/|anthropic\/claude-(?:[a-z]+-)?\d+-\d+(?:-|$))/;
+/** `creator/model` with a lower-case creator, as AI Gateway model ids are written. */
+const GATEWAY_MODEL_ID = /^[a-z0-9][a-z0-9._-]*\/\S+$/;
+/** Router spellings the gateway does not serve: `mastra/…`, `vercel/<creator>/…`, `claude-haiku-4-5`. */
+const ROUTER_MODEL_ID =
+  /^(?:mastra\/|vercel\/[^/]+\/|anthropic\/claude-(?:[a-z]+-)?\d+-\d+(?:-|$))/;
 
 /**
  * A real model goes through the Vercel AI Gateway (ADR-034); on Vercel its credential is the OIDC
@@ -249,19 +250,20 @@ function resolveChatModel(env: RawEnv): ChatModelSetting | UnconfiguredChatModel
   if (!id) {
     const reason = 'is required (tests set MELOS_LLM_BASE_URL instead)';
     problems.push({ name: 'MELOS_CHAT_MODEL', reason });
-  } else if (!/^[^/\s]+\/\S+$/.test(id) || ROUTER_MODEL_ID.test(id)) {
+  } else if (!GATEWAY_MODEL_ID.test(id) || ROUTER_MODEL_ID.test(id)) {
     const reason =
       'must be an AI Gateway model id such as anthropic/claude-haiku-4.5, not a router id';
     problems.push({ name: 'MELOS_CHAT_MODEL', reason });
   }
-  if (!env.VERCEL && !env.AI_GATEWAY_API_KEY) {
-    problems.push({
-      name: 'AI_GATEWAY_API_KEY',
-      reason: 'is required off Vercel for a real model',
-    });
+  // On Vercel parseServerEnv refuses any key. Elsewhere the provider would send a blank one.
+  const apiKey = env.AI_GATEWAY_API_KEY;
+  if (!env.VERCEL && !apiKey?.trim()) {
+    const reason =
+      apiKey === undefined ? 'is required off Vercel for a real model' : 'must not be blank';
+    problems.push({ name: 'AI_GATEWAY_API_KEY', reason });
   }
   if (!id || problems.length > 0) return { provider: 'unconfigured', problems };
-  return { provider: 'gateway', id, apiKey: env.AI_GATEWAY_API_KEY };
+  return { provider: 'gateway', id, apiKey };
 }
 
 /** The chat model, or a ServerEnvError naming what it lacks. App startup and Mastra call it. */
