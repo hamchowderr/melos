@@ -28,6 +28,7 @@
     "db:workspace-tables": "node src/server/db/workspace-tables.ts",
     "db:workspace-migrations": "node src/server/db/embed-workspace-migrations.ts",
     "db:migrate-workspaces": "tsx --env-file-if-exists=.env.local scripts/migrate-workspaces.ts",
+    "db:seed-demo": "tsx --env-file-if-exists=.env.local scripts/seed-demo.ts",
     "workspace:provision": "tsx --env-file-if-exists=.env.local scripts/workspace-provision.ts"
   },
   "dependencies": {
