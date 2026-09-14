@@ -5,6 +5,7 @@ import {
   activeWorkspaceId,
   createWorkspace,
   pingInChat,
+  setMemberRole,
   setWorkspaceStatus,
   signIn,
   signOut,
@@ -188,6 +189,21 @@ test('melos-g4u: a member stuck on a failed workspace switches or signs out from
   await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
   await page.goto('/');
   await expect(page).toHaveURL(/\/sign-in$/);
+});
+
+test('melos-g4u: a member whose active workspace has an invalid role picks from the others', async ({
+  page,
+}) => {
+  const { names, secondId } = await signUpWithTwoWorkspaces(page, 'Misrole', ['Kept', 'Broken']);
+  // A configuration error: Melos assigns one role per member (P-30).
+  await setMemberRole(secondId, 'owner,viewer');
+
+  for (const path of ['/', '/settings']) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/workspaces$/);
+    await expect(workspaceButtons(page)).toHaveCount(1);
+    await expect(workspaceButtons(page)).toContainText(names[0]);
+  }
 });
 
 test('TEN-002: a member of a failed workspace is told why, not sent to /workspaces/new', async ({

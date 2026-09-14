@@ -1,5 +1,7 @@
 import type { LLMock } from '@copilotkit/aimock';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { member } from '../../src/server/db/schema/auth';
 import { prepareTestEnvironment, TestClient } from './support';
 
 type Handler = (request: Request) => Promise<Response>;
@@ -11,11 +13,15 @@ const password = 'integration-password-123';
 let mock: LLMock;
 let authRoute: { POST: Handler };
 let auth: typeof import('../../src/server/auth/auth').auth;
+let controlDb: typeof import('../../src/server/db/client').controlDb;
+let listMemberships: typeof import('../../src/server/services/memberships').listMemberships;
 
 beforeAll(async () => {
   mock = await prepareTestEnvironment('sign-in-workspace');
   authRoute = await import('../../src/app/api/auth/[...all]/route');
   ({ auth } = await import('../../src/server/auth/auth'));
+  ({ controlDb } = await import('../../src/server/db/client'));
+  ({ listMemberships } = await import('../../src/server/services/memberships'));
 });
 
 afterAll(async () => {
@@ -77,5 +83,39 @@ describe('melos-2lm: a new session opens the only workspace its user is a member
   it('opens no workspace for a user with two, who picks one at /workspaces', async () => {
     await createWorkspace(ownerClient, 'gamma');
     expect((await signIn(owner)).active).toBeNull();
+  });
+});
+
+describe('melos-g4u: a membership with an invalid role is never listed or opened (P-30)', () => {
+  const invalidRoles = ['owner,viewer', 'superuser'];
+  let person: Person;
+  let client: TestClient;
+  let delta = '';
+
+  /** Writes the role straight to the control database, past singleRolePlugin. */
+  const setDeltaRole = (role: string) => {
+    const row = and(eq(member.userId, person.userId), eq(member.organizationId, delta));
+    return controlDb.update(member).set({ role }).where(row);
+  };
+
+  it('lists and opens nothing when that is the only membership', async () => {
+    person = await signUp('misrole');
+    ({ client } = await signIn(person));
+    delta = await createWorkspace(client, 'delta');
+    for (const role of invalidRoles) {
+      await setDeltaRole(role);
+      expect(await listMemberships(person.userId)).toEqual([]);
+      expect((await signIn(person)).active).toBeNull();
+    }
+  });
+
+  it('lists and opens the one valid membership beside it', async () => {
+    const epsilon = await createWorkspace(client, 'epsilon');
+    for (const role of invalidRoles) {
+      await setDeltaRole(role);
+      const valid = { organizationId: epsilon, name: 'epsilon', role: 'owner' };
+      expect(await listMemberships(person.userId)).toEqual([valid]);
+      expect((await signIn(person)).active).toBe(epsilon);
+    }
   });
 });

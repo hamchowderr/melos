@@ -95,6 +95,14 @@ export async function setWorkspaceStatus(organizationId: string, status: string)
   await controlQuery(sql, [status, organizationId]);
 }
 
+/** Sets the role of every member of an organization, as a configuration error would (P-30). */
+export async function setMemberRole(organizationId: string, role: string): Promise<void> {
+  await controlQuery('UPDATE member SET role = ? WHERE organization_id = ?', [
+    role,
+    organizationId,
+  ]);
+}
+
 /** Sends "ping" (fixtures/aimock/ping.json) and waits for the ping tool's card. */
 export async function pingInChat(page: Page): Promise<void> {
   const input = page.getByRole('textbox').first();
