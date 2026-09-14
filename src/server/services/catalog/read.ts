@@ -237,7 +237,11 @@ export async function getSongCatalog(
         .from(recordingContributors)
         .innerJoin(parties, eq(parties.id, recordingContributors.partyId))
         .where(ofSong(recordingContributors.recordingId))
-        .orderBy(asc(recordingContributors.role), asc(parties.displayName)),
+        .orderBy(
+          asc(recordingContributors.role),
+          asc(parties.displayName),
+          asc(recordingContributors.id),
+        ),
       database
         .select(TERM)
         .from(recordingTerms)
@@ -249,7 +253,14 @@ export async function getSongCatalog(
         .from(releaseTracks)
         .innerJoin(releases, eq(releases.id, releaseTracks.releaseId))
         .where(and(ofSong(releaseTracks.recordingId), isNull(releases.deletedAt)))
-        .orderBy(asc(releases.releaseDate), asc(releases.title), asc(releaseTracks.discNumber)),
+        .orderBy(
+          asc(releases.releaseDate),
+          asc(releases.title),
+          asc(releaseTracks.discNumber),
+          asc(releaseTracks.trackNumber),
+          asc(releases.id),
+          asc(releaseTracks.recordingId),
+        ),
     ]);
   });
   // Only the database work is sanitized, so a bug in the mapping throws as itself.
