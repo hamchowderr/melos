@@ -1,15 +1,17 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
-import { type Client, createClient } from '@libsql/client';
+import { type Client, createClient, type InValue } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import { migrate } from 'drizzle-orm/libsql/migrator';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { validateSeeded } from '../../docs/fixtures/validate.mjs';
 import { openWithoutForeignKeys, TestClient } from './support';
 
 type Handler = (request: Request) => Promise<Response>;
 type Tables = Record<string, Record<string, unknown>[]>;
 type Seed = typeof import('../../src/server/db/seed/northstar');
 type Command = typeof import('../../scripts/seed-demo');
+type ValidateCommand = typeof import('../../scripts/validate-demo');
 
 const DATA_DIR = 'data/test-northstar-seed';
 const PASSWORD = 'northstar-seed-password-never-printed';
@@ -32,6 +34,7 @@ let workspace: Client;
 let authRoute: { POST: Handler };
 let seed: Seed;
 let runSeedDemoCommand: Command['runSeedDemoCommand'];
+let runValidateDemoCommand: ValidateCommand['runValidateDemoCommand'];
 const clients: Client[] = [];
 
 const open = (url: string) => clients[clients.push(createClient({ url })) - 1];
@@ -76,6 +79,7 @@ beforeAll(async () => {
   authRoute = await import('../../src/app/api/auth/[...all]/route');
   seed = await import('../../src/server/db/seed/northstar');
   ({ runSeedDemoCommand } = await import('../../scripts/seed-demo'));
+  ({ runValidateDemoCommand } = await import('../../scripts/validate-demo'));
   const seeded = await seed.seedNorthstar({ password: PASSWORD, seedDate: '2026-09-14' });
   expect(seeded).toMatchObject({ status: 'seeded', organizationId: ORGANIZATION_ID, dateShift: 0 });
   workspace = open(String((await registryOf(control.$client)).database_url));
@@ -223,5 +227,83 @@ describe('melos-cqn.1: the Northstar Demo Catalog seed (§8 phase 3)', () => {
     expect([remote.status, remote.stdout]).toEqual([2, '']);
     const output = [done, refused, remote].map(({ stdout, stderr }) => stdout + stderr);
     expect(output.join('')).not.toContain(PASSWORD);
+  });
+});
+
+// Runs after the seed tests, which compare seeded rows: the share case edits the seeded workspace.
+describe('melos-cqn.2: a seeded Northstar workspace meets every demo precondition (§5.6, §6.5)', () => {
+  const lines: string[] = [];
+  const validate = () => runValidateDemoCommand([], (line) => lines.push(line));
+
+  it('db:validate-demo passes the full validate.mjs assertion set against the seed for 2026-09-14', async () => {
+    const script = spawnSync(process.execPath, ['docs/fixtures/validate.mjs'], {
+      encoding: 'utf8',
+      timeout: 50_000,
+    });
+    const [, total] = /^(\d+) assertions, 0 failed\n$/.exec(script.stdout) ?? [];
+    expect([script.status, total], script.stderr).toEqual([0, expect.stringMatching(/^\d+$/)]);
+    expect(await validate()).toBe(0);
+    expect(lines).toEqual([`${total} assertions, 0 failed`]);
+  });
+
+  it('passes when the control database also holds another organization, its member and workspace', async () => {
+    // Fixture rows under new ids, in parent order: no Northstar check may count them.
+    type Row = Record<string, InValue>;
+    const organizationId = 'organization_OTHER';
+    const like = (table: string, values: Row): Row => ({ ...fixture.control[table][0], ...values });
+    const owner = { user_id: 'usr_OTHER', organization_id: organizationId };
+    const database = { organization_id: organizationId, database_name: 'melos-ws-OTHER' };
+    const others: [string, Row][] = [
+      ['user', like('user', { id: 'usr_OTHER', email: 'other@other.example' })],
+      ['organization', like('organization', { id: organizationId, slug: 'other' })],
+      ['member', like('member', { id: 'member_OTHER', ...owner })],
+      ['workspace_registry', like('workspace_registry', { id: 'ws_OTHER', ...database })],
+    ];
+    const insert = ([table, row]: [string, Row]) => {
+      const columns = Object.keys(row).map((column) => `"${column}"`);
+      const sql = `INSERT INTO "${table}" (${columns}) VALUES (${columns.map(() => '?')})`;
+      return { sql, args: Object.values(row) };
+    };
+    await control.$client.batch(others.map(insert), 'write');
+    lines.length = 0;
+    try {
+      expect(await validate(), lines.join('\n')).toBe(0);
+    } finally {
+      const remove = ([table, { id }]: [string, Row]) => ({
+        sql: `DELETE FROM "${table}" WHERE id = ?`,
+        args: [id],
+      });
+      await control.$client.batch([...others].reverse().map(remove), 'write');
+    }
+  });
+
+  it('fails the seeded run with the check name when a pitch event is deleted or a share changes', async () => {
+    // pitch_events is append-only, so the delete runs on a copy without its delete trigger.
+    const copy = `${DATA_DIR}/pitch-event-deleted.db`;
+    await workspace.execute(`VACUUM INTO '${copy}'`);
+    const deleted = open(`file:./${copy}`);
+    await deleted.execute('DROP TRIGGER pitch_events_no_delete');
+    const event =
+      "DELETE FROM pitch_events WHERE pitch_item_id = ? AND to_status = 'awaiting_reply'";
+    const removed = await deleted.execute({ sql: event, args: [keys.pti_PAPER_REBECCA] });
+    expect(removed.rowsAffected).toBe(1);
+    const { failures } = await validateSeeded(control.$client, deleted);
+    const status = 'pti_PAPER_REBECCA current_status is the latest status event';
+    expect(failures).toContainEqual(
+      expect.objectContaining({ group: 'projections', label: status }),
+    );
+
+    const share = 'UPDATE composition_contributors SET writer_share_bp = ? WHERE id = ?';
+    await workspace.execute({ sql: share, args: [4000, keys.ctr_OCEAN_ALEX] });
+    lines.length = 0;
+    try {
+      expect(await validate()).toBe(1);
+    } finally {
+      await workspace.execute({ sql: share, args: [5000, keys.ctr_OCEAN_ALEX] });
+    }
+    expect(lines).toContainEqual(
+      expect.stringMatching(/^FAIL \[contract\] §6\.5 Ocean Blue totals\n/),
+    );
+    expect(lines.at(-1)).toMatch(/^\d+ assertions, [1-9]\d* failed$/);
   });
 });

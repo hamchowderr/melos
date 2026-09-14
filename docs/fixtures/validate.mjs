@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 // Validates the Northstar demo fixture (beads melos-73v).
 //
-// 1. Extracts the workspace and control-plane DDL from docs/CONTRACT.md and applies it to fresh libSQL files.
+// 1. Extracts the workspace and control-plane DDL from docs/CONTRACT.md and applies it to fresh in-memory libSQL databases.
 // 2. Loads docs/fixtures/northstar-demo.json.
 // 3. Asserts, with SQL, every table in docs/fixtures/EXPECTED.md marked <!-- check:... -->, the fixture
 //    invariants, the source fixture (docs/source/GIZMO_Demo_Fixture.json) and the CONTRACT §6.5 readiness table.
 //
 // Run from anywhere: node docs/fixtures/validate.mjs. Exits 1 on any mismatch.
+// validateSeeded runs the same checks against a seeded Northstar workspace (npm run db:validate-demo).
 // @libsql/client resolves from LIBSQL_CLIENT_BASE (a package.json path), the repository root, or the Gate A worktree.
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,7 +21,7 @@ const readText = (rel) => readFileSync(path.join(REPO, rel), 'utf8').replace(/\r
 
 const contractMd = readText('docs/CONTRACT.md');
 const expectedMd = readText('docs/fixtures/EXPECTED.md');
-const fixture = JSON.parse(readText('docs/fixtures/northstar-demo.json'));
+export const fixture = JSON.parse(readText('docs/fixtures/northstar-demo.json'));
 const source = JSON.parse(readText('docs/source/GIZMO_Demo_Fixture.json'));
 
 // ---------- assertions ----------
@@ -233,15 +233,11 @@ function loadLibsql() {
   );
 }
 
-// Windows can hold libSQL file handles briefly after close; a leftover temp directory is not a failure.
-function removeDir(dir) {
-  try {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
-  } catch {}
-}
-
-async function freshDb(dir, name, ddl) {
-  const db = loadLibsql().createClient({ url: `file:${path.join(dir, name).replace(/\\/g, '/')}` });
+// In memory, because a closed libSQL file stays locked on Windows until its statements are garbage
+// collected, so its temp directory could not be removed. One connection serves the whole database:
+// nothing may use the client while one of its transactions is open.
+async function freshDb(ddl) {
+  const db = loadLibsql().createClient({ url: ':memory:' });
   await db.execute('PRAGMA foreign_keys = ON');
   await db.executeMultiple(ddl);
   return db;
@@ -711,7 +707,10 @@ async function checkProjections(ws) {
 }
 
 async function checkMembership(ws, ctl) {
-  const members = await q(ctl, 'SELECT user_id, role FROM member');
+  // A shared control database holds other organizations' members.
+  const members = await q(ctl, 'SELECT user_id, role FROM member WHERE organization_id = ?', [
+    idOf(fixture.demo.organization),
+  ]);
   check(
     'membership',
     'only Jordan Taylor is a member',
@@ -1436,15 +1435,13 @@ async function checkExpected(ws, ctl, workspaceDdl, ready, tables) {
     },
     audit_rows: async () => String((await q(ws, 'SELECT COUNT(*) AS n FROM audit_log'))[0].n),
     other_workspace: async (cmp) => {
-      const dir = mkdtempSync(path.join(tmpdir(), 'melos-fixture-other-'));
-      const other = await freshDb(dir, 'other.db', workspaceDdl);
+      const other = await freshDb(workspaceDdl);
       try {
         return (await q(other, 'SELECT id FROM compositions WHERE id = ?', [idOf(cmp)])).length
           ? 'FOUND'
           : 'NOT_FOUND';
       } finally {
         other.close();
-        removeDir(dir);
       }
     },
     template: async (preset) =>
@@ -1532,7 +1529,8 @@ async function checkExpected(ws, ctl, workspaceDdl, ready, tables) {
 
 // ---------- main ----------
 
-async function main() {
+/** The workspace, Better Auth and control-plane DDL in CONTRACT.md. */
+function contractDdl() {
   const workspaceDdl = sections(contractMd, /^### [\d.]+ Workspace database\b/)
     .flatMap(sqlBlocks)
     .join('\n');
@@ -1551,40 +1549,67 @@ async function main() {
     if (!ddl.includes(marker))
       throw new Error(`${name} DDL extracted from CONTRACT.md lacks "${marker}"`);
   }
+  return { workspaceDdl, betterAuthDdl, controlDdl };
+}
 
-  const dir = mkdtempSync(path.join(tmpdir(), 'melos-fixture-'));
-  const ws = await freshDb(dir, 'workspace.db', workspaceDdl);
-  const ctl = await freshDb(dir, 'control.db', `${betterAuthDdl}\n${controlDdl}`);
+/** Runs every check against loaded workspace and control databases. */
+async function runChecks(ws, ctl, { workspaceDdl, betterAuthDdl, controlDdl }) {
+  assertions = 0;
+  failures.length = 0;
+  await checkIds(ws, ctl, workspaceDdl, `${betterAuthDdl}\n${controlDdl}`);
+  await checkIntegrity(ws, ctl);
+  await checkFictional();
+  await checkProjections(ws);
+  await checkMembership(ws, ctl);
+  const ready = await readiness(ws);
+  await checkSource(ws, ready);
+  await checkContractReadiness(ws, ready);
+  await checkExpected(ws, ctl, workspaceDdl, ready, checkTables(expectedMd));
+  check(
+    'integrity',
+    'workspace PRAGMA foreign_key_check after every check',
+    await q(ws, 'PRAGMA foreign_key_check'),
+    [],
+  );
+  check(
+    'integrity',
+    'control PRAGMA foreign_key_check after every check',
+    await q(ctl, 'PRAGMA foreign_key_check'),
+    [],
+  );
+  return { assertions, failures: [...failures] };
+}
+
+/**
+ * Runs every check against open control and workspace clients of a seeded Northstar workspace
+ * (melos-cqn.2), without loading the fixture or building catalog_search. Provisioner-owned ids map
+ * to their keys as the seed maps them, the workspace by organization and report templates by
+ * preset_key; every other key must match exactly. Returns the assertion count and the failures.
+ * Calls must not overlap: they share this module's key map and assertion results.
+ */
+export async function validateSeeded(ctl, ws) {
+  const registry = 'SELECT id FROM workspace_registry WHERE organization_id = ?';
+  for (const { id } of await q(ctl, registry, [idOf(fixture.demo.organization)]))
+    keyOf.set(id, fixture.demo.workspace);
+  for (const template of fixture.workspace.report_templates) {
+    const preset = 'SELECT id FROM report_templates WHERE preset_key = ?';
+    for (const { id } of await q(ws, preset, [template.preset_key])) keyOf.set(id, K(template.id));
+  }
+  return runChecks(ws, ctl, contractDdl());
+}
+
+async function main() {
+  const { workspaceDdl, betterAuthDdl, controlDdl } = contractDdl();
+  const ws = await freshDb(workspaceDdl);
+  const ctl = await freshDb(`${betterAuthDdl}\n${controlDdl}`);
   try {
     await load(ctl, fixture.control);
     await load(ws, fixture.workspace);
     await buildSearchIndex(ws);
-
-    await checkIds(ws, ctl, workspaceDdl, `${betterAuthDdl}\n${controlDdl}`);
-    await checkIntegrity(ws, ctl);
-    await checkFictional();
-    await checkProjections(ws);
-    await checkMembership(ws, ctl);
-    const ready = await readiness(ws);
-    await checkSource(ws, ready);
-    await checkContractReadiness(ws, ready);
-    await checkExpected(ws, ctl, workspaceDdl, ready, checkTables(expectedMd));
-    check(
-      'integrity',
-      'workspace PRAGMA foreign_key_check after every check',
-      await q(ws, 'PRAGMA foreign_key_check'),
-      [],
-    );
-    check(
-      'integrity',
-      'control PRAGMA foreign_key_check after every check',
-      await q(ctl, 'PRAGMA foreign_key_check'),
-      [],
-    );
+    await runChecks(ws, ctl, { workspaceDdl, betterAuthDdl, controlDdl });
   } finally {
     ws.close();
     ctl.close();
-    removeDir(dir);
   }
 
   for (const f of failures)
@@ -1595,7 +1620,10 @@ async function main() {
   process.exitCode = failures.length ? 1 : 0;
 }
 
-main().catch((err) => {
-  console.error(err.stack ?? err);
-  process.exitCode = 1;
-});
+// Only when node runs this file; npm run db:validate-demo imports validateSeeded instead. Node
+// resolves a junction or symlink in the started path, so both sides are real paths.
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url))
+  main().catch((err) => {
+    console.error(err.stack ?? err);
+    process.exitCode = 1;
+  });
