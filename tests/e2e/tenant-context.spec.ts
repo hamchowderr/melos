@@ -149,3 +149,22 @@ test('TEN-002: a member of a migrating workspace is not told a reload opens chat
   );
   await expect(page.getByRole('textbox')).toHaveCount(0);
 });
+
+test('TEN-002: a member of a provisioning workspace is not told a reload opens chat', async ({
+  page,
+}) => {
+  await signUpWithWorkspace(page, 'Provisioning');
+  await setWorkspaceStatus(await activeOrganizationId(page), 'provisioning');
+
+  await page.goto('/');
+  await expect(
+    page.getByRole('heading', { name: 'Your workspace is still being set up' }),
+  ).toBeVisible();
+  // An attempt that dies before its last write leaves the row provisioning until a retry (ADR-032).
+  const message = page.getByTestId('workspace-not-ready');
+  await expect(message).toHaveAttribute('data-status', 'provisioning');
+  await expect(message).toHaveText(
+    'Chat opens once its database is ready. If it stays unavailable, try again later, or contact the workspace owner.',
+  );
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+});
