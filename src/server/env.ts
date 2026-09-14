@@ -44,7 +44,8 @@ const rawEnvSchema = z.object({
     z.string().refine(isTokenKey, { error: 'must be 32 bytes encoded as base64' }).optional(),
   ),
   MELOS_CHAT_MODEL: optionalText,
-  MASTRA_GATEWAY_API_KEY: optionalText,
+  // Kept as given, not blanked: @ai-sdk/gateway reads any present value, whitespace included.
+  AI_GATEWAY_API_KEY: z.string().optional(),
   MELOS_LLM_BASE_URL: optionalUrl,
   MELOS_EMAIL_TRANSPORT: z.preprocess(
     blankToUndefined,
@@ -116,6 +117,13 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
     if (env.MELOS_LLM_BASE_URL) {
       flag('MELOS_LLM_BASE_URL', 'is test-only and must not be set on Vercel');
     }
+    // The gateway provider prefers a present key, even a blank one, over the OIDC token used here.
+    if (env.AI_GATEWAY_API_KEY !== undefined) {
+      flag(
+        'AI_GATEWAY_API_KEY',
+        'must not be set on Vercel (the OIDC token authenticates the gateway)',
+      );
+    }
   }
 
   // outbox and memory are development mailers; production gets one when phase 8 wires Resend.
@@ -124,14 +132,6 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
       'MELOS_AUTH_MAILER',
       'must be disabled in production (outbox and memory are for development)',
     );
-  }
-
-  if (!env.MELOS_LLM_BASE_URL) {
-    if (!env.MELOS_CHAT_MODEL) {
-      flag('MELOS_CHAT_MODEL', 'is required (tests set MELOS_LLM_BASE_URL instead)');
-    } else if (env.MELOS_CHAT_MODEL.startsWith('mastra/') && !env.MASTRA_GATEWAY_API_KEY) {
-      flag('MASTRA_GATEWAY_API_KEY', 'is required when MELOS_CHAT_MODEL uses the Mastra Gateway');
-    }
   }
 });
 
@@ -143,9 +143,13 @@ export type WorkspaceHostSetting =
   | { kind: 'turso'; apiToken: string; organization: string; group: string; tokenKey: string }
   | { kind: 'unconfigured'; missing: string[] };
 
+/** A real model goes through the AI Gateway: no key on Vercel (its OIDC token), a key elsewhere. */
 export type ChatModelSetting =
-  | { provider: 'router'; id: string }
+  | { provider: 'gateway'; id: string; apiKey?: string }
   | { provider: 'openai-compatible'; id: string; url: string };
+
+/** A chat model whose variables are missing or invalid; `requireChatModel` throws its problems. */
+export type UnconfiguredChatModel = { provider: 'unconfigured'; problems: EnvProblem[] };
 
 export type ServerEnv = {
   onVercel: boolean;
@@ -153,7 +157,7 @@ export type ServerEnv = {
   controlDatabase: DatabaseSetting;
   agentDatabase: DatabaseSetting;
   workspaceHost: WorkspaceHostSetting;
-  chatModel: ChatModelSetting;
+  chatModel: ChatModelSetting | UnconfiguredChatModel;
   emailTransport: 'sandbox';
   authMailer: 'outbox' | 'memory' | 'disabled';
   /** Lower-cased addresses that may sign up; null lets anyone sign up (never in production). */
@@ -226,6 +230,48 @@ function resolveWorkspaceHost(env: RawEnv): WorkspaceHostSetting {
   return { kind: 'unconfigured', missing: names.filter((name) => !env[name]) };
 }
 
+/** `creator/model` with a lower-case creator, as AI Gateway model ids are written. */
+const GATEWAY_MODEL_ID = /^[a-z0-9][a-z0-9._-]*\/\S+$/;
+/** Router spellings the gateway does not serve: `mastra/…`, `vercel/<creator>/…`, `claude-haiku-4-5`. */
+const ROUTER_MODEL_ID =
+  /^(?:mastra\/|vercel\/[^/]+\/|anthropic\/claude-(?:[a-z]+-)?\d+-\d+(?:-|$))/;
+
+/**
+ * A real model goes through the Vercel AI Gateway (ADR-034); on Vercel its credential is the OIDC
+ * token each request carries. Problems wait for `requireChatModel`, so operator scripts, which
+ * call no model, do not need these variables.
+ */
+function resolveChatModel(env: RawEnv): ChatModelSetting | UnconfiguredChatModel {
+  if (env.MELOS_LLM_BASE_URL) {
+    return { provider: 'openai-compatible', id: TEST_CHAT_MODEL_ID, url: env.MELOS_LLM_BASE_URL };
+  }
+  const id = env.MELOS_CHAT_MODEL;
+  const problems: EnvProblem[] = [];
+  if (!id) {
+    const reason = 'is required (tests set MELOS_LLM_BASE_URL instead)';
+    problems.push({ name: 'MELOS_CHAT_MODEL', reason });
+  } else if (!GATEWAY_MODEL_ID.test(id) || ROUTER_MODEL_ID.test(id)) {
+    const reason =
+      'must be an AI Gateway model id such as anthropic/claude-haiku-4.5, not a router id';
+    problems.push({ name: 'MELOS_CHAT_MODEL', reason });
+  }
+  // On Vercel parseServerEnv refuses any key. Elsewhere the provider would send a blank one.
+  const apiKey = env.AI_GATEWAY_API_KEY;
+  if (!env.VERCEL && !apiKey?.trim()) {
+    const reason =
+      apiKey === undefined ? 'is required off Vercel for a real model' : 'must not be blank';
+    problems.push({ name: 'AI_GATEWAY_API_KEY', reason });
+  }
+  if (!id || problems.length > 0) return { provider: 'unconfigured', problems };
+  return { provider: 'gateway', id, apiKey };
+}
+
+/** The chat model, or a ServerEnvError naming what it lacks. App startup and Mastra call it. */
+export function requireChatModel(setting: ServerEnv['chatModel']): ChatModelSetting {
+  if (setting.provider === 'unconfigured') throw new ServerEnvError(setting.problems);
+  return setting;
+}
+
 /** Parses an environment record. Throws ServerEnvError listing variable names, never values. */
 export function parseServerEnv(source: Record<string, string | undefined>): ServerEnv {
   const result = envSchema.safeParse(source);
@@ -251,13 +297,7 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
       authToken: env.MELOS_AGENT_DATABASE_AUTH_TOKEN,
     },
     workspaceHost: resolveWorkspaceHost(env),
-    chatModel: env.MELOS_LLM_BASE_URL
-      ? {
-          provider: 'openai-compatible',
-          id: TEST_CHAT_MODEL_ID,
-          url: env.MELOS_LLM_BASE_URL,
-        }
-      : { provider: 'router', id: env.MELOS_CHAT_MODEL ?? '' },
+    chatModel: resolveChatModel(env),
     emailTransport: env.MELOS_EMAIL_TRANSPORT,
     authMailer: env.MELOS_AUTH_MAILER,
     signUpAllowedEmails: parseSignUpAllowlist(env),

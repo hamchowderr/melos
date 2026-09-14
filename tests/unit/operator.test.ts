@@ -30,4 +30,26 @@ describe('operator scripts print only error names and codes (ADR-032)', () => {
       stderr.mockRestore();
     }
   });
+
+  it('validates an operator environment with no chat model and an unset or blank gateway key', async () => {
+    // Off Vercel with no MELOS_LLM_BASE_URL: operator scripts call no model, so they need no key.
+    try {
+      for (const key of [undefined, '', '   ']) {
+        for (const name of ['VERCEL', 'MELOS_LLM_BASE_URL', 'MELOS_CHAT_MODEL']) {
+          vi.stubEnv(name, undefined);
+        }
+        vi.stubEnv('AI_GATEWAY_API_KEY', key);
+        vi.resetModules();
+        const operator = await import('../../scripts/operator');
+        const exitCode = await operator.runOperatorCommand([], () =>
+          operator.withControl(async ({ env }) =>
+            env.chatModel.provider === 'unconfigured' ? 0 : 3,
+          ),
+        );
+        expect(exitCode, JSON.stringify(key)).toBe(0);
+      }
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
