@@ -1,3 +1,4 @@
+import { createGateway } from '@ai-sdk/gateway';
 import type { MastraModelConfig } from '@mastra/core/llm';
 import type { ChatModelSetting } from '../server/env';
 
@@ -5,8 +6,9 @@ import type { ChatModelSetting } from '../server/env';
 const TEST_ENDPOINT_API_KEY = 'melos-test-endpoint-no-key';
 
 /**
- * Production and previews pass a Mastra model router string (e.g. a Mastra Gateway model);
- * the router reads that provider's key from the environment itself.
+ * Real models go through the Vercel AI Gateway as an AI SDK model (ADR-034). A `vercel/` Mastra
+ * router string would need AI_GATEWAY_API_KEY; with no key (on Vercel) this provider reads the
+ * deployment's OIDC token on each request.
  */
 export function toModelConfig(setting: ChatModelSetting): MastraModelConfig {
   if (setting.provider === 'openai-compatible') {
@@ -16,5 +18,5 @@ export function toModelConfig(setting: ChatModelSetting): MastraModelConfig {
       apiKey: TEST_ENDPOINT_API_KEY,
     };
   }
-  return setting.id as `${string}/${string}`;
+  return createGateway({ apiKey: setting.apiKey })(setting.id);
 }

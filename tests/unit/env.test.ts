@@ -56,8 +56,8 @@ describe('parseServerEnv', () => {
   it('uses local file databases and localhost when nothing else is set', () => {
     const env = parseServerEnv({
       BETTER_AUTH_SECRET: SECRET,
-      MELOS_CHAT_MODEL: 'mastra/anthropic/claude-haiku-4.5',
-      MASTRA_GATEWAY_API_KEY: 'gateway-key-for-test',
+      MELOS_CHAT_MODEL: 'anthropic/claude-haiku-4.5',
+      AI_GATEWAY_API_KEY: 'gateway-key-for-test',
     });
     expect(env.onVercel).toBe(false);
     expect(env.auth.baseURL).toBe('http://localhost:3100');
@@ -71,8 +71,9 @@ describe('parseServerEnv', () => {
     });
     expect(env.workspaceHost).toEqual({ kind: 'local', dataDir: '.data' });
     expect(env.chatModel).toEqual({
-      provider: 'router',
-      id: 'mastra/anthropic/claude-haiku-4.5',
+      provider: 'gateway',
+      id: 'anthropic/claude-haiku-4.5',
+      apiKey: 'gateway-key-for-test',
     });
     expect(env.emailTransport).toBe('sandbox');
   });
@@ -94,6 +95,7 @@ describe('parseServerEnv', () => {
   it('lists every missing name without printing any value', () => {
     const error = problemsOf({ BETTER_AUTH_SECRET: 'short-secret-value' });
     expect(error.problems.map((p) => p.name).sort()).toEqual([
+      'AI_GATEWAY_API_KEY',
       'BETTER_AUTH_SECRET',
       'MELOS_CHAT_MODEL',
     ]);
@@ -169,12 +171,21 @@ describe('parseServerEnv', () => {
     }
   });
 
-  it('requires the gateway key for a Mastra Gateway model', () => {
-    const error = problemsOf({
-      BETTER_AUTH_SECRET: SECRET,
-      MELOS_CHAT_MODEL: 'mastra/anthropic/claude-haiku-4.5',
+  it('requires AI_GATEWAY_API_KEY off Vercel and an AI Gateway model id', () => {
+    const model = { BETTER_AUTH_SECRET: SECRET, MELOS_CHAT_MODEL: 'anthropic/claude-haiku-4.5' };
+    expect(problemsOf(model).problems).toEqual([
+      {
+        name: 'AI_GATEWAY_API_KEY',
+        reason: 'is required off Vercel (tests set MELOS_LLM_BASE_URL instead)',
+      },
+    ]);
+    const bare = problemsOf({
+      ...model,
+      MELOS_CHAT_MODEL: 'claude-haiku-4.5',
+      AI_GATEWAY_API_KEY: 'gateway-key-for-test',
     });
-    expect(error.problems.map((p) => p.name)).toEqual(['MASTRA_GATEWAY_API_KEY']);
+    expect(bare.problems.map((p) => p.name)).toEqual(['MELOS_CHAT_MODEL']);
+    expect(bare.message).not.toContain('gateway-key-for-test');
   });
 
   it('fails production startup while a development mailer is selected', async () => {
@@ -221,7 +232,7 @@ describe('parseServerEnv', () => {
     ).toEqual(['owner@example.com']);
   });
 
-  it('refuses local files, the local workspace host and the test model endpoint on Vercel', () => {
+  it('refuses local files, the local workspace host, the test model endpoint and a gateway key on Vercel', () => {
     const error = problemsOf({
       VERCEL: '1',
       VERCEL_URL: 'melos-abc123.vercel.app',
@@ -229,8 +240,11 @@ describe('parseServerEnv', () => {
       MELOS_CONTROL_DATABASE_URL: 'file:./data/control.db',
       MELOS_WORKSPACE_DATA_DIR: '.data/workspaces',
       MELOS_LLM_BASE_URL: 'http://127.0.0.1:4010/v1',
+      AI_GATEWAY_API_KEY: 'gateway-key-for-test',
     });
+    expect(error.message).not.toContain('gateway-key-for-test');
     expect(error.problems.map((p) => p.name).sort()).toEqual([
+      'AI_GATEWAY_API_KEY',
       'MELOS_AGENT_DATABASE_AUTH_TOKEN',
       'MELOS_AGENT_DATABASE_URL',
       'MELOS_CONTROL_DATABASE_AUTH_TOKEN',
@@ -250,8 +264,7 @@ describe('parseServerEnv', () => {
       MELOS_CONTROL_DATABASE_AUTH_TOKEN: 'control-token-for-test',
       MELOS_AGENT_DATABASE_URL: 'libsql://agent-example.turso.io',
       MELOS_AGENT_DATABASE_AUTH_TOKEN: 'agent-token-for-test',
-      MELOS_CHAT_MODEL: 'mastra/anthropic/claude-haiku-4.5',
-      MASTRA_GATEWAY_API_KEY: 'gateway-key-for-test',
+      MELOS_CHAT_MODEL: 'anthropic/claude-haiku-4.5',
       VERCEL_URL: 'melos-abc123-otaku.vercel.app',
     };
 
@@ -260,6 +273,8 @@ describe('parseServerEnv', () => {
       VERCEL_BRANCH_URL: 'melos-git-feat-otaku.vercel.app',
     });
     expect(branch.onVercel).toBe(true);
+    // No key on Vercel: the gateway authenticates with the deployment's OIDC token.
+    expect(branch.chatModel).toEqual({ provider: 'gateway', id: 'anthropic/claude-haiku-4.5' });
     // Vercel starts without the Turso variables; the host names the missing ones when used.
     const missing = ['TURSO_API_TOKEN', 'TURSO_ORG', 'MELOS_WORKSPACE_TOKEN_KEY'];
     expect(branch.workspaceHost).toEqual({ kind: 'unconfigured', missing });

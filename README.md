@@ -49,9 +49,9 @@ Pick how the chat model is served:
 
 - **Keyless (AIMock).** In `.env.local` set `MELOS_LLM_BASE_URL=http://127.0.0.1:4010/v1`, then
   run `npm run aimock` in a second terminal. The fixtures answer the message `ping`.
-- **Real model.** Set `MELOS_CHAT_MODEL` (for example `mastra/anthropic/claude-haiku-4.5`) and
-  inject `MASTRA_GATEWAY_API_KEY` at runtime from your secrets manager. Never write the key to a
-  file.
+- **Real model.** Set `MELOS_CHAT_MODEL` to a Vercel AI Gateway model id (for example
+  `anthropic/claude-haiku-4.5`) and inject `AI_GATEWAY_API_KEY` at runtime from your secrets
+  manager. Never write the key to a file. On Vercel the deployment's OIDC token is used instead.
 
 ```bash
 npm run dev                       # http://localhost:3100
@@ -98,8 +98,8 @@ failure lists the variable names that are missing or invalid, never their values
 | `MELOS_CONTROL_DATABASE_AUTH_TOKEN` | on Vercel                          | libSQL token for the control plane                                                            |
 | `MELOS_AGENT_DATABASE_URL`          | on Vercel                          | Mastra storage, separate from the control plane. Local default `file:./data/agent.db`         |
 | `MELOS_AGENT_DATABASE_AUTH_TOKEN`   | on Vercel                          | libSQL token for agent storage                                                                |
-| `MELOS_CHAT_MODEL`                  | unless `MELOS_LLM_BASE_URL` is set | Mastra model router string, e.g. `mastra/anthropic/claude-haiku-4.5`                          |
-| `MASTRA_GATEWAY_API_KEY`            | for `mastra/*` models              | Read by the Mastra model router                                                               |
+| `MELOS_CHAT_MODEL`                  | unless `MELOS_LLM_BASE_URL` is set | Vercel AI Gateway model id, e.g. `anthropic/claude-haiku-4.5`                                 |
+| `AI_GATEWAY_API_KEY`                | off Vercel, for a real model       | AI Gateway key. Rejected on Vercel, where the deployment OIDC token authenticates             |
 | `MELOS_LLM_BASE_URL`                | tests only                         | OpenAI-compatible mock URL (AIMock). Dummy key. Rejected on Vercel                            |
 | `MELOS_EMAIL_TRANSPORT`             | no                                 | `sandbox` (default). Contract name, not used yet                                              |
 | `COPILOTKIT_TELEMETRY_DISABLED`     | no                                 | Set to `true`                                                                                 |

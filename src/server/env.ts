@@ -44,7 +44,7 @@ const rawEnvSchema = z.object({
     z.string().refine(isTokenKey, { error: 'must be 32 bytes encoded as base64' }).optional(),
   ),
   MELOS_CHAT_MODEL: optionalText,
-  MASTRA_GATEWAY_API_KEY: optionalText,
+  AI_GATEWAY_API_KEY: optionalText,
   MELOS_LLM_BASE_URL: optionalUrl,
   MELOS_EMAIL_TRANSPORT: z.preprocess(
     blankToUndefined,
@@ -116,6 +116,13 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
     if (env.MELOS_LLM_BASE_URL) {
       flag('MELOS_LLM_BASE_URL', 'is test-only and must not be set on Vercel');
     }
+    // A key takes precedence over the deployment's OIDC token, which is the gateway credential here.
+    if (env.AI_GATEWAY_API_KEY) {
+      flag(
+        'AI_GATEWAY_API_KEY',
+        'must not be set on Vercel (the OIDC token authenticates the gateway)',
+      );
+    }
   }
 
   // outbox and memory are development mailers; production gets one when phase 8 wires Resend.
@@ -126,11 +133,16 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
     );
   }
 
+  // A real model goes through the Vercel AI Gateway (ADR-034). On Vercel its credential is the
+  // OIDC token each request carries, so startup has nothing to check.
   if (!env.MELOS_LLM_BASE_URL) {
     if (!env.MELOS_CHAT_MODEL) {
       flag('MELOS_CHAT_MODEL', 'is required (tests set MELOS_LLM_BASE_URL instead)');
-    } else if (env.MELOS_CHAT_MODEL.startsWith('mastra/') && !env.MASTRA_GATEWAY_API_KEY) {
-      flag('MASTRA_GATEWAY_API_KEY', 'is required when MELOS_CHAT_MODEL uses the Mastra Gateway');
+    } else if (!/^[^/\s]+\/\S+$/.test(env.MELOS_CHAT_MODEL)) {
+      flag('MELOS_CHAT_MODEL', 'must be an AI Gateway model id such as anthropic/claude-haiku-4.5');
+    }
+    if (!env.VERCEL && !env.AI_GATEWAY_API_KEY) {
+      flag('AI_GATEWAY_API_KEY', 'is required off Vercel (tests set MELOS_LLM_BASE_URL instead)');
     }
   }
 });
@@ -143,8 +155,9 @@ export type WorkspaceHostSetting =
   | { kind: 'turso'; apiToken: string; organization: string; group: string; tokenKey: string }
   | { kind: 'unconfigured'; missing: string[] };
 
+/** A real model goes through the AI Gateway: no key on Vercel (its OIDC token), a key elsewhere. */
 export type ChatModelSetting =
-  | { provider: 'router'; id: string }
+  | { provider: 'gateway'; id: string; apiKey?: string }
   | { provider: 'openai-compatible'; id: string; url: string };
 
 export type ServerEnv = {
@@ -257,7 +270,7 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
           id: TEST_CHAT_MODEL_ID,
           url: env.MELOS_LLM_BASE_URL,
         }
-      : { provider: 'router', id: env.MELOS_CHAT_MODEL ?? '' },
+      : { provider: 'gateway', id: env.MELOS_CHAT_MODEL ?? '', apiKey: env.AI_GATEWAY_API_KEY },
     emailTransport: env.MELOS_EMAIL_TRANSPORT,
     authMailer: env.MELOS_AUTH_MAILER,
     signUpAllowedEmails: parseSignUpAllowlist(env),
