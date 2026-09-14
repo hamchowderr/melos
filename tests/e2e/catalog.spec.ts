@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  AUTH_REDIRECT,
   activeOrganizationId,
   setWorkspaceStatus,
   signInAsJordan,
@@ -12,7 +13,8 @@ test('melos-rpr.2: Jordan opens Catalog: 5 songs with their primary artists', as
   const nav = page.getByRole('navigation', { name: 'Workspace' });
   const catalogLink = nav.getByRole('link', { name: 'Catalog' });
   await catalogLink.click();
-  await expect(page).toHaveURL(/\/catalog$/);
+  // A cold server renders /catalog alongside the nav's prefetches; 5s is too tight.
+  await expect(page).toHaveURL(/\/catalog$/, AUTH_REDIRECT);
   await expect(catalogLink).toHaveAttribute('aria-current', 'page');
 
   const table = page.getByRole('table');
@@ -36,7 +38,7 @@ test('melos-rpr.2: Jordan opens Catalog: 5 songs with their primary artists', as
 test('melos-rpr.2: a new workspace shows the empty catalog', async ({ page }) => {
   await signUpWithWorkspace(page, 'Blank');
   await page.getByRole('link', { name: 'Catalog' }).click();
-  await expect(page).toHaveURL(/\/catalog$/);
+  await expect(page).toHaveURL(/\/catalog$/, AUTH_REDIRECT);
   await expect(page.getByText('No songs yet')).toBeVisible();
   await expect(page.getByRole('table')).toHaveCount(0);
 });
