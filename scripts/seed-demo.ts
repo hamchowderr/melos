@@ -1,6 +1,6 @@
 import { runAsMain, withControl } from './operator';
 
-const USAGE = 'Usage: npm run db:seed-demo [-- --date YYYY-MM-DD]';
+const USAGE = 'Usage: npm run db:seed-demo [-- [--date YYYY-MM-DD] [--replace]]';
 const PASSWORD = 'MELOS_DEMO_PASSWORD';
 
 /** A real calendar date written YYYY-MM-DD. */
@@ -15,17 +15,22 @@ function isCalendarDate(value: string): boolean {
 
 /**
  * Seeds the Northstar Demo Catalog (§8 phase 3) into the configured control database and a
- * workspace it provisions, for `--date` or today in America/Los_Angeles. Jordan Taylor's password
- * is read from MELOS_DEMO_PASSWORD and never printed. Prints `<organizationId> <workspaceId>
- * <dateShift>`. Returns 0 once seeded; 1 when a step fails or the organization already exists,
- * which changes nothing; and 2 for a usage or configuration error.
+ * workspace it provisions, for `--date` or today in America/Los_Angeles. With `--replace` it first
+ * deletes an earlier Northstar seed, complete or partial, through Better Auth (ADR-030), signed in
+ * with the seeded credential. Jordan Taylor's password is read from MELOS_DEMO_PASSWORD and never
+ * printed. Prints `<organizationId> <workspaceId> <dateShift>`. Returns 0 once seeded; 1 when a
+ * step fails, when the organization exists without `--replace`, which changes nothing, or when a
+ * delete is refused, which seeds nothing; and 2 for a usage or configuration error.
  */
 export async function runSeedDemoCommand(
   args: readonly string[],
   print: (line: string) => void = console.log,
 ): Promise<number> {
-  const [flag, seedDate] = args;
-  if (args.length !== 0 && !(args.length === 2 && flag === '--date' && isCalendarDate(seedDate))) {
+  const dated = args.filter((arg) => arg !== '--replace');
+  const [flag, seedDate] = dated;
+  const replace = args.length === dated.length + 1;
+  const withDate = dated.length === 2 && flag === '--date' && isCalendarDate(seedDate);
+  if ((dated.length !== 0 && !withDate) || args.length > dated.length + 1) {
     console.error(USAGE);
     return 2;
   }
@@ -42,9 +47,18 @@ export async function runSeedDemoCommand(
       return 2;
     }
     const { seedNorthstar } = await import('../src/server/db/seed/northstar');
-    const seed = await seedNorthstar({ password, seedDate });
+    const seed = await seedNorthstar({ password, seedDate, replace });
     if (seed.status === 'exists') {
-      console.error(`Organization ${seed.organizationId} already exists; nothing was changed`);
+      console.error(
+        `Organization ${seed.organizationId} already exists; nothing was changed (--replace replaces it)`,
+      );
+      return 1;
+    }
+    if (seed.status === 'refused') {
+      const { organizationId, refusal } = seed;
+      console.error(
+        `Organization ${organizationId} was not replaced (${refusal}); nothing was seeded`,
+      );
       return 1;
     }
     print(`${seed.organizationId} ${seed.workspaceId} ${seed.dateShift}`);

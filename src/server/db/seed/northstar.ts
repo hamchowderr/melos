@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { isAPIError } from 'better-auth/api';
 import { eq, getTableColumns, sql } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { ulid } from 'ulid';
@@ -88,24 +89,69 @@ function valuesOf(table: SQLiteTable, row: Row, days: number, ids: Map<string, s
 
 export type NorthstarSeed =
   | { status: 'exists'; organizationId: string }
+  | { status: 'refused'; organizationId: string; refusal: string }
   | { status: 'seeded'; organizationId: string; workspaceId: string; dateShift: number };
+
+/** Awaits a Better Auth call; a refusal comes back as `<step> <status> <code>`, never its message. */
+const refusalOf = (step: string, call: Promise<unknown>) =>
+  call.then(
+    () => undefined,
+    (error: unknown) => {
+      if (!isAPIError(error)) throw error;
+      return `${step} ${error.statusCode} ${error.body?.code}`;
+    },
+  );
+
+/**
+ * Deletes what an earlier seed left, complete or partial, through Better Auth, whose hooks delete the
+ * workspace database, its registry row and the control rows (ADR-030, §7.2): the organization while
+ * it exists, then the user. Deleting an organization takes an owner's session, which the seeded
+ * credential opens, since it commits with the organization. Returns the first refusal, after which
+ * nothing more is deleted.
+ */
+async function deleteNorthstar(organizationId: string, userId: string, password: string) {
+  const byId = eq(organization.id, organizationId);
+  if ((await controlDb.select().from(organization).where(byId)).length > 0) {
+    const body = { email: String(NORTHSTAR.control.user[0].email), password };
+    const signIn = auth.api.signInEmail({ body, returnHeaders: true });
+    const notSignedIn = await refusalOf('sign_in', signIn);
+    if (notSignedIn) return notSignedIn;
+    const cookies = (await signIn).headers.getSetCookie().map((cookie) => cookie.split(';')[0]);
+    const headers = new Headers({ cookie: cookies.join('; ') });
+    const deleted = auth.api.deleteOrganization({ headers, body: { organizationId } });
+    const kept = await refusalOf('delete_organization', deleted).finally(() =>
+      auth.api.signOut({ headers }),
+    );
+    if (kept) return kept;
+  }
+  const { internalAdapter } = await auth.$context;
+  if (await internalAdapter.findUserById(userId)) {
+    return refusalOf('delete_user', internalAdapter.deleteUser(userId));
+  }
+}
 
 /**
  * Seeds the fixture for `seedDate` (default: today in the demo timezone), with every timestamp,
  * calendar date and epoch value moved by dateShift, the whole days from the demo date (§8 phase 3).
  * Control rows commit in one transaction, the workspace is provisioned (§7.2), then its rows and
  * catalog_search commit in one workspace transaction, all through IntegrityGuard. When the
- * organization id exists, returns `exists` and writes nothing.
+ * organization id exists, returns `exists` and writes nothing. With `replace`, an earlier seed is
+ * deleted first, a partial one too; a refused delete returns `refused` and seeds nothing.
  */
 export async function seedNorthstar(options: {
   password: string;
   seedDate?: string;
+  replace?: boolean;
 }): Promise<NorthstarSeed> {
   const { demo, keys, control, workspace } = NORTHSTAR;
   const seedDate = options.seedDate ?? dateIn(demo.timezone);
   const days = (Date.parse(seedDate) - Date.parse(demo.date)) / DAY_MS;
   if (!Number.isInteger(days)) throw new Error('The seed date must be YYYY-MM-DD');
   const [organizationId, userId] = [keys[demo.organization], keys[demo.user]];
+  if (options.replace) {
+    const refusal = await deleteNorthstar(organizationId, userId, options.password);
+    if (refusal) return { status: 'refused', organizationId, refusal };
+  }
   const ids = new Map<string, string>();
   const at = (row: Row) => new Date(shift('created_at', row.created_at, days) as number);
   const hash = await (await auth.$context).password.hash(options.password);
