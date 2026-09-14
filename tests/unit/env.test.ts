@@ -3,7 +3,12 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createClient } from '@libsql/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { parseServerEnv, ServerEnvError, TEST_CHAT_MODEL_ID } from '../../src/server/env';
+import {
+  parseServerEnv,
+  requireChatModel,
+  ServerEnvError,
+  TEST_CHAT_MODEL_ID,
+} from '../../src/server/env';
 
 const SECRET = 'unit-test-secret-value-that-is-long-enough';
 const TEST_MODEL = { BETTER_AUTH_SECRET: SECRET, MELOS_LLM_BASE_URL: 'http://127.0.0.1:4010/v1' };
@@ -94,11 +99,8 @@ describe('parseServerEnv', () => {
 
   it('lists every missing name without printing any value', () => {
     const error = problemsOf({ BETTER_AUTH_SECRET: 'short-secret-value' });
-    expect(error.problems.map((p) => p.name).sort()).toEqual([
-      'AI_GATEWAY_API_KEY',
-      'BETTER_AUTH_SECRET',
-      'MELOS_CHAT_MODEL',
-    ]);
+    // The chat model's variables are checked by requireChatModel, not here.
+    expect(error.problems.map((p) => p.name)).toEqual(['BETTER_AUTH_SECRET']);
     expect(error.message).toContain('BETTER_AUTH_SECRET');
     expect(error.message).not.toContain('short-secret-value');
   });
@@ -171,21 +173,52 @@ describe('parseServerEnv', () => {
     }
   });
 
-  it('requires AI_GATEWAY_API_KEY off Vercel and an AI Gateway model id', () => {
-    const model = { BETTER_AUTH_SECRET: SECRET, MELOS_CHAT_MODEL: 'anthropic/claude-haiku-4.5' };
-    expect(problemsOf(model).problems).toEqual([
-      {
-        name: 'AI_GATEWAY_API_KEY',
-        reason: 'is required off Vercel (tests set MELOS_LLM_BASE_URL instead)',
-      },
-    ]);
-    const bare = problemsOf({
-      ...model,
-      MELOS_CHAT_MODEL: 'claude-haiku-4.5',
-      AI_GATEWAY_API_KEY: 'gateway-key-for-test',
+  it('checks the chat model where it is resolved, so an operator environment needs no model key', () => {
+    // Off Vercel with no MELOS_LLM_BASE_URL: operator scripts parse this and never call a model.
+    const operator = parseServerEnv({ BETTER_AUTH_SECRET: SECRET });
+    expect(operator.chatModel).toEqual({
+      provider: 'unconfigured',
+      problems: [
+        { name: 'MELOS_CHAT_MODEL', reason: 'is required (tests set MELOS_LLM_BASE_URL instead)' },
+        { name: 'AI_GATEWAY_API_KEY', reason: 'is required off Vercel for a real model' },
+      ],
     });
-    expect(bare.problems.map((p) => p.name)).toEqual(['MELOS_CHAT_MODEL']);
-    expect(bare.message).not.toContain('gateway-key-for-test');
+    expect(() => requireChatModel(operator.chatModel)).toThrow(ServerEnvError);
+
+    const keyed = { BETTER_AUTH_SECRET: SECRET, AI_GATEWAY_API_KEY: 'gateway-key-for-test' };
+    const routerSpellings = [
+      'mastra/anthropic/claude-haiku-4.5',
+      'anthropic/claude-haiku-4-5',
+      'anthropic/claude-sonnet-4-5-20250929',
+      'claude-haiku-4.5',
+    ];
+    for (const id of routerSpellings) {
+      const { chatModel } = parseServerEnv({ ...keyed, MELOS_CHAT_MODEL: id });
+      expect(() => requireChatModel(chatModel), id).toThrow(
+        'MELOS_CHAT_MODEL must be an AI Gateway model id such as anthropic/claude-haiku-4.5',
+      );
+    }
+    for (const id of ['anthropic/claude-haiku-4.5', 'anthropic/claude-3-haiku', 'openai/gpt-5']) {
+      const { chatModel } = parseServerEnv({ ...keyed, MELOS_CHAT_MODEL: id });
+      expect(requireChatModel(chatModel)).toEqual({
+        provider: 'gateway',
+        id,
+        apiKey: keyed.AI_GATEWAY_API_KEY,
+      });
+    }
+
+    // A blank key is refused, not ignored: the gateway provider would send it (model.test.ts).
+    for (const key of ['', '   ']) {
+      expect(problemsOf({ ...keyed, AI_GATEWAY_API_KEY: key }).problems).toEqual([
+        { name: 'AI_GATEWAY_API_KEY', reason: 'must not be blank' },
+      ]);
+      expect(
+        problemsOf({ ...keyed, VERCEL: '1', AI_GATEWAY_API_KEY: key }).problems,
+      ).toContainEqual({
+        name: 'AI_GATEWAY_API_KEY',
+        reason: 'must not be set on Vercel (the OIDC token authenticates the gateway)',
+      });
+    }
   });
 
   it('fails production startup while a development mailer is selected', async () => {
