@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
-import { type Client, createClient } from '@libsql/client';
+import { type Client, createClient, type InValue } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import { migrate } from 'drizzle-orm/libsql/migrator';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -244,6 +244,37 @@ describe('melos-cqn.2: a seeded Northstar workspace meets every demo preconditio
     expect([script.status, total], script.stderr).toEqual([0, expect.stringMatching(/^\d+$/)]);
     expect(await validate()).toBe(0);
     expect(lines).toEqual([`${total} assertions, 0 failed`]);
+  });
+
+  it('passes when the control database also holds another organization, its member and workspace', async () => {
+    // Fixture rows under new ids, in parent order: no Northstar check may count them.
+    type Row = Record<string, InValue>;
+    const organizationId = 'organization_OTHER';
+    const like = (table: string, values: Row): Row => ({ ...fixture.control[table][0], ...values });
+    const owner = { user_id: 'usr_OTHER', organization_id: organizationId };
+    const database = { organization_id: organizationId, database_name: 'melos-ws-OTHER' };
+    const others: [string, Row][] = [
+      ['user', like('user', { id: 'usr_OTHER', email: 'other@other.example' })],
+      ['organization', like('organization', { id: organizationId, slug: 'other' })],
+      ['member', like('member', { id: 'member_OTHER', ...owner })],
+      ['workspace_registry', like('workspace_registry', { id: 'ws_OTHER', ...database })],
+    ];
+    const insert = ([table, row]: [string, Row]) => {
+      const columns = Object.keys(row).map((column) => `"${column}"`);
+      const sql = `INSERT INTO "${table}" (${columns}) VALUES (${columns.map(() => '?')})`;
+      return { sql, args: Object.values(row) };
+    };
+    await control.$client.batch(others.map(insert), 'write');
+    lines.length = 0;
+    try {
+      expect(await validate(), lines.join('\n')).toBe(0);
+    } finally {
+      const remove = ([table, { id }]: [string, Row]) => ({
+        sql: `DELETE FROM "${table}" WHERE id = ?`,
+        args: [id],
+      });
+      await control.$client.batch([...others].reverse().map(remove), 'write');
+    }
   });
 
   it('fails the seeded run with the check name when a pitch event is deleted or a share changes', async () => {
