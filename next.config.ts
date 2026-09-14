@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     '@mastra/memory',
     '@mastra/libsql',
     '@libsql/client',
+    '@libsql/core',
     'libsql',
     '@copilotkit/runtime',
     '@ag-ui/mastra',

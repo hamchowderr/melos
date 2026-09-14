@@ -1,3 +1,6 @@
+import { resolve } from 'node:path';
+import { expandConfig, isInMemoryConfig } from '@libsql/core/config';
+import { encodeBaseUrl } from '@libsql/core/uri';
 import { z } from 'zod';
 import { LOCAL_AGENT_DATABASE_URL, LOCAL_CONTROL_DATABASE_URL } from './db/local-database';
 import { isTokenKey } from './db/token-cipher';
@@ -63,9 +66,39 @@ const DATABASES = [
   ['MELOS_AGENT_DATABASE_URL', 'MELOS_AGENT_DATABASE_AUTH_TOKEN'],
 ] as const;
 
+/**
+ * Where @libsql/client sends a URL's queries, from its own expansion and base URL: HTTP resolves
+ * `v2/pipeline` against the base URL, so its directory is the endpoint, and a WebSocket opens the base
+ * URL itself. One server answers both, so both compare on the HTTP scheme. A file URL is its resolved
+ * path. An in-memory database is private to its client and an unparsable URL opens nothing, so
+ * neither has a key.
+ */
+function databaseKey(url: string): string | null {
+  try {
+    const config = expandConfig({ url }, true);
+    if (isInMemoryConfig(config)) return null;
+    if (config.scheme === 'file') return `file:${resolve(config.path)}`;
+    const base = encodeBaseUrl(config.scheme, config.authority, config.path);
+    const http = config.scheme === 'https' || config.scheme === 'http';
+    const { host, pathname } = http ? new URL('./', base) : base;
+    const secure = config.scheme === 'https' || config.scheme === 'wss';
+    return `${secure ? 'https' : 'http'}://${host}${pathname}`;
+  } catch {
+    return null;
+  }
+}
+
 const envSchema = rawEnvSchema.superRefine((env, ctx) => {
   const flag = (name: keyof RawEnv, message: string) =>
     ctx.addIssue({ code: 'custom', path: [name], message });
+
+  // Mastra storage never shares the control database (TEN-006). Workspace URLs are generated per
+  // workspace (§7.2), so neither can name one.
+  const agentKey = databaseKey(env.MELOS_AGENT_DATABASE_URL ?? LOCAL_AGENT_DATABASE_URL);
+  const controlKey = databaseKey(env.MELOS_CONTROL_DATABASE_URL ?? LOCAL_CONTROL_DATABASE_URL);
+  if (agentKey !== null && agentKey === controlKey) {
+    flag('MELOS_AGENT_DATABASE_URL', 'must not name the control database');
+  }
 
   if (env.VERCEL) {
     for (const [urlName, tokenName] of DATABASES) {
