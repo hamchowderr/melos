@@ -7,6 +7,7 @@
 //    invariants, the source fixture (docs/source/GIZMO_Demo_Fixture.json) and the CONTRACT §6.5 readiness table.
 //
 // Run from anywhere: node docs/fixtures/validate.mjs. Exits 1 on any mismatch.
+// validateSeeded runs the same checks against a seeded Northstar workspace (npm run db:validate-demo).
 // @libsql/client resolves from LIBSQL_CLIENT_BASE (a package.json path), the repository root, or the Gate A worktree.
 
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -21,7 +22,7 @@ const readText = (rel) => readFileSync(path.join(REPO, rel), 'utf8').replace(/\r
 
 const contractMd = readText('docs/CONTRACT.md');
 const expectedMd = readText('docs/fixtures/EXPECTED.md');
-const fixture = JSON.parse(readText('docs/fixtures/northstar-demo.json'));
+export const fixture = JSON.parse(readText('docs/fixtures/northstar-demo.json'));
 const source = JSON.parse(readText('docs/source/GIZMO_Demo_Fixture.json'));
 
 // ---------- assertions ----------
@@ -711,7 +712,10 @@ async function checkProjections(ws) {
 }
 
 async function checkMembership(ws, ctl) {
-  const members = await q(ctl, 'SELECT user_id, role FROM member');
+  // A shared control database holds other organizations' members.
+  const members = await q(ctl, 'SELECT user_id, role FROM member WHERE organization_id = ?', [
+    idOf(fixture.demo.organization),
+  ]);
   check(
     'membership',
     'only Jordan Taylor is a member',
@@ -1532,7 +1536,8 @@ async function checkExpected(ws, ctl, workspaceDdl, ready, tables) {
 
 // ---------- main ----------
 
-async function main() {
+/** The workspace, Better Auth and control-plane DDL in CONTRACT.md. */
+function contractDdl() {
   const workspaceDdl = sections(contractMd, /^### [\d.]+ Workspace database\b/)
     .flatMap(sqlBlocks)
     .join('\n');
@@ -1551,7 +1556,56 @@ async function main() {
     if (!ddl.includes(marker))
       throw new Error(`${name} DDL extracted from CONTRACT.md lacks "${marker}"`);
   }
+  return { workspaceDdl, betterAuthDdl, controlDdl };
+}
 
+/** Runs every check against loaded workspace and control databases. */
+async function runChecks(ws, ctl, { workspaceDdl, betterAuthDdl, controlDdl }) {
+  assertions = 0;
+  failures.length = 0;
+  await checkIds(ws, ctl, workspaceDdl, `${betterAuthDdl}\n${controlDdl}`);
+  await checkIntegrity(ws, ctl);
+  await checkFictional();
+  await checkProjections(ws);
+  await checkMembership(ws, ctl);
+  const ready = await readiness(ws);
+  await checkSource(ws, ready);
+  await checkContractReadiness(ws, ready);
+  await checkExpected(ws, ctl, workspaceDdl, ready, checkTables(expectedMd));
+  check(
+    'integrity',
+    'workspace PRAGMA foreign_key_check after every check',
+    await q(ws, 'PRAGMA foreign_key_check'),
+    [],
+  );
+  check(
+    'integrity',
+    'control PRAGMA foreign_key_check after every check',
+    await q(ctl, 'PRAGMA foreign_key_check'),
+    [],
+  );
+  return { assertions, failures: [...failures] };
+}
+
+/**
+ * Runs every check against open control and workspace clients of a seeded Northstar workspace
+ * (melos-cqn.2), without loading the fixture or building catalog_search. Provisioner-owned ids map
+ * to their keys as the seed maps them, the workspace by organization and report templates by
+ * preset_key; every other key must match exactly. Returns the assertion count and the failures.
+ */
+export async function validateSeeded(ctl, ws) {
+  const registry = 'SELECT id FROM workspace_registry WHERE organization_id = ?';
+  for (const { id } of await q(ctl, registry, [idOf(fixture.demo.organization)]))
+    keyOf.set(id, fixture.demo.workspace);
+  for (const template of fixture.workspace.report_templates) {
+    const preset = 'SELECT id FROM report_templates WHERE preset_key = ?';
+    for (const { id } of await q(ws, preset, [template.preset_key])) keyOf.set(id, K(template.id));
+  }
+  return runChecks(ws, ctl, contractDdl());
+}
+
+async function main() {
+  const { workspaceDdl, betterAuthDdl, controlDdl } = contractDdl();
   const dir = mkdtempSync(path.join(tmpdir(), 'melos-fixture-'));
   const ws = await freshDb(dir, 'workspace.db', workspaceDdl);
   const ctl = await freshDb(dir, 'control.db', `${betterAuthDdl}\n${controlDdl}`);
@@ -1559,28 +1613,7 @@ async function main() {
     await load(ctl, fixture.control);
     await load(ws, fixture.workspace);
     await buildSearchIndex(ws);
-
-    await checkIds(ws, ctl, workspaceDdl, `${betterAuthDdl}\n${controlDdl}`);
-    await checkIntegrity(ws, ctl);
-    await checkFictional();
-    await checkProjections(ws);
-    await checkMembership(ws, ctl);
-    const ready = await readiness(ws);
-    await checkSource(ws, ready);
-    await checkContractReadiness(ws, ready);
-    await checkExpected(ws, ctl, workspaceDdl, ready, checkTables(expectedMd));
-    check(
-      'integrity',
-      'workspace PRAGMA foreign_key_check after every check',
-      await q(ws, 'PRAGMA foreign_key_check'),
-      [],
-    );
-    check(
-      'integrity',
-      'control PRAGMA foreign_key_check after every check',
-      await q(ctl, 'PRAGMA foreign_key_check'),
-      [],
-    );
+    await runChecks(ws, ctl, { workspaceDdl, betterAuthDdl, controlDdl });
   } finally {
     ws.close();
     ctl.close();
@@ -1595,7 +1628,9 @@ async function main() {
   process.exitCode = failures.length ? 1 : 0;
 }
 
-main().catch((err) => {
-  console.error(err.stack ?? err);
-  process.exitCode = 1;
-});
+// Only when node runs this file; npm run db:validate-demo imports validateSeeded instead.
+if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url))
+  main().catch((err) => {
+    console.error(err.stack ?? err);
+    process.exitCode = 1;
+  });
