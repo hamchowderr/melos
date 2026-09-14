@@ -2,6 +2,7 @@ import type { LLMock } from '@copilotkit/aimock';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { member, session } from '../../src/server/db/schema/auth';
+import { workspaceRegistry } from '../../src/server/db/schema/control';
 import { prepareTestEnvironment, readAgUiEvents, TestClient } from './support';
 
 type Handler = (request: Request) => Promise<Response>;
@@ -45,10 +46,18 @@ async function signIn(label: string) {
   return { client, email, userId: user.id };
 }
 
-/** Creates a workspace owned by the client and makes it active; returns its id. */
+/** Registry workspace id by organization id, recorded as each workspace is created. */
+const workspaceIds = new Map<string, string>();
+
+/** Creates a workspace owned by the client and makes it active; returns the organization id. */
 async function createWorkspace(client: TestClient, name: string): Promise<string> {
   const { id } = await post(client, '/organization/create', { name, slug: `${name}-${stamp}` });
   await post(client, '/organization/set-active', { organizationId: id });
+  const columns = { id: workspaceRegistry.id, status: workspaceRegistry.status };
+  const byOrganization = eq(workspaceRegistry.organizationId, id);
+  const rows = await controlDb.select(columns).from(workspaceRegistry).where(byOrganization);
+  expect(rows).toEqual([{ id: expect.stringMatching(/^ws_/), status: 'active' }]);
+  workspaceIds.set(id, rows[0].id);
   return id;
 }
 
@@ -79,7 +88,7 @@ async function expectRefused(client: TestClient, status: number, error: string) 
   expect(mock.getRequests().length).toBe(modelCalls);
 }
 
-describe('AUTH-INT-008: tenant context from the session and the member row', () => {
+describe('AUTH-INT-008: tenant context from the session, the member row and the registry', () => {
   let user: SignedIn;
   let other: SignedIn;
   let alpha = '';
@@ -87,6 +96,7 @@ describe('AUTH-INT-008: tenant context from the session and the member row', () 
   const tenant = (organizationId: string, workspaceRole: string) => ({
     userId: user.userId,
     organizationId,
+    workspaceId: workspaceIds.get(organizationId),
     workspaceRole,
   });
 
@@ -103,14 +113,14 @@ describe('AUTH-INT-008: tenant context from the session and the member row', () 
     await expectRefused(expiring.client, 401, 'unauthenticated');
   });
 
-  it('resolves userId, organizationId, workspaceRole and requestId', async () => {
+  it('resolves userId, organizationId, workspaceId, workspaceRole and requestId (TEN-002)', async () => {
     user = await signIn('tenant');
     alpha = await createWorkspace(user.client, 'alpha');
     const context = { ...tenant(alpha, 'owner'), requestId: expect.any(String) };
     expect(await resolver.resolve(user.client.headers())).toEqual({ status: 'ok', context });
   });
 
-  it('gives the newly active workspace and its role on the next request', async () => {
+  it('gives the newly active workspace, its registry id and its role on the next request', async () => {
     other = await signIn('other');
     beta = await createWorkspace(other.client, 'beta');
     const body = { userId: user.userId, organizationId: beta, role: 'viewer' as const };
@@ -122,7 +132,13 @@ describe('AUTH-INT-008: tenant context from the session and the member row', () 
   });
 
   it('ignores tenant values sent as AG-UI context, forwarded props or request headers', async () => {
-    const spoof = { userId: other.userId, organizationId: alpha, workspaceRole: 'owner' };
+    const workspaceId = String(workspaceIds.get(alpha));
+    const spoof = {
+      userId: other.userId,
+      organizationId: alpha,
+      workspaceId,
+      workspaceRole: 'owner',
+    };
     const result = await pingResult(user.client, spoof);
     expect(result).toEqual({ status: 'ok', ...tenant(beta, 'viewer') });
   });
@@ -150,5 +166,33 @@ describe('AUTH-INT-008: tenant context from the session and the member row', () 
       expect(JSON.stringify(log.mock.calls)).not.toContain(token);
     }
     log.mockRestore();
+  });
+
+  it('answers 403 and runs no agent while the registry row is missing or not active (TEN-002)', async () => {
+    const owner = await signIn('registry');
+    const row = eq(workspaceRegistry.organizationId, await createWorkspace(owner.client, 'gamma'));
+    // Neither column may reach a resolution, a response or a log line.
+    const hidden = { dbTokenCiphertext: 'ciphertext-never-shown', statusDetail: 'detail-hidden' };
+    const logs = (['error', 'warn', 'info', 'log'] as const).map((level) =>
+      vi.spyOn(console, level).mockImplementation(() => {}),
+    );
+    const results = [];
+    const statuses = ['provisioning', 'migrating', 'failed', 'suspended', 'deleting'] as const;
+    for (const workspaceStatus of statuses) {
+      const set = { status: workspaceStatus, ...hidden };
+      await controlDb.update(workspaceRegistry).set(set).where(row);
+      results.push(await resolver.resolve(owner.client.headers()));
+      expect(results.at(-1)).toEqual({ status: 'workspace-unavailable', workspaceStatus });
+      await expectRefused(owner.client, 403, 'workspace-unavailable');
+    }
+
+    await controlDb.delete(workspaceRegistry).where(row);
+    results.push(await resolver.resolve(owner.client.headers()));
+    expect(results.at(-1)).toEqual({ status: 'workspace-not-provisioned' });
+    await expectRefused(owner.client, 403, 'workspace-not-provisioned');
+
+    const seen = JSON.stringify([results, logs.map((log) => log.mock.calls)]);
+    for (const value of Object.values(hidden)) expect(seen).not.toContain(value);
+    for (const log of logs) log.mockRestore();
   });
 });

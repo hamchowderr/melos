@@ -17,6 +17,9 @@ test('sign up, sign in, create a workspace, and render the ping tool in chat', a
   await input.press('Enter');
 
   await expect(page.getByTestId('ping-card')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('ping-workspace-id')).toHaveText(active.activeOrganizationId ?? '');
+  await expect(page.getByTestId('ping-organization-id')).toHaveText(
+    active.activeOrganizationId ?? '',
+  );
+  await expect(page.getByTestId('ping-workspace-id')).toHaveText(/^ws_[0-9A-HJKMNP-TV-Z]{26}$/);
   await page.screenshot({ path: 'test-results/ping-card.png', fullPage: true });
 });

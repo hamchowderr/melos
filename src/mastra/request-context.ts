@@ -3,12 +3,19 @@ import { z } from 'zod';
 import { isWorkspaceRole, type WorkspaceRole } from '../lib/auth/permissions';
 import type { TenantContext } from '../server/services/tenant-context';
 
-/** The canonical tenant keys: the route sets them, tools read them (docs/CONTRACT.md §7.1). */
-const TENANT_KEYS = ['userId', 'organizationId', 'workspaceRole', 'requestId'] as const;
+/** The canonical tenant keys: the route sets them, tools read them (docs/CONTRACT.md §3.1, §7.1). */
+const TENANT_KEYS = [
+  'userId',
+  'organizationId',
+  'workspaceId',
+  'workspaceRole',
+  'requestId',
+] as const;
 
 const tenantContextSchema = z.object({
   userId: z.string().min(1),
   organizationId: z.string().min(1),
+  workspaceId: z.string().min(1),
   workspaceRole: z.custom<WorkspaceRole>(isWorkspaceRole),
   requestId: z.string().min(1),
 });

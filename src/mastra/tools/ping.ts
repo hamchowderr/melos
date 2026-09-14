@@ -11,7 +11,7 @@ import { readTenantContext } from '../request-context';
 export const pingTool = createTool({
   id: PING_TOOL_NAME,
   description:
-    'Check the connection. Returns the active workspace id, the user id and the workspace role this chat runs as.',
+    'Check the connection. Returns the active organization and workspace ids, the user id and the workspace role this chat runs as.',
   inputSchema: pingInputSchema,
   outputSchema: pingResultSchema,
   execute: async (_input, context): Promise<PingResult> => {
@@ -19,6 +19,7 @@ export const pingTool = createTool({
     return {
       status: 'ok',
       organizationId: tenant.organizationId,
+      workspaceId: tenant.workspaceId,
       userId: tenant.userId,
       workspaceRole: tenant.workspaceRole,
     };

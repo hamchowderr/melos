@@ -81,6 +81,7 @@ describe('agent route: session -> tenant context -> Mastra tool (AIMock model)',
     expect(JSON.parse(toolResult?.content ?? '{}')).toEqual({
       status: 'ok',
       organizationId: workspaceId,
+      workspaceId: expect.stringMatching(/^ws_[0-9A-HJKMNP-TV-Z]{26}$/),
       userId,
       workspaceRole: 'owner',
     });

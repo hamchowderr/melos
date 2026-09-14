@@ -9,6 +9,7 @@ export const pingInputSchema = z.object({});
 export const pingResultSchema = z.object({
   status: z.literal('ok'),
   organizationId: z.string(),
+  workspaceId: z.string(),
   userId: z.string(),
   workspaceRole: z.string(),
 });

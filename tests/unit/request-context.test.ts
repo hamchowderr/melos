@@ -10,6 +10,7 @@ describe('agent request context', () => {
   const tenant = {
     userId: 'user_1',
     organizationId: 'org_1',
+    workspaceId: 'ws_1',
     workspaceRole: 'viewer',
     requestId: 'req_1',
   } as const;
@@ -21,6 +22,14 @@ describe('agent request context', () => {
   it('refuses a context without a tenant', () => {
     expect(() => readTenantContext(new RequestContext())).toThrow(/no tenant/);
     expect(() => readTenantContext(undefined)).toThrow(/no tenant/);
+  });
+
+  it('refuses a context without workspaceId', () => {
+    const requestContext = new RequestContext();
+    for (const [key, value] of Object.entries(tenant)) {
+      if (key !== 'workspaceId') requestContext.set(key, value);
+    }
+    expect(() => readTenantContext(requestContext)).toThrow(/no tenant: .*workspaceId/);
   });
 
   it('refuses a context whose role is not one Melos role', () => {
