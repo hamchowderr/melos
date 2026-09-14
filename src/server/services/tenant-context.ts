@@ -5,7 +5,10 @@ import { controlDb } from '../db/client';
 import { member } from '../db/schema/auth';
 import { type WORKSPACE_STATUSES, workspaceRegistry } from '../db/schema/control';
 
-/** Who is calling, in which workspace, with which role (docs/CONTRACT.md §7.1 step 2.4). */
+/**
+ * Who is calling, in which workspace, with which role (docs/CONTRACT.md §7.1 step 2.4). Ids only:
+ * services open the workspace database with getWorkspaceDatabase(workspaceId) (§7.2).
+ */
 export type TenantContext = {
   userId: string;
   organizationId: string;
