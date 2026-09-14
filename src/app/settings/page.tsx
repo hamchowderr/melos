@@ -1,14 +1,12 @@
 import { headers } from 'next/headers';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { buttonVariants } from '@/components/ui/button';
+import { resolveWorkspacePage } from '@/app/workspace-page';
 import { MembersPanel } from '@/components/workspace/members-panel';
 import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import type { WorkspacePermissions } from '@/lib/auth/permissions';
 import { auth } from '@/server/auth/auth';
 import { getServerEnv } from '@/server/env';
 import { requirePermission } from '@/server/services/permissions';
-import { tenantContextResolver } from '@/server/services/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,28 +18,22 @@ const expiry = new Intl.DateTimeFormat('en-US', {
 });
 
 export default async function SettingsPage() {
-  const requestHeaders = await headers();
-  const tenant = await tenantContextResolver.resolve(requestHeaders);
-  if (tenant.status === 'unauthenticated') redirect('/sign-in');
+  const workspace = await resolveWorkspacePage();
   // The home page explains a workspace without an active database.
-  if (tenant.status === 'workspace-unavailable' || tenant.status === 'workspace-not-provisioned') {
-    redirect('/');
-  }
-  // No active workspace, not a member, or an invalid role (P-30): the user picks a workspace.
-  if (tenant.status !== 'ok') redirect('/workspaces');
+  if (workspace.status === 'not-ready') redirect('/');
+  const { tenant } = workspace;
 
   // Membership lives only in Better Auth (docs/CONTRACT.md §6.1), which checks the caller.
-  const query = { organizationId: tenant.context.organizationId };
-  const [workspace, list, invitations] = await Promise.all([
-    auth.api.getOrganization({ headers: requestHeaders, query }).catch(() => null),
+  const requestHeaders = await headers();
+  const query = { organizationId: tenant.organizationId };
+  const [list, invitations] = await Promise.all([
     auth.api.listMembers({ headers: requestHeaders, query }).catch(() => null),
     auth.api.listInvitations({ headers: requestHeaders, query }).catch(() => null),
   ]);
-  if (!workspace || !list || !invitations) redirect('/workspaces/new');
+  if (!list || !invitations) redirect('/workspaces/new');
 
   // Decides which controls to show, from the role resolved for this request (§7.1).
-  const can = (permissions: WorkspacePermissions) =>
-    requirePermission(tenant.context, permissions).ok;
+  const can = (permissions: WorkspacePermissions) => requirePermission(tenant, permissions).ok;
 
   // Better Auth lists every invitation it wrote; only a pending, unexpired one can be accepted.
   const now = new Date();
@@ -58,11 +50,7 @@ export default async function SettingsPage() {
 
   return (
     <main>
-      <WorkspaceHeader workspaceName={workspace.name}>
-        <Link href="/" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          Chat
-        </Link>
-      </WorkspaceHeader>
+      <WorkspaceHeader workspaceName={workspace.workspaceName} current="settings" />
       <div className="flex justify-center px-4 py-6">
         <MembersPanel
           members={list.members}
