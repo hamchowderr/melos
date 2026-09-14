@@ -52,4 +52,44 @@ describe('operator scripts print only error names and codes (ADR-032)', () => {
       vi.unstubAllEnvs();
     }
   });
+
+  it('drops AI_GATEWAY_API_KEY so a run with VERCEL set and the Turso host validates (ADR-034)', async () => {
+    // Operators set VERCEL=1 for the Turso host; `infisical run --path=/melos` also injects the
+    // shared gateway key, which startup refuses on Vercel. Operator commands call no model.
+    const operatorEnv = {
+      VERCEL: '1',
+      MELOS_CONTROL_DATABASE_URL: 'https://control.example.invalid',
+      MELOS_CONTROL_DATABASE_AUTH_TOKEN: 'control-token-for-test',
+      MELOS_AGENT_DATABASE_URL: 'https://agent.example.invalid',
+      MELOS_AGENT_DATABASE_AUTH_TOKEN: 'agent-token-for-test',
+      MELOS_WORKSPACE_DATA_DIR: undefined,
+      MELOS_LLM_BASE_URL: undefined,
+      MELOS_CHAT_MODEL: undefined,
+      TURSO_API_TOKEN: 'api-token-for-test',
+      TURSO_ORG: 'example-org',
+      MELOS_WORKSPACE_TOKEN_KEY: Buffer.alloc(32, 7).toString('base64'),
+      AI_GATEWAY_API_KEY: 'gateway-key-for-test',
+    };
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      for (const [name, value] of Object.entries(operatorEnv)) vi.stubEnv(name, value);
+      vi.resetModules();
+      const operator = await import('../../scripts/operator');
+      let seen: unknown;
+      // The HTTP client sends nothing until a query, and `work` runs none.
+      const exitCode = await operator.runOperatorCommand([], () =>
+        operator.withControl(async ({ env }) => {
+          const key = 'AI_GATEWAY_API_KEY' in process.env;
+          seen = { key, onVercel: env.onVercel, host: env.workspaceHost.kind };
+          return 0;
+        }),
+      );
+      expect(stderr).not.toHaveBeenCalled();
+      expect(exitCode).toBe(0);
+      expect(seen).toEqual({ key: false, onVercel: true, host: 'turso' });
+    } finally {
+      vi.unstubAllEnvs();
+      stderr.mockRestore();
+    }
+  });
 });

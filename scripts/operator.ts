@@ -24,6 +24,10 @@ function reportFailure(error: unknown): number {
  * control client cannot be created, 1 when `work` throws, and otherwise what `work` returns.
  */
 export async function withControl(work: (control: Control) => Promise<number>): Promise<number> {
+  // Operator commands never call a model. Startup refuses any gateway key while VERCEL is set
+  // (ADR-034), and operators set VERCEL for the Turso host, so drop the key before `getServerEnv`
+  // first reads process.env.
+  delete process.env.AI_GATEWAY_API_KEY;
   let control: Control;
   try {
     const env = (await import('../src/server/env')).getServerEnv();
