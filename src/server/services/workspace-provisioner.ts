@@ -8,6 +8,7 @@ import { applyWorkspaceMigrations } from '../db/workspace-migrations';
 import { getServerEnv } from '../env';
 import { errorCode } from '../error-code';
 import { type GuardTransaction, controlIntegrityGuard as guard } from './integrity-guard';
+import { closeWorkspaceDatabase } from './workspace-connections';
 
 export type WorkspaceRegistryRow = typeof workspaceRegistry.$inferSelect;
 
@@ -237,6 +238,8 @@ export async function deleteWorkspaceDatabase(
     step = 'mark_deleting';
     const row = await writeIf(existing.id, unchanged(existing), { status: 'deleting' });
     if (!row) throw claimHeld();
+    // A `deleting` row opens no new client; the cached one closes before its database goes.
+    await closeWorkspaceDatabase(existing.id);
     if (host.kind === 'unconfigured') return row;
     step = 'delete_database';
     try {
