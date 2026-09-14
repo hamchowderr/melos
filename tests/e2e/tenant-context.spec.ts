@@ -5,6 +5,7 @@ import {
   activeWorkspaceId,
   createWorkspace,
   pingInChat,
+  setMemberRole,
   setWorkspaceStatus,
   signIn,
   signOut,
@@ -50,7 +51,8 @@ test('AUTH-E2E-003: tool results follow the newly active workspace', async ({ pa
   expect(await activeWorkspaceId(secondId)).not.toBe(await activeWorkspaceId(firstId));
   await expectPing(page, secondId);
 
-  // No workspace switcher exists yet; switch through the endpoint the auth client calls.
+  // Switches through the endpoint the auth client calls, on purpose: this test is about tool
+  // results following the switch; the melos-g4u tests drive the workspace list.
   // Better Auth refuses a cookie-bearing POST without an Origin header.
   const switched = await page.request.post('/api/auth/organization/set-active', {
     headers: { origin: new URL(page.url()).origin },
@@ -96,7 +98,8 @@ test('melos-2lm: a member of two workspaces picks one after signing in and reach
   await expect(workspaces).toContainText([north, south]);
   await expect(workspaces.getByText('owner', { exact: true })).toHaveCount(2);
 
-  // South was active at sign-out; picking North proves the pick sets the workspace.
+  // A new session starts with no active workspace, whichever was active before; the ping below
+  // proves the pick opened North.
   await workspaces.filter({ hasText: north }).click();
   await expect(page).toHaveURL(`${new URL(page.url()).origin}/`, AUTH_REDIRECT);
   await expect(page.getByTestId('active-workspace-name')).toHaveText(north);
@@ -109,6 +112,148 @@ test('melos-2lm: a user with no workspace is still sent to /workspaces/new', asy
   await page.goto('/workspaces');
   await expect(page).toHaveURL(/\/workspaces\/new$/);
   await expect(page.getByRole('heading', { name: 'Create a workspace' })).toBeVisible();
+});
+
+/** Signs up a user who owns two workspaces, named with `labels`; the second is active. */
+async function signUpWithTwoWorkspaces(page: Page, user: string, labels: [string, string]) {
+  await signIn(page, await signUp(page, user));
+  const names = labels.map((label) => `${user} ${label} ${Date.now()}`);
+  await createWorkspace(page, names[0]);
+  const firstId = await activeOrganizationId(page);
+  await page.goto('/workspaces/new');
+  await createWorkspace(page, names[1]);
+  return { names, firstId, secondId: await activeOrganizationId(page) };
+}
+
+const workspaceButtons = (page: Page) =>
+  page.getByRole('list', { name: 'Your workspaces' }).getByRole('button');
+
+test('melos-g4u: a signed-in user signs out from the workspace header', async ({ page }) => {
+  await signUpWithWorkspace(page, 'Leave');
+  await page.goto('/settings');
+  await expect(page.getByRole('link', { name: 'Switch workspace' })).toBeVisible();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/sign-in$/);
+});
+
+test('melos-g4u: a member of two workspaces switches from the workspace header', async ({
+  page,
+}) => {
+  const { names, firstId } = await signUpWithTwoWorkspaces(page, 'Header', ['North', 'South']);
+  await page.getByRole('link', { name: 'Switch workspace' }).click();
+  await expect(page).toHaveURL(/\/workspaces$/);
+
+  // Holds set-active so the chosen button's pending text can be seen.
+  const { promise: held, resolve: release } = Promise.withResolvers<void>();
+  await page.route('**/api/auth/organization/set-active', async (route) => {
+    await held;
+    await route.continue();
+  });
+  const [north, south] = names.map((name) => workspaceButtons(page).filter({ hasText: name }));
+  await north.click();
+  await expect(north).toContainText('Opening...');
+  await expect(north).toBeDisabled();
+  await expect(south).toBeDisabled();
+  release();
+
+  await expect(page).toHaveURL(`${new URL(page.url()).origin}/`, AUTH_REDIRECT);
+  await expect(page.getByTestId('active-workspace-name')).toHaveText(names[0]);
+  await expectPing(page, firstId);
+});
+
+test('melos-g4u: a member stuck on a failed workspace switches or signs out from its screen', async ({
+  page,
+}) => {
+  const { names, firstId, secondId } = await signUpWithTwoWorkspaces(page, 'Stuck', [
+    'Healthy',
+    'Failed',
+  ]);
+  await setWorkspaceStatus(secondId, 'failed');
+  const home = `${new URL(page.url()).origin}/`;
+  const notReady = page.getByTestId('workspace-not-ready');
+
+  await page.reload();
+  await expect(notReady).toHaveAttribute('data-status', 'failed');
+  await page.getByRole('link', { name: 'Switch workspace' }).click();
+  await workspaceButtons(page).filter({ hasText: names[0] }).click();
+  await expect(page).toHaveURL(home, AUTH_REDIRECT);
+  await expect(page.getByTestId('active-workspace-name')).toHaveText(names[0]);
+  await expectPing(page, firstId);
+
+  await page.getByRole('link', { name: 'Switch workspace' }).click();
+  await workspaceButtons(page).filter({ hasText: names[1] }).click();
+  await expect(notReady).toHaveAttribute('data-status', 'failed', AUTH_REDIRECT);
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/sign-in$/);
+});
+
+test('melos-g4u: a member whose active workspace has an invalid role picks from the others or signs out', async ({
+  page,
+}) => {
+  const { names, secondId } = await signUpWithTwoWorkspaces(page, 'Misrole', ['Kept', 'Broken']);
+  // A configuration error: Melos assigns one role per member (P-30).
+  await setMemberRole(secondId, 'owner,viewer');
+
+  for (const path of ['/', '/settings']) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/workspaces$/);
+    await expect(workspaceButtons(page)).toHaveCount(1);
+    await expect(workspaceButtons(page)).toContainText(names[0]);
+  }
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
+});
+
+test('melos-g4u: a user with no workspace signs out from /workspaces/new', async ({ page }) => {
+  await signIn(page, await signUp(page, 'Nowhere'));
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
+  await page.goto('/workspaces/new');
+  await expect(page).toHaveURL(/\/sign-in$/);
+});
+
+const signOutError = (page: Page) =>
+  page.getByRole('alert').filter({ hasText: 'Could not sign out.' });
+
+test('melos-g4u: a sign-out that fails on the network shows its error and can be retried', async ({
+  page,
+}) => {
+  await signUpWithWorkspace(page, 'Offline');
+  const signOut = page.getByRole('button', { name: 'Sign out' });
+  // An aborted request makes the auth client throw instead of returning an error.
+  await page.route('**/api/auth/sign-out', (route) => route.abort());
+  await signOut.click();
+  await expect(signOutError(page)).toBeVisible();
+  await expect(signOut).toBeEnabled();
+
+  await page.unroute('**/api/auth/sign-out');
+  await signOut.click();
+  await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
+});
+
+test('melos-g4u: on a phone, the workspace header fits, with or without a sign-out error', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await signUpWithWorkspace(page, 'Phone');
+  await page.route('**/api/auth/sign-out', (route) => route.abort());
+  const signOut = page.getByRole('button', { name: 'Sign out' });
+
+  for (const failed of [false, true]) {
+    if (failed) await signOut.click();
+    if (failed) await expect(signOutError(page)).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId('active-workspace-name')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Switch workspace' })).toBeInViewport({ ratio: 1 });
+    await expect(signOut).toBeInViewport({ ratio: 1 });
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  }
 });
 
 test('TEN-002: a member of a failed workspace is told why, not sent to /workspaces/new', async ({

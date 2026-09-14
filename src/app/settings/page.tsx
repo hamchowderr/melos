@@ -27,10 +27,8 @@ export default async function SettingsPage() {
   if (tenant.status === 'workspace-unavailable' || tenant.status === 'workspace-not-provisioned') {
     redirect('/');
   }
-  if (tenant.status === 'no-active-workspace' || tenant.status === 'not-a-member') {
-    redirect('/workspaces');
-  }
-  if (tenant.status !== 'ok') redirect('/workspaces/new');
+  // No active workspace, not a member, or an invalid role (P-30): the user picks a workspace.
+  if (tenant.status !== 'ok') redirect('/workspaces');
 
   // Membership lives only in Better Auth (docs/CONTRACT.md §6.1), which checks the caller.
   const query = { organizationId: tenant.context.organizationId };

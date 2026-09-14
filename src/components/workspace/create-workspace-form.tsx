@@ -1,6 +1,7 @@
 'use client';
 
 import { type FormEvent, useState } from 'react';
+import { SignOutButton } from '@/components/auth/sign-out-button';
 import { PageCard } from '@/components/page-card';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -27,22 +28,22 @@ export function CreateWorkspaceForm() {
     setPending(true);
     setError(null);
 
-    const created = await authClient.organization.create({
-      name,
-      slug: toSlug(name),
-    });
-    if (created.error || !created.data) {
+    // The auth client throws on a network error instead of returning one.
+    const created = await authClient.organization
+      .create({ name, slug: toSlug(name) })
+      .catch(() => null);
+    if (!created || created.error || !created.data) {
       setPending(false);
-      setError(created.error?.message ?? 'Could not create the workspace.');
+      setError(created?.error?.message ?? 'Could not create the workspace.');
       return;
     }
 
-    const active = await authClient.organization.setActive({
-      organizationId: created.data.id,
-    });
-    if (active.error) {
+    const active = await authClient.organization
+      .setActive({ organizationId: created.data.id })
+      .catch(() => null);
+    if (!active || active.error) {
       setPending(false);
-      setError(active.error.message ?? 'Could not open the workspace.');
+      setError(active?.error?.message ?? 'Could not open the workspace.');
       return;
     }
     window.location.assign('/');
@@ -62,6 +63,9 @@ export function CreateWorkspaceForm() {
           </Button>
         </FieldGroup>
       </form>
+      <div className="flex flex-wrap items-center gap-2">
+        <SignOutButton variant="ghost" />
+      </div>
     </PageCard>
   );
 }

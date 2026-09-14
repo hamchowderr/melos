@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { isWorkspaceRole, type WorkspaceRole } from '../../lib/auth/permissions';
+import { isSingleWorkspaceRole, type WorkspaceRole } from '../../lib/auth/permissions';
 import { auth } from '../auth/auth';
 import { controlDb } from '../db/client';
 import { member } from '../db/schema/auth';
@@ -61,7 +61,7 @@ export const tenantContextResolver: TenantContextResolver = {
 
     const requestId = crypto.randomUUID();
     // Melos assigns one role per member; Better Auth joins several with commas (P-30).
-    if (membership.role.includes(',') || !isWorkspaceRole(membership.role)) {
+    if (!isSingleWorkspaceRole(membership.role)) {
       // Ids only: the session, its token and the request headers are never logged.
       const { id: memberId, role } = membership;
       const detail = { requestId, organizationId, userId, memberId, role };
