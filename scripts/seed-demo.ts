@@ -59,6 +59,10 @@ export async function runSeedDemoCommand(
       console.error(
         `Organization ${organizationId} was not replaced (${refusal}); nothing was seeded`,
       );
+      // The seeded credential still holds the password the earlier seed hashed.
+      if (refusal.startsWith('sign_in ')) {
+        console.error(`Set ${PASSWORD} to the value the existing seed used, then run this again`);
+      }
       return 1;
     }
     print(`${seed.organizationId} ${seed.workspaceId} ${seed.dateShift}`);

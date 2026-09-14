@@ -365,7 +365,7 @@ describe('melos-cqn.3: db:seed-demo -- --replace replaces an earlier seed, compl
     expect(await rows(replaceControl, deleted)).toEqual([{ target_id: earlier.id }]);
   });
 
-  it('refuses a wrong password or a live provisioning claim with 1, deleting and seeding nothing', async () => {
+  it('refuses a wrong password, naming the variable to set, or a live provisioning claim with 1, deleting and seeding nothing', async () => {
     const claim = 'UPDATE workspace_registry SET status = ?, updated_at = ?';
     await replaceControl.execute({ sql: claim, args: ['provisioning', new Date().toISOString()] });
     const before = await snapshot(replaceControl);
@@ -386,6 +386,9 @@ describe('melos-cqn.3: db:seed-demo -- --replace replaces an earlier seed, compl
     expect([held.status, held.stdout]).toEqual([1, '']);
     expect(held.stderr).toContain('at provisioning_in_progress: WorkspaceClaimHeld');
     expect(held.stderr).toContain(`${refused} (delete_organization 503 WORKSPACE_DELETE_FAILED)`);
+    const hint = 'Set MELOS_DEMO_PASSWORD to the value the existing seed used';
+    expect(wrong.stderr).toContain(hint);
+    expect(held.stderr).not.toContain(hint);
     expect(await snapshot(replaceControl)).toEqual(before);
     expect(existsSync(fileOf(previous))).toBe(true);
     expect(held.stdout + held.stderr + wrong.stderr).not.toContain(PASSWORD);
