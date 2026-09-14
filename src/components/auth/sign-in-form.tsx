@@ -17,13 +17,13 @@ export function SignInForm() {
     const form = new FormData(event.currentTarget);
     setPending(true);
     setError(null);
-    const result = await authClient.signIn.email({
-      email: String(form.get('email')),
-      password: String(form.get('password')),
-    });
-    if (result.error) {
+    // The auth client throws on a network error instead of returning one.
+    const result = await authClient.signIn
+      .email({ email: String(form.get('email')), password: String(form.get('password')) })
+      .catch(() => null);
+    if (!result || result.error) {
       setPending(false);
-      setError(result.error.message ?? 'Could not sign in.');
+      setError(result?.error?.message ?? 'Could not sign in.');
       return;
     }
     // Full navigation so the server reads the new session cookie.
