@@ -136,9 +136,9 @@ const artistRows = (database: WorkspaceDatabase, where: SQL | undefined) =>
  */
 export async function listSongs(tenant: TenantContext): Promise<ServiceResult<SongListItem[]>> {
   if (!canRead(tenant)) return failure('FORBIDDEN');
-  return sanitized(tenant.workspaceId, async () => {
+  const reads = sanitized(tenant.workspaceId, async () => {
     const database = await getWorkspaceDatabase(tenant.workspaceId);
-    const [songs, altTitles, songRecordings, artists] = await database.batch([
+    return database.batch([
       database.select(COMPOSITION).from(compositions).where(isNull(compositions.deletedAt)),
       database.select().from(compositionAltTitles).orderBy(asc(compositionAltTitles.title)),
       database
@@ -148,6 +148,9 @@ export async function listSongs(tenant: TenantContext): Promise<ServiceResult<So
         .orderBy(...RECORDING_ORDER),
       artistRows(database, eq(recordingArtists.role, 'primary')),
     ]);
+  });
+  // Only the database work is sanitized, so a bug in the grouping throws as itself.
+  return reads.then(([songs, altTitles, songRecordings, artists]) => {
     const altTitlesOf = Map.groupBy(altTitles, (row) => row.compositionId);
     const recordingsOf = Map.groupBy(songRecordings, (row) => row.compositionId);
     const artistsOf = byRecording(artists);
@@ -191,92 +194,93 @@ export async function getSongCatalog(
   { entityType, entityId }: CatalogFocus,
 ): Promise<ServiceResult<SongCatalogDTO>> {
   if (!canRead(tenant)) return failure('FORBIDDEN');
-  return sanitized(tenant.workspaceId, async (): Promise<ServiceResult<SongCatalogDTO>> => {
+  const isComposition = entityType === 'composition';
+  const reads = sanitized(tenant.workspaceId, async () => {
     const database = await getWorkspaceDatabase(tenant.workspaceId);
-    const isComposition = entityType === 'composition';
+    const live = isNull(recordings.deletedAt);
     // The song's composition: the id itself, or the composition of the live recording it names.
-    const named = and(eq(recordings.id, entityId), isNull(recordings.deletedAt));
+    const named = and(eq(recordings.id, entityId), live);
     const owner = database.select({ id: recordings.compositionId }).from(recordings).where(named);
     const inSong = (column: Column) =>
       isComposition ? eq(column, entityId) : inArray(column, owner);
     const alone = isComposition ? undefined : eq(recordings.id, entityId);
-    const songRecording = and(
-      isNull(recordings.deletedAt),
-      or(inSong(recordings.compositionId), alone),
-    );
+    const songRecording = and(live, or(inSong(recordings.compositionId), alone));
     const ids = database.select({ id: recordings.id }).from(recordings).where(songRecording);
     const ofSong = (column: Column) => inArray(column, ids);
-    const [found, altTitles, songRecordings, links, artists, contributors, terms, songReleases] =
-      await database.batch([
-        database
-          .select(COMPOSITION)
-          .from(compositions)
-          .where(and(inSong(compositions.id), isNull(compositions.deletedAt))),
-        database
-          .select({ title: compositionAltTitles.title })
-          .from(compositionAltTitles)
-          .where(inSong(compositionAltTitles.compositionId))
-          .orderBy(asc(compositionAltTitles.title)),
-        database
-          .select(RECORDING)
-          .from(recordings)
-          .where(songRecording)
-          .orderBy(...RECORDING_ORDER),
-        database
-          .select(LINK)
-          .from(recordingLinks)
-          .where(ofSong(recordingLinks.recordingId))
-          .orderBy(
-            desc(recordingLinks.isPrimary),
-            asc(recordingLinks.createdAt),
-            asc(recordingLinks.id),
-          ),
-        artistRows(database, ofSong(recordingArtists.recordingId)),
-        database
-          .select(CONTRIBUTOR)
-          .from(recordingContributors)
-          .innerJoin(parties, eq(parties.id, recordingContributors.partyId))
-          .where(ofSong(recordingContributors.recordingId))
-          .orderBy(asc(recordingContributors.role), asc(parties.displayName)),
-        database
-          .select(TERM)
-          .from(recordingTerms)
-          .innerJoin(metadataTerms, eq(metadataTerms.id, recordingTerms.termId))
-          .where(ofSong(recordingTerms.recordingId))
-          .orderBy(asc(metadataTerms.termType), asc(metadataTerms.label)),
-        database
-          .select(RELEASE)
-          .from(releaseTracks)
-          .innerJoin(releases, eq(releases.id, releaseTracks.releaseId))
-          .where(and(ofSong(releaseTracks.recordingId), isNull(releases.deletedAt)))
-          .orderBy(asc(releases.releaseDate), asc(releases.title), asc(releaseTracks.discNumber)),
-      ]);
-
-    const [composition] = found;
-    const focused = songRecordings.find(({ recording }) => recording.id === entityId);
-    // A recording id names no song when the recording, or the composition it belongs to, is not live.
-    const orphaned = focused !== undefined && focused.compositionId !== null && !composition;
-    if (isComposition ? !composition : !focused || orphaned) return failure('NOT_FOUND');
-    const linksOf = byRecording(links);
-    const artistsOf = byRecording(artists);
-    const contributorsOf = byRecording(contributors);
-    const termsOf = byRecording(terms);
-    const recordingDtos = songRecordings.map(({ recording }) => ({
-      ...recording,
-      primaryLink: linksOf.get(recording.id)?.find((link) => link.isPrimary) ?? null,
-      links: linksOf.get(recording.id) ?? [],
-      artists: artistsOf.get(recording.id) ?? [],
-      contributors: contributorsOf.get(recording.id) ?? [],
-      terms: termsOf.get(recording.id) ?? [],
-    }));
-    return success({
-      focus: { entityType, entityId },
-      composition: composition
-        ? { ...composition, altTitles: altTitles.map((alt) => alt.title) }
-        : null,
-      primaryRecordingId: primaryRecording(composition?.title ?? '', recordingDtos)?.id ?? null,
-      recordings: recordingDtos,
-      releases: songReleases,
-    });
+    return database.batch([
+      database
+        .select(COMPOSITION)
+        .from(compositions)
+        .where(and(inSong(compositions.id), isNull(compositions.deletedAt))),
+      database
+        .select({ title: compositionAltTitles.title })
+        .from(compositionAltTitles)
+        .where(inSong(compositionAltTitles.compositionId))
+        .orderBy(asc(compositionAltTitles.title)),
+      database
+        .select(RECORDING)
+        .from(recordings)
+        .where(songRecording)
+        .orderBy(...RECORDING_ORDER),
+      database
+        .select(LINK)
+        .from(recordingLinks)
+        .where(ofSong(recordingLinks.recordingId))
+        .orderBy(
+          desc(recordingLinks.isPrimary),
+          asc(recordingLinks.createdAt),
+          asc(recordingLinks.id),
+        ),
+      artistRows(database, ofSong(recordingArtists.recordingId)),
+      database
+        .select(CONTRIBUTOR)
+        .from(recordingContributors)
+        .innerJoin(parties, eq(parties.id, recordingContributors.partyId))
+        .where(ofSong(recordingContributors.recordingId))
+        .orderBy(asc(recordingContributors.role), asc(parties.displayName)),
+      database
+        .select(TERM)
+        .from(recordingTerms)
+        .innerJoin(metadataTerms, eq(metadataTerms.id, recordingTerms.termId))
+        .where(ofSong(recordingTerms.recordingId))
+        .orderBy(asc(metadataTerms.termType), asc(metadataTerms.label)),
+      database
+        .select(RELEASE)
+        .from(releaseTracks)
+        .innerJoin(releases, eq(releases.id, releaseTracks.releaseId))
+        .where(and(ofSong(releaseTracks.recordingId), isNull(releases.deletedAt)))
+        .orderBy(asc(releases.releaseDate), asc(releases.title), asc(releaseTracks.discNumber)),
+    ]);
   });
+  // Only the database work is sanitized, so a bug in the mapping throws as itself.
+  return reads.then(
+    ([found, altTitles, songRecordings, links, artists, contributors, terms, songReleases]) => {
+      const [composition] = found;
+      const focused = songRecordings.find(({ recording }) => recording.id === entityId);
+      // A recording id names no song when it, or the composition it belongs to, is not live.
+      const orphaned = focused !== undefined && focused.compositionId !== null && !composition;
+      if (isComposition ? !composition : !focused || orphaned) return failure('NOT_FOUND');
+      const linksOf = byRecording(links);
+      const artistsOf = byRecording(artists);
+      const contributorsOf = byRecording(contributors);
+      const termsOf = byRecording(terms);
+      const recordingDtos = songRecordings.map(({ recording }) => ({
+        ...recording,
+        primaryLink: linksOf.get(recording.id)?.find((link) => link.isPrimary) ?? null,
+        links: linksOf.get(recording.id) ?? [],
+        artists: artistsOf.get(recording.id) ?? [],
+        contributors: contributorsOf.get(recording.id) ?? [],
+        terms: termsOf.get(recording.id) ?? [],
+      }));
+      return success({
+        focus: { entityType, entityId },
+        composition: composition
+          ? { ...composition, altTitles: altTitles.map((alt) => alt.title) }
+          : null,
+        primaryRecordingId: primaryRecording(composition?.title ?? '', recordingDtos)?.id ?? null,
+        recordings: recordingDtos,
+        releases: songReleases,
+      });
+    },
+  );
 }
