@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { createClient } from '@libsql/client';
 import { expect, type Page } from '@playwright/test';
+import { DEMO_JORDAN } from './demo-seed';
 
 // The first auth request after `next start` hashes a password on a cold server; 5s is too tight.
 export const AUTH_REDIRECT = { timeout: 30_000 };
@@ -36,6 +37,16 @@ export async function signIn(
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(landing, AUTH_REDIRECT);
+}
+
+/** Signs in as Jordan Taylor, owner of the seeded Northstar workspace; read specs only (D-9). */
+export async function signInAsJordan(page: Page): Promise<void> {
+  const stamp = Date.now();
+  // Its own client address, as in signUp, so Better Auth's per-IP limit counts this sign-in alone.
+  const clientIp = `198.19.${(stamp >> 8) & 255}.${stamp & 255}`;
+  await page.setExtraHTTPHeaders({ 'x-forwarded-for': clientIp });
+  await page.goto('/sign-in');
+  await signIn(page, DEMO_JORDAN, `${new URL(page.url()).origin}/`);
 }
 
 /** Signs out through the endpoint the auth client calls, which wants an Origin and a JSON body. */

@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+import { DEMO_JORDAN } from './tests/e2e/demo-seed';
 
 const PORT = 3100;
 const AIMOCK_PORT = 4010;
@@ -30,7 +31,9 @@ export default defineConfig({
     ...aimockServer,
     {
       // Builds with the same keyless env it runs with. Never run this while `next dev` is up.
-      command: `npm run db:migrate && npm run build && npx next start -p ${PORT}`,
+      // Read specs use the seeded Northstar catalog (D-9); --replace deletes the seed a previous
+      // run left, so every run starts from the fixture.
+      command: `npm run db:migrate && npx tsx scripts/seed-demo.ts --replace && npm run build && npx next start -p ${PORT}`,
       port: PORT,
       reuseExistingServer: false,
       timeout: 600_000,
@@ -44,6 +47,7 @@ export default defineConfig({
         // Every workspace created in the suite provisions a database file here, not in .data.
         MELOS_WORKSPACE_DATA_DIR: 'data/e2e-workspaces',
         MELOS_LLM_BASE_URL: `http://127.0.0.1:${AIMOCK_PORT}/v1`,
+        MELOS_DEMO_PASSWORD: DEMO_JORDAN.password,
       },
     },
   ],
