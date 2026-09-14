@@ -32,7 +32,7 @@ const connections = new Map<string, Promise<WorkspaceDatabase>>();
  * Runs `work` and replaces any error with a WorkspaceConnectionError holding its name and code:
  * control-plane and libSQL messages may name a URL, a file path or a token.
  */
-async function sanitized<T>(workspaceId: string, work: () => Promise<T>): Promise<T> {
+export async function sanitized<T>(workspaceId: string, work: () => Promise<T>): Promise<T> {
   try {
     return await work();
   } catch (error) {
