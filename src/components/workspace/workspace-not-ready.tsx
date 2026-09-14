@@ -12,9 +12,9 @@ const COPY: Record<Status, { title: string; message: string }> = {
     message: 'Chat opens again once the update finishes. Reload this page in a moment.',
   },
   failed: {
-    title: 'Your workspace could not be set up',
+    title: 'Your workspace is not available right now',
     message:
-      'Melos could not set up its database. The workspace and its members are kept, so you do not need to create another one.',
+      'Its database ran into a problem during setup or an update. The workspace and its members are kept. Try again later, or contact the workspace owner.',
   },
   suspended: {
     title: 'This workspace is suspended',

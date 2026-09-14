@@ -69,7 +69,7 @@ test('TEN-002: a member of a failed workspace is told why, not sent to /workspac
     await page.goto(path);
     await expect(page).toHaveURL(home);
     await expect(
-      page.getByRole('heading', { name: 'Your workspace could not be set up' }),
+      page.getByRole('heading', { name: 'Your workspace is not available right now' }),
     ).toBeVisible();
     await expect(page.getByTestId('workspace-not-ready')).toHaveAttribute('data-status', 'failed');
     await expect(page.getByRole('textbox')).toHaveCount(0);
