@@ -131,7 +131,8 @@ export async function seedNorthstar(options: {
     const [owner] = control.member;
     const audit = {
       id: `cad_${ulid()}`,
-      actorUserId: userId,
+      // An operator command has no session, so no acting user (§4.1).
+      actorUserId: null,
       organizationId,
       action: 'member.added',
     };
@@ -146,7 +147,7 @@ export async function seedNorthstar(options: {
   if (!created) return { status: 'exists', organizationId };
 
   // Inserted rows fire no Better Auth hook, so the seed provisions as organization creation does.
-  const registry = await provisionWorkspace(organizationId, userId);
+  const registry = await provisionWorkspace(organizationId, null);
   if (registry.status !== 'active') {
     const error = new Error(`Workspace ${registry.id} is ${registry.status}`);
     throw Object.assign(error, { code: 'WorkspaceNotActive' });

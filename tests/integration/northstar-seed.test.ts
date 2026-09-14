@@ -93,6 +93,10 @@ describe('melos-cqn.1: the Northstar Demo Catalog seed (§8 phase 3)', () => {
     expect(await dump(workspace, seededTables('workspace'))).toEqual(fixtureRows('workspace'));
     const registry = await registryOf(control.$client);
     expect(registry).toMatchObject({ organization_id: ORGANIZATION_ID, status: 'active' });
+    const settings = 'SELECT id, follow_up_interval_days, updated_by FROM workspace_settings';
+    const { id, follow_up_interval_days, updated_by } = fixture.workspace.workspace_settings[0];
+    const provisionedSettings = [{ id, follow_up_interval_days, updated_by }];
+    expect(await rows(workspace, settings)).toEqual(provisionedSettings);
     const columns = ['name', 'report_type', 'preset_key', 'config_json', 'is_system'];
     const query = `SELECT id, ${columns} FROM report_templates ORDER BY rowid`;
     const templates = await rows(workspace, query);
@@ -105,7 +109,8 @@ describe('melos-cqn.1: the Northstar Demo Catalog seed (§8 phase 3)', () => {
       control.$client,
       'SELECT * FROM control_audit_log ORDER BY occurred_at',
     );
-    const common = { actor_user_id: keys.usr_JORDAN, organization_id: ORGANIZATION_ID };
+    // The seed runs without a session, so neither row names an acting user (§4.1).
+    const common = { actor_user_id: null, organization_id: ORGANIZATION_ID };
     const added = {
       action: 'member.added',
       target_type: 'member',
