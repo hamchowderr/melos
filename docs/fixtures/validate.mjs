@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Validates the Northstar demo fixture (beads melos-73v).
 //
-// 1. Extracts the workspace and control-plane DDL from docs/CONTRACT.md and applies it to fresh libSQL files.
+// 1. Extracts the workspace and control-plane DDL from docs/CONTRACT.md and applies it to fresh in-memory libSQL databases.
 // 2. Loads docs/fixtures/northstar-demo.json.
 // 3. Asserts, with SQL, every table in docs/fixtures/EXPECTED.md marked <!-- check:... -->, the fixture
 //    invariants, the source fixture (docs/source/GIZMO_Demo_Fixture.json) and the CONTRACT §6.5 readiness table.
@@ -10,9 +10,8 @@
 // validateSeeded runs the same checks against a seeded Northstar workspace (npm run db:validate-demo).
 // @libsql/client resolves from LIBSQL_CLIENT_BASE (a package.json path), the repository root, or the Gate A worktree.
 
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -234,15 +233,11 @@ function loadLibsql() {
   );
 }
 
-// Windows can hold libSQL file handles briefly after close; a leftover temp directory is not a failure.
-function removeDir(dir) {
-  try {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
-  } catch {}
-}
-
-async function freshDb(dir, name, ddl) {
-  const db = loadLibsql().createClient({ url: `file:${path.join(dir, name).replace(/\\/g, '/')}` });
+// In memory, because a closed libSQL file stays locked on Windows until its statements are garbage
+// collected, so its temp directory could not be removed. One connection serves the whole database:
+// nothing may use the client while one of its transactions is open.
+async function freshDb(ddl) {
+  const db = loadLibsql().createClient({ url: ':memory:' });
   await db.execute('PRAGMA foreign_keys = ON');
   await db.executeMultiple(ddl);
   return db;
@@ -1440,15 +1435,13 @@ async function checkExpected(ws, ctl, workspaceDdl, ready, tables) {
     },
     audit_rows: async () => String((await q(ws, 'SELECT COUNT(*) AS n FROM audit_log'))[0].n),
     other_workspace: async (cmp) => {
-      const dir = mkdtempSync(path.join(tmpdir(), 'melos-fixture-other-'));
-      const other = await freshDb(dir, 'other.db', workspaceDdl);
+      const other = await freshDb(workspaceDdl);
       try {
         return (await q(other, 'SELECT id FROM compositions WHERE id = ?', [idOf(cmp)])).length
           ? 'FOUND'
           : 'NOT_FOUND';
       } finally {
         other.close();
-        removeDir(dir);
       }
     },
     template: async (preset) =>
@@ -1607,9 +1600,8 @@ export async function validateSeeded(ctl, ws) {
 
 async function main() {
   const { workspaceDdl, betterAuthDdl, controlDdl } = contractDdl();
-  const dir = mkdtempSync(path.join(tmpdir(), 'melos-fixture-'));
-  const ws = await freshDb(dir, 'workspace.db', workspaceDdl);
-  const ctl = await freshDb(dir, 'control.db', `${betterAuthDdl}\n${controlDdl}`);
+  const ws = await freshDb(workspaceDdl);
+  const ctl = await freshDb(`${betterAuthDdl}\n${controlDdl}`);
   try {
     await load(ctl, fixture.control);
     await load(ws, fixture.workspace);
@@ -1618,7 +1610,6 @@ async function main() {
   } finally {
     ws.close();
     ctl.close();
-    removeDir(dir);
   }
 
   for (const f of failures)
