@@ -362,6 +362,37 @@ describe('melos-75e.14: provisioning claims and the operator retry command (§7.
     expect([printed.includes(TOKEN), printed.includes('failed:')]).toEqual([false, false]);
   });
 
+  it('--all-failed also retries a provisioning row whose claim is stale and leaves a live claim alone', async () => {
+    const failed = await createFailed('all-failed-row');
+    const crashed = await createFailed('all-crashed');
+    // An attempt that died before its last write leaves the row provisioning under its claim.
+    const at = new Date().toISOString();
+    const stuck = { status: 'provisioning' as const, attemptId: ulid(), updatedAt: at };
+    await control.update(workspaceRegistry).set(stuck).where(eq(workspaceRegistry.id, crashed.id));
+    const live = await rowOf(crashed.organizationId);
+    expect(live).toMatchObject(stuck);
+    const lines: string[] = [];
+    const print = (line: string) => lines.push(line);
+    const byStatus = eq(workspaceRegistry.status, 'failed');
+    const failedRows = await control.select().from(workspaceRegistry).where(byStatus);
+    expect(failedRows.map((row) => row.organizationId)).toContain(failed.organizationId);
+    failedRows.sort((a, b) => (a.id < b.id ? -1 : 1));
+
+    // Within STALE_CLAIM_MS the attempt may still be running: the batch retries only failed rows.
+    expect(await runProvisionCommand(['--all-failed'], print)).toBe(0);
+    expect(lines).toEqual(failedRows.map((row) => `${row.organizationId} active`));
+    expect(await rowOf(failed.organizationId)).toMatchObject({ status: 'active' });
+    expect(await rowOf(crashed.organizationId)).toEqual(live);
+
+    await backdate(crashed.id);
+    lines.length = 0;
+    expect(await runProvisionCommand(['--all-failed'], print)).toBe(0);
+    expect(lines).toEqual([`${crashed.organizationId} active`]);
+    const resumed = { id: crashed.id, databaseName: crashed.databaseName, statusDetail: null };
+    const active = { ...resumed, status: 'active', schemaVersion: latest() };
+    expect(await rowOf(crashed.organizationId)).toMatchObject(active);
+  });
+
   it('runs as the npm script through tsx on a control database file (smoke)', async () => {
     const file = 'data/test-workspace-provision-command.db';
     for (const suffix of ['', '-shm', '-wal']) rmSync(`${file}${suffix}`, { force: true });

@@ -110,6 +110,10 @@ export function unchanged(row: WorkspaceRegistryRow): SQL | undefined {
 const liveClaim = (row: WorkspaceRegistryRow) =>
   row.status === 'provisioning' && Date.parse(row.updatedAt) > Date.now() - STALE_CLAIM_MS;
 
+/** A `failed` row, or a `provisioning` row whose attempt went silent: a retry may claim it. */
+export const claimable = (row: WorkspaceRegistryRow) =>
+  row.status === 'failed' || (row.status === 'provisioning' && !liveClaim(row));
+
 /**
  * Claims the organization's row for `attemptId` (ADR-032): registers a missing row, or moves a
  * `failed` or stale `provisioning` row to `provisioning` under the attempt, only while the row is
@@ -125,7 +129,7 @@ async function claim(organizationId: string, attemptId: string, actorUserId: str
       return raced;
     });
   }
-  if (row.status !== 'failed' && (row.status !== 'provisioning' || liveClaim(row))) return row;
+  if (!claimable(row)) return row;
   const claimed = await writeIf(row.id, unchanged(row), { status: 'provisioning', attemptId });
   return claimed ?? (await readRow(organizationId)) ?? row;
 }
