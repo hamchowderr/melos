@@ -6,6 +6,7 @@ import { ac, roles } from '../../lib/auth/permissions';
 import { controlDb } from '../db/client';
 import * as schema from '../db/schema/auth';
 import { getServerEnv } from '../env';
+import { listMemberships } from '../services/memberships';
 import { provisionWorkspace } from '../services/workspace-provisioner';
 import { controlDeleteHooks, controlDeletesPlugin } from './control-deletes';
 import { sendAuthEmail } from './mailer';
@@ -70,6 +71,17 @@ export const auth = betterAuth({
               message: 'Sign-up is invite-only for now.',
             });
           }
+        },
+      },
+    },
+    session: {
+      create: {
+        // A new session opens the user's workspace when they belong to exactly one; with several they
+        // pick one at /workspaces (§7.1). Only the user's own member rows are read.
+        before: async (session) => {
+          const memberships = await listMemberships(session.userId);
+          if (memberships.length !== 1) return;
+          return { data: { ...session, activeOrganizationId: memberships[0].organizationId } };
         },
       },
     },

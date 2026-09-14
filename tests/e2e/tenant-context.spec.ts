@@ -1,10 +1,14 @@
 import { expect, type Page, test } from '@playwright/test';
 import {
+  AUTH_REDIRECT,
   activeOrganizationId,
   activeWorkspaceId,
   createWorkspace,
   pingInChat,
   setWorkspaceStatus,
+  signIn,
+  signOut,
+  signUp,
   signUpWithWorkspace,
 } from './support';
 
@@ -56,6 +60,55 @@ test('AUTH-E2E-003: tool results follow the newly active workspace', async ({ pa
   await page.reload();
   await expect(page.getByTestId('active-workspace-name')).toHaveText(firstName);
   await expectPing(page, firstId);
+});
+
+test('melos-2lm: a member of one workspace signs back in to its chat, not /workspaces/new', async ({
+  page,
+}) => {
+  const user = await signUp(page, 'Return');
+  await signIn(page, user);
+  const workspaceName = `Return Records ${Date.now()}`;
+  await createWorkspace(page, workspaceName);
+  const organizationId = await activeOrganizationId(page);
+
+  await signOut(page);
+  await page.goto('/sign-in');
+  await signIn(page, user, `${new URL(page.url()).origin}/`);
+  await expect(page.getByTestId('active-workspace-name')).toHaveText(workspaceName);
+  await expectPing(page, organizationId);
+});
+
+test('melos-2lm: a member of two workspaces picks one after signing in and reaches its chat', async ({
+  page,
+}) => {
+  const user = await signUp(page, 'Picker');
+  await signIn(page, user);
+  const [north, south] = ['North', 'South'].map((name) => `Picker ${name} ${Date.now()}`);
+  await createWorkspace(page, north);
+  const northId = await activeOrganizationId(page);
+  await page.goto('/workspaces/new');
+  await createWorkspace(page, south);
+
+  await signOut(page);
+  await page.goto('/sign-in');
+  await signIn(page, user, /\/workspaces$/);
+  const workspaces = page.getByRole('list', { name: 'Your workspaces' }).getByRole('button');
+  await expect(workspaces).toContainText([north, south]);
+  await expect(workspaces.getByText('owner', { exact: true })).toHaveCount(2);
+
+  // South was active at sign-out; picking North proves the pick sets the workspace.
+  await workspaces.filter({ hasText: north }).click();
+  await expect(page).toHaveURL(`${new URL(page.url()).origin}/`, AUTH_REDIRECT);
+  await expect(page.getByTestId('active-workspace-name')).toHaveText(north);
+  await expectPing(page, northId);
+});
+
+test('melos-2lm: a user with no workspace is still sent to /workspaces/new', async ({ page }) => {
+  // signIn waits for /workspaces/new; the workspace list sends the user there too.
+  await signIn(page, await signUp(page, 'Empty'));
+  await page.goto('/workspaces');
+  await expect(page).toHaveURL(/\/workspaces\/new$/);
+  await expect(page.getByRole('heading', { name: 'Create a workspace' })).toBeVisible();
 });
 
 test('TEN-002: a member of a failed workspace is told why, not sent to /workspaces/new', async ({

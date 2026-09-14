@@ -19,6 +19,10 @@ export default async function HomePage() {
     return <WorkspaceNotReady status={tenant.workspaceStatus} />;
   }
   if (tenant.status === 'workspace-not-provisioned') return <WorkspaceNotReady status="failed" />;
+  // The user picks one of their workspaces; /workspaces sends a user with none to create one.
+  if (tenant.status === 'no-active-workspace' || tenant.status === 'not-a-member') {
+    redirect('/workspaces');
+  }
   if (tenant.status !== 'ok') redirect('/workspaces/new');
 
   // Read server-side for the session's active organization; Better Auth checks membership.

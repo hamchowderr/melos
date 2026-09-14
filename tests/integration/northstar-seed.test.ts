@@ -31,7 +31,7 @@ const fixtureRows = (scope: 'control' | 'workspace'): Tables =>
 
 let control: Awaited<ReturnType<typeof openWithoutForeignKeys>>;
 let workspace: Client;
-let authRoute: { POST: Handler };
+let authRoute: { GET: Handler; POST: Handler };
 let seed: Seed;
 let runSeedDemoCommand: Command['runSeedDemoCommand'];
 let runValidateDemoCommand: ValidateCommand['runValidateDemoCommand'];
@@ -145,6 +145,9 @@ describe('melos-cqn.1: the Northstar Demo Catalog seed (§8 phase 3)', () => {
       client.call(authRoute.POST, 'POST', '/api/auth/sign-in/email', { email, password });
     expect((await signIn('not-the-demo-password')).status).toBe(401);
     expect((await signIn(PASSWORD)).status).toBe(200);
+    // melos-2lm: Jordan Taylor is a member of Northstar only, so the new session opens it.
+    const current = await client.call(authRoute.GET, 'GET', '/api/auth/get-session');
+    expect((await current.json()).session.activeOrganizationId).toBe(ORGANIZATION_ID);
     const where = `WHERE organization_id = '${ORGANIZATION_ID}'`;
     const members = await rows(control.$client, `SELECT user_id, role FROM member ${where}`);
     expect(members).toEqual([{ user_id: keys.usr_JORDAN, role: 'owner' }]);
