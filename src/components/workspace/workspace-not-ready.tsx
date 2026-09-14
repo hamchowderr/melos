@@ -5,7 +5,8 @@ type Status = 'provisioning' | 'migrating' | 'failed' | 'suspended' | 'deleting'
 const COPY: Record<Status, { title: string; message: string }> = {
   provisioning: {
     title: 'Your workspace is still being set up',
-    message: 'Chat opens once its database is ready. Reload this page in a moment.',
+    message:
+      'Chat opens once its database is ready. If it stays unavailable, try again later, or contact the workspace owner.',
   },
   migrating: {
     title: 'Your workspace is being updated',

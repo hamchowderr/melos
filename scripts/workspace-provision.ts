@@ -1,14 +1,16 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { workspaceRegistry } from '../src/server/db/schema/control';
 import { runAsMain, withControl } from './operator';
 
-const USAGE = 'Usage: npm run workspace:provision -- <organizationId> | --all-failed';
+const USAGE =
+  'Usage: npm run workspace:provision -- <organizationId> | --all-failed (failed or stale provisioning)';
 
 /**
  * Retries workspace provisioning (§7.2, P-23) for one organization or, with `--all-failed`, every
- * failed workspace, one at a time. Prints `<organizationId> <status>` per workspace and never a
- * token, error message or status_detail. Returns 0 when every workspace is active, 1 when one is
- * not or a query fails, and 2 for a usage or configuration error (ADR-032).
+ * failed workspace and every provisioning one whose claim is stale, one at a time. Prints
+ * `<organizationId> <status>` per workspace and never a token, error message or status_detail.
+ * Returns 0 when every workspace is active, 1 when one is not or a query fails, and 2 for a usage or
+ * configuration error (ADR-032).
  */
 export async function runProvisionCommand(
   args: readonly string[],
@@ -26,15 +28,20 @@ export async function runProvisionCommand(
       );
       return 2;
     }
-    const { provisionWorkspace } = await import('../src/server/services/workspace-provisioner');
-    const failed = eq(workspaceRegistry.status, 'failed');
+    const { claimable, provisionWorkspace } = await import(
+      '../src/server/services/workspace-provisioner'
+    );
+    const retryable = inArray(workspaceRegistry.status, ['failed', 'provisioning']);
     const rows = await controlDb
       .select()
       .from(workspaceRegistry)
-      .where(failed)
+      .where(retryable)
       .orderBy(workspaceRegistry.id);
+    // A provisioning row under a live claim is left to the attempt that may still be running it.
     const organizationIds =
-      target === '--all-failed' ? rows.map((row) => row.organizationId) : [target];
+      target === '--all-failed'
+        ? rows.filter(claimable).map((row) => row.organizationId)
+        : [target];
     let exitCode = 0;
     for (const organizationId of organizationIds) {
       // The error names the step and code, as status_detail does; print the status read back instead.
