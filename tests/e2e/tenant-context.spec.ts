@@ -77,3 +77,22 @@ test('TEN-002: a member of a failed workspace is told why, not sent to /workspac
   const info = await page.request.get('/api/copilotkit/info');
   expect([info.status(), await info.json()]).toEqual([403, { error: 'workspace-unavailable' }]);
 });
+
+test('TEN-002: a member of a migrating workspace is not told a reload opens chat', async ({
+  page,
+}) => {
+  await signUpWithWorkspace(page, 'Migrating');
+  await setWorkspaceStatus(await activeOrganizationId(page), 'migrating');
+
+  await page.goto('/');
+  await expect(
+    page.getByRole('heading', { name: 'Your workspace is being updated' }),
+  ).toBeVisible();
+  // A locked final registry write leaves the row migrating until a rerun takes it over (ADR-033).
+  const message = page.getByTestId('workspace-not-ready');
+  await expect(message).toHaveAttribute('data-status', 'migrating');
+  await expect(message).toHaveText(
+    'Chat opens again once the update finishes. If it stays unavailable, try again later, or contact the workspace owner.',
+  );
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+});

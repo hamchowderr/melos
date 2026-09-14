@@ -9,7 +9,8 @@ const COPY: Record<Status, { title: string; message: string }> = {
   },
   migrating: {
     title: 'Your workspace is being updated',
-    message: 'Chat opens again once the update finishes. Reload this page in a moment.',
+    message:
+      'Chat opens again once the update finishes. If it stays unavailable, try again later, or contact the workspace owner.',
   },
   failed: {
     title: 'Your workspace is not available right now',
