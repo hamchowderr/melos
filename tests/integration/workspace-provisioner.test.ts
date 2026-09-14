@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { type Client, createClient } from '@libsql/client';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/libsql';
@@ -396,5 +398,32 @@ describe('melos-75e.14: provisioning claims and the operator retry command (§7.
     expect([invalid.status, invalid.stdout]).toEqual([2, '']);
     expect(invalid.stderr).toMatch(/^Configuration error: LibsqlError URL_\w+$/m);
     expect(invalid.stderr).not.toContain(marker);
+  });
+});
+
+describe('melos-75e.18: provisioning applies the embedded migrations, never the SQL folder', () => {
+  it('activates a workspace from a working directory without the SQL folder, as a Vercel function', async () => {
+    const { organizationId } = await createFailed('no-sql-folder');
+    const version = latest();
+    // An absolute data directory, so the database file stays out of the empty working directory.
+    const dataDir = resolve(DATA_DIR).replaceAll('\\', '/');
+    createHost.mockReturnValueOnce(hosts.createWorkspaceHost({ kind: 'local', dataDir }));
+    const cwd = process.cwd();
+    const empty = mkdtempSync(join(tmpdir(), 'melos-no-sql-folder-'));
+    process.chdir(empty);
+    try {
+      // The read that failed on the preview deploy fails here too.
+      expect(() => migrations.readWorkspaceMigrations()).toThrow('ENOENT');
+      const active = await provisionWorkspace(organizationId);
+      expect(active).toMatchObject({
+        status: 'active',
+        statusDetail: null,
+        schemaVersion: version,
+      });
+    } finally {
+      process.chdir(cwd);
+      rmSync(empty, { recursive: true, force: true });
+    }
+    expect(await seedRows(await openWorkspace(await rowOf(organizationId)))).toEqual(SEED);
   });
 });
