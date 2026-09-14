@@ -26,12 +26,23 @@ export async function signUp(page: Page, label: string): Promise<TestUser> {
   return { email, password };
 }
 
-/** Signs in from the sign-in page as a user with no active workspace. */
-export async function signIn(page: Page, { email, password }: TestUser): Promise<void> {
+/** Signs in from the sign-in page and waits for `landing`: /workspaces/new for a user with none. */
+export async function signIn(
+  page: Page,
+  { email, password }: TestUser,
+  landing: string | RegExp = /\/workspaces\/new$/,
+): Promise<void> {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/workspaces\/new$/, AUTH_REDIRECT);
+  await expect(page).toHaveURL(landing, AUTH_REDIRECT);
+}
+
+/** Signs out through the endpoint the auth client calls, which wants an Origin and a JSON body. */
+export async function signOut(page: Page): Promise<void> {
+  const headers = { origin: new URL(page.url()).origin };
+  const signedOut = await page.request.post('/api/auth/sign-out', { headers, data: {} });
+  expect(signedOut.status()).toBe(200);
 }
 
 /** Signs up a fresh user, signs in and creates a workspace. Returns the workspace name. */

@@ -27,6 +27,9 @@ export default async function SettingsPage() {
   if (tenant.status === 'workspace-unavailable' || tenant.status === 'workspace-not-provisioned') {
     redirect('/');
   }
+  if (tenant.status === 'no-active-workspace' || tenant.status === 'not-a-member') {
+    redirect('/workspaces');
+  }
   if (tenant.status !== 'ok') redirect('/workspaces/new');
 
   // Membership lives only in Better Auth (docs/CONTRACT.md §6.1), which checks the caller.
