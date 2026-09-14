@@ -10,7 +10,7 @@
 // validateSeeded runs the same checks against a seeded Northstar workspace (npm run db:validate-demo).
 // @libsql/client resolves from LIBSQL_CLIENT_BASE (a package.json path), the repository root, or the Gate A worktree.
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -1592,6 +1592,7 @@ async function runChecks(ws, ctl, { workspaceDdl, betterAuthDdl, controlDdl }) {
  * (melos-cqn.2), without loading the fixture or building catalog_search. Provisioner-owned ids map
  * to their keys as the seed maps them, the workspace by organization and report templates by
  * preset_key; every other key must match exactly. Returns the assertion count and the failures.
+ * Calls must not overlap: they share this module's key map and assertion results.
  */
 export async function validateSeeded(ctl, ws) {
   const registry = 'SELECT id FROM workspace_registry WHERE organization_id = ?';
@@ -1628,8 +1629,9 @@ async function main() {
   process.exitCode = failures.length ? 1 : 0;
 }
 
-// Only when node runs this file; npm run db:validate-demo imports validateSeeded instead.
-if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url))
+// Only when node runs this file; npm run db:validate-demo imports validateSeeded instead. Node
+// resolves a junction or symlink in the started path, so both sides are real paths.
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url))
   main().catch((err) => {
     console.error(err.stack ?? err);
     process.exitCode = 1;
