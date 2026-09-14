@@ -1,5 +1,5 @@
-import { spawnSync } from 'node:child_process';
-import { readFileSync, rmSync } from 'node:fs';
+import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { type Client, createClient, type InValue } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import { migrate } from 'drizzle-orm/libsql/migrator';
@@ -67,6 +67,16 @@ function sixDaysLater(tables: Tables): Tables {
     list.map((row) => Object.fromEntries(Object.entries(row).map(move))),
   ]);
   return Object.fromEntries(later);
+}
+
+/** Runs an npm script's tsx command in a child process, as npm run does, with the demo password. */
+function runScript(name: string, variables: Record<string, string>, ...flags: string[]) {
+  const script = JSON.parse(readFileSync('package.json', 'utf8')).scripts[name];
+  const [runner, ...args] = String(script).split(' ');
+  expect(runner).toBe('tsx');
+  const env = { ...process.env, VERCEL: '', MELOS_DEMO_PASSWORD: PASSWORD, ...variables };
+  const tsx = ['node_modules/tsx/dist/cli.mjs', ...args, ...flags];
+  return spawnSync(process.execPath, tsx, { env, encoding: 'utf8', timeout: 50_000 });
 }
 
 beforeAll(async () => {
@@ -173,7 +183,7 @@ describe('melos-cqn.1: the Northstar Demo Catalog seed (§8 phase 3)', () => {
   it('refuses a second seed for the same organization id and changes nothing', async () => {
     const before = [await snapshot(control.$client), await snapshot(workspace)];
     const again = await seed.seedNorthstar({ password: PASSWORD, seedDate: '2026-09-20' });
-    expect(again).toEqual({ status: 'exists', organizationId: ORGANIZATION_ID });
+    expect(again).toEqual({ status: 'exists', table: 'organization', id: ORGANIZATION_ID });
     expect([await snapshot(control.$client), await snapshot(workspace)]).toEqual(before);
   });
 
@@ -196,15 +206,10 @@ describe('melos-cqn.1: the Northstar Demo Catalog seed (§8 phase 3)', () => {
     const file = `${DATA_DIR}/command-control.db`;
     const commandControl = open(`file:./${file}`);
     await migrate(drizzle(commandControl), { migrationsFolder: MIGRATIONS });
-    const script = JSON.parse(readFileSync('package.json', 'utf8')).scripts['db:seed-demo'];
-    const [runner, ...args] = String(script).split(' ');
-    expect(runner).toBe('tsx');
     const run = (url: string, ...flags: string[]) => {
       const workspaces = `${DATA_DIR}/command-workspaces`;
       const variables = { MELOS_CONTROL_DATABASE_URL: url, MELOS_WORKSPACE_DATA_DIR: workspaces };
-      const env = { ...process.env, ...variables, VERCEL: '', MELOS_DEMO_PASSWORD: PASSWORD };
-      const tsx = ['node_modules/tsx/dist/cli.mjs', ...args, ...flags];
-      return spawnSync(process.execPath, tsx, { env, encoding: 'utf8', timeout: 50_000 });
+      return runScript('db:seed-demo', variables, ...flags);
     };
     const done = run(`file:./${file}`, '--date', '2026-09-20');
     expect(done.status, done.stderr).toBe(0);
@@ -305,5 +310,119 @@ describe('melos-cqn.2: a seeded Northstar workspace meets every demo preconditio
       expect.stringMatching(/^FAIL \[contract\] §6\.5 Ocean Blue totals\n/),
     );
     expect(lines.at(-1)).toMatch(/^\d+ assertions, [1-9]\d* failed$/);
+  });
+});
+
+// Child processes only: Windows keeps a libSQL file this process opened locked until garbage
+// collection, and replacing deletes the earlier workspace file.
+describe('melos-cqn.3: db:seed-demo -- --replace replaces an earlier seed, complete or partial (§8 phase 3)', () => {
+  const file = `${DATA_DIR}/replace-control.db`;
+  const workspaces = `${DATA_DIR}/replace-workspaces`;
+  const variables = {
+    MELOS_CONTROL_DATABASE_URL: `file:./${file}`,
+    MELOS_WORKSPACE_DATA_DIR: workspaces,
+  };
+  const seed = (...flags: string[]) =>
+    runScript('db:seed-demo', variables, '--date', '2026-09-14', ...flags);
+  const replace = () => seed('--replace');
+  let replaceControl: Client;
+  let previous: Record<string, unknown>;
+  const fileOf = (registry: Record<string, unknown>) =>
+    `${workspaces}/${registry.database_name}.db`;
+
+  /** One Northstar organization, user, registry row and workspace file, seeded completely. */
+  async function expectOneSeed(...runs: SpawnSyncReturns<string>[]) {
+    for (const { status, stderr } of runs) expect(status, stderr).toBe(0);
+    const identities =
+      'SELECT (SELECT group_concat(id) FROM organization) AS o, group_concat(id) AS u FROM user';
+    expect(await rows(replaceControl, identities)).toEqual([
+      { o: ORGANIZATION_ID, u: keys.usr_JORDAN },
+    ]);
+    const registries = await rows(replaceControl, 'SELECT * FROM workspace_registry');
+    expect(registries).toMatchObject([{ organization_id: ORGANIZATION_ID, status: 'active' }]);
+    expect(readdirSync(workspaces)).toEqual([`${registries[0].database_name}.db`]);
+    // The replace signed in as the seeded user and out again: no session is left.
+    expect(await rows(replaceControl, 'SELECT count(*) AS n FROM session')).toEqual([{ n: 0 }]);
+    const validated = runScript('db:validate-demo', variables);
+    const passed = [0, expect.stringMatching(/^\d+ assertions, 0 failed\n$/)];
+    expect([validated.status, validated.stdout], validated.stderr).toEqual(passed);
+    const output = [...runs, validated].map(({ stdout, stderr }) => stdout + stderr);
+    expect(output.join('')).not.toContain(PASSWORD);
+    [previous] = registries;
+  }
+
+  beforeAll(async () => {
+    replaceControl = open(`file:./${file}`);
+    await migrate(drizzle(replaceControl), { migrationsFolder: MIGRATIONS });
+  });
+
+  it('replaces a complete seed: the earlier workspace database is deleted and the new seed passes db:validate-demo', async () => {
+    await expectOneSeed(seed());
+    const earlier = previous;
+    await expectOneSeed(replace());
+    expect(existsSync(fileOf(earlier))).toBe(false);
+    const deleted = "SELECT target_id FROM control_audit_log WHERE action = 'workspace.deleted'";
+    expect(await rows(replaceControl, deleted)).toEqual([{ target_id: earlier.id }]);
+  });
+
+  it('refuses a wrong password, naming the variable to set, or a live provisioning claim with 1, deleting and seeding nothing', async () => {
+    const claim = 'UPDATE workspace_registry SET status = ?, updated_at = ?';
+    await replaceControl.execute({ sql: claim, args: ['provisioning', new Date().toISOString()] });
+    const before = await snapshot(replaceControl);
+    const wrong = runScript(
+      'db:seed-demo',
+      { ...variables, MELOS_DEMO_PASSWORD: 'not-the-seed-password' },
+      '--replace',
+    );
+    const held = replace();
+    const refused = `Organization ${ORGANIZATION_ID} was not replaced`;
+    expect([wrong.status, wrong.stdout, wrong.stderr]).toEqual([
+      1,
+      '',
+      expect.stringContaining(
+        `${refused} (sign_in 401 INVALID_EMAIL_OR_PASSWORD); nothing was seeded`,
+      ),
+    ]);
+    expect([held.status, held.stdout]).toEqual([1, '']);
+    expect(held.stderr).toContain('at provisioning_in_progress: WorkspaceClaimHeld');
+    expect(held.stderr).toContain(`${refused} (delete_organization 503 WORKSPACE_DELETE_FAILED)`);
+    const hint = 'Set MELOS_DEMO_PASSWORD to the value the existing seed used';
+    expect(wrong.stderr).toContain(hint);
+    expect(held.stderr).not.toContain(hint);
+    expect(await snapshot(replaceControl)).toEqual(before);
+    expect(existsSync(fileOf(previous))).toBe(true);
+    expect(held.stdout + held.stderr + wrong.stderr).not.toContain(PASSWORD);
+    await replaceControl.execute({ sql: claim, args: ['active', new Date().toISOString()] });
+  });
+
+  it('replaces a partial seed whose registry row is failed over a database with no tables', async () => {
+    const failed =
+      "UPDATE workspace_registry SET status = 'failed', status_detail = 'migrate failed: Error'";
+    await replaceControl.execute(failed);
+    writeFileSync(fileOf(previous), '');
+    await expectOneSeed(replace());
+  });
+
+  it('replaces a partial seed with no registry row, and a seeded user with no organization, which a plain seed refuses', async () => {
+    // A seed that stopped after its control commit, before provisioning registered the workspace.
+    rmSync(fileOf(previous));
+    await replaceControl.execute('DELETE FROM workspace_registry');
+    await expectOneSeed(replace());
+    // A replace that deleted the organization and stopped before deleting the user.
+    rmSync(fileOf(previous));
+    const tables = ['workspace_registry', 'workspace_member_settings', 'member', 'organization'];
+    await replaceControl.batch(
+      tables.map((table) => `DELETE FROM "${table}"`),
+      'write',
+    );
+    // A plain seed refuses the leftover user as it refuses an existing organization.
+    const before = await snapshot(replaceControl);
+    const plain = seed();
+    const exists = `Northstar user ${keys.usr_JORDAN} already exists; nothing was changed`;
+    expect([plain.status, plain.stdout]).toEqual([1, '']);
+    expect(plain.stderr).toContain(`${exists} (--replace replaces it)`);
+    expect(plain.stderr).not.toContain(PASSWORD);
+    expect(await snapshot(replaceControl)).toEqual(before);
+    await expectOneSeed(replace());
   });
 });
