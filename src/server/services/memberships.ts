@@ -1,5 +1,5 @@
 import { asc, eq } from 'drizzle-orm';
-import { isWorkspaceRole, type WorkspaceRole } from '../../lib/auth/permissions';
+import { isSingleWorkspaceRole, type WorkspaceRole } from '../../lib/auth/permissions';
 import { controlDb } from '../db/client';
 import { member, organization } from '../db/schema/auth';
 
@@ -18,8 +18,5 @@ export async function listMemberships(userId: string): Promise<Membership[]> {
     .innerJoin(organization, eq(organization.id, member.organizationId))
     .where(eq(member.userId, userId))
     .orderBy(asc(organization.name));
-  // The resolver's check: one role per member; Better Auth joins several with commas (P-30).
-  return rows.filter(
-    (row): row is Membership => !row.role.includes(',') && isWorkspaceRole(row.role),
-  );
+  return rows.filter((row): row is Membership => isSingleWorkspaceRole(row.role));
 }

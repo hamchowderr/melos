@@ -73,6 +73,14 @@ export function isWorkspaceRole(value: unknown): value is WorkspaceRole {
   return typeof value === 'string' && Object.hasOwn(roles, value);
 }
 
+/**
+ * One Melos role, never several: Better Auth joins several roles with commas, and Melos assigns
+ * one role per member (P-30). isWorkspaceRole refuses a joined name too; the comma test says why.
+ */
+export function isSingleWorkspaceRole(role: string): role is WorkspaceRole {
+  return !role.includes(',') && isWorkspaceRole(role);
+}
+
 /** A permission request: resource to the actions it needs, e.g. `{ catalog: ['update'] }`. */
 export type WorkspacePermissions = {
   [Resource in keyof typeof statement]?: (typeof statement)[Resource][number][];
