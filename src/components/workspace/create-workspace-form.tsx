@@ -1,6 +1,7 @@
 'use client';
 
 import { type FormEvent, useState } from 'react';
+import { SignOutButton } from '@/components/auth/sign-out-button';
 import { PageCard } from '@/components/page-card';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -62,6 +63,9 @@ export function CreateWorkspaceForm() {
           </Button>
         </FieldGroup>
       </form>
+      <div className="flex flex-wrap items-center gap-2">
+        <SignOutButton variant="ghost" />
+      </div>
     </PageCard>
   );
 }

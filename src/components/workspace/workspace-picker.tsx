@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { SignOutButton } from '@/components/auth/sign-out-button';
 import { PageCard } from '@/components/page-card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -61,6 +62,9 @@ export function WorkspacePicker({ workspaces }: { workspaces: Workspace[] }) {
       <FieldDescription className="text-center">
         Or <Link href="/workspaces/new">create a workspace</Link>.
       </FieldDescription>
+      <div className="flex flex-wrap items-center gap-2">
+        <SignOutButton variant="ghost" />
+      </div>
     </PageCard>
   );
 }

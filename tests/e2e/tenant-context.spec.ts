@@ -191,7 +191,7 @@ test('melos-g4u: a member stuck on a failed workspace switches or signs out from
   await expect(page).toHaveURL(/\/sign-in$/);
 });
 
-test('melos-g4u: a member whose active workspace has an invalid role picks from the others', async ({
+test('melos-g4u: a member whose active workspace has an invalid role picks from the others or signs out', async ({
   page,
 }) => {
   const { names, secondId } = await signUpWithTwoWorkspaces(page, 'Misrole', ['Kept', 'Broken']);
@@ -204,6 +204,16 @@ test('melos-g4u: a member whose active workspace has an invalid role picks from 
     await expect(workspaceButtons(page)).toHaveCount(1);
     await expect(workspaceButtons(page)).toContainText(names[0]);
   }
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
+});
+
+test('melos-g4u: a user with no workspace signs out from /workspaces/new', async ({ page }) => {
+  await signIn(page, await signUp(page, 'Nowhere'));
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
+  await page.goto('/workspaces/new');
+  await expect(page).toHaveURL(/\/sign-in$/);
 });
 
 test('TEN-002: a member of a failed workspace is told why, not sent to /workspaces/new', async ({
