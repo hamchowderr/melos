@@ -1,9 +1,43 @@
+import { once } from 'node:events';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createClient } from '@libsql/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseServerEnv, ServerEnvError, TEST_CHAT_MODEL_ID } from '../../src/server/env';
 
 const SECRET = 'unit-test-secret-value-that-is-long-enough';
 const TEST_MODEL = { BETTER_AUTH_SECRET: SECRET, MELOS_LLM_BASE_URL: 'http://127.0.0.1:4010/v1' };
 const TOKEN_KEY = Buffer.alloc(32, 7).toString('base64');
+
+/** The URLs @libsql/client's HTTP transport requests for a database URL, from a stub fetch. */
+async function requestedBy(url: string): Promise<string[]> {
+  const requested: string[] = [];
+  const fetch = async (request: Request) => {
+    requested.push(request.url);
+    return new Response('stub', { status: 500, headers: { 'content-type': 'text/plain' } });
+  };
+  const client = createClient({ url, fetch });
+  await client.execute('SELECT 1').catch(() => undefined);
+  client.close();
+  return requested;
+}
+
+/** The paths @libsql/client's WebSocket transport opens for `path`, seen by a local server. */
+async function socketPathsFor(path: string): Promise<string[]> {
+  const opened = new Set<string>();
+  const server = createServer().on('upgrade', (request, socket) => {
+    opened.add(String(request.url));
+    socket.destroy();
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const { port } = server.address() as AddressInfo;
+  const client = createClient({ url: `ws://127.0.0.1:${port}${path}` });
+  await client.execute('SELECT 1').catch(() => undefined);
+  client.close();
+  server.close();
+  return [...opened];
+}
 
 function problemsOf(source: Record<string, string | undefined>) {
   try {
@@ -74,6 +108,65 @@ describe('parseServerEnv', () => {
     const error = problemsOf({ ...TEST_MODEL, MELOS_WORKSPACE_TOKEN_KEY: shortKey });
     expect(error.message).toContain('MELOS_WORKSPACE_TOKEN_KEY must be 32 bytes encoded as base64');
     expect(error.message).not.toContain(shortKey);
+  });
+
+  it('compares remote URLs by the endpoints the installed @libsql/client requests', async () => {
+    // HTTP resolves v2/pipeline against the base URL; a WebSocket opens the base URL as it is.
+    const requests = [];
+    for (const url of [
+      'https://example.invalid/control',
+      'https://example.invalid/agent',
+      'https://example.invalid/control/',
+      'libsql://Melos-Control.example.turso.io',
+    ]) {
+      requests.push(await requestedBy(url));
+    }
+    expect(requests).toEqual([
+      ['https://example.invalid/v2/pipeline'],
+      ['https://example.invalid/v2/pipeline'],
+      ['https://example.invalid/control/v2/pipeline'],
+      ['https://melos-control.example.turso.io/v2/pipeline'],
+    ]);
+    expect([await socketPathsFor('/control'), await socketPathsFor('')]).toEqual([
+      ['/control'],
+      ['/'],
+    ]);
+  });
+
+  it('refuses an agent database URL that reaches the control database as libSQL sends it (TEN-006)', () => {
+    const urls = (control?: string, agent?: string) => ({
+      ...TEST_MODEL,
+      MELOS_CONTROL_DATABASE_URL: control,
+      MELOS_AGENT_DATABASE_URL: agent,
+    });
+    const reason = 'must not name the control database';
+    const same = [
+      [undefined, 'file:data/control.db'],
+      ['file:data/control.db', 'file:data/%63ontrol.db'],
+      ['https://example.invalid', 'libsql://example.invalid:443'],
+      ['https://example.invalid/control', 'https://example.invalid/agent'],
+      ['wss://example.invalid', 'https://example.invalid'],
+      ['libsql://Melos-Control.example.turso.io', 'wss://melos-control.example.turso.io/'],
+      ['http://127.0.0.1:8080', 'libsql://127.0.0.1:8080?tls=0'],
+    ];
+    for (const [control, agent] of same) {
+      const { problems } = problemsOf(urls(control, agent));
+      expect(problems, agent).toEqual([{ name: 'MELOS_AGENT_DATABASE_URL', reason }]);
+    }
+    // Local defaults, private in-memory databases, and the Turso shapes previews and production use.
+    const apart = [
+      [undefined, undefined],
+      ['file::memory:', 'file::memory:'],
+      [':memory:', ':memory:'],
+      ['libsql://melos-control-otaku.turso.io', 'libsql://melos-agent-otaku.turso.io'],
+      ['https://example.invalid/control/', 'https://example.invalid/control'],
+      ['wss://example.invalid/control', 'wss://example.invalid/agent'],
+      ['https://example.invalid', 'https://example.invalid:8443'],
+    ];
+    for (const [control, agent] of apart) {
+      const env = parseServerEnv(urls(control, agent));
+      expect(env.agentDatabase.url).toBe(agent ?? 'file:./data/agent.db');
+    }
   });
 
   it('requires the gateway key for a Mastra Gateway model', () => {
