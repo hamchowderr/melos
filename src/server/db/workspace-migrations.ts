@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type Client, LibsqlBatchError } from '@libsql/client';
+import { EMBEDDED_WORKSPACE_MIGRATIONS } from './workspace-migrations.generated.ts';
 
+/** The SQL folder, relative to the repository root. Deployed functions do not include it. */
 export const WORKSPACE_MIGRATIONS = './src/server/db/migrations/workspace';
 
 /** `NNNN_<name>.sql`: a four-digit version and a lowercase snake_case name. */
@@ -37,7 +39,8 @@ export interface WorkspaceMigrationResult {
 
 /**
  * Reads `folder` into migrations ordered by version, refusing a misnamed file, a duplicate number
- * or a gap, so a bad folder fails before any statement runs.
+ * or a gap, so a bad folder fails before any statement runs. For generators and tests: runtime code
+ * applies EMBEDDED_WORKSPACE_MIGRATIONS, which `npm run db:workspace-migrations` renders from it.
  */
 export function readWorkspaceMigrations(folder = WORKSPACE_MIGRATIONS): WorkspaceMigration[] {
   const migrations = readdirSync(folder)
@@ -86,11 +89,12 @@ export async function readSchemaVersion(client: Client): Promise<number> {
  * leaves nothing of itself and keeps the versions before it. `onApplied` runs after each commit, for
  * callers that record progress in workspace_registry. On a local connection `migrate()` turns
  * foreign keys back on afterwards, so a caller that keeps them off sets the pragma again.
+ * `migrations` defaults to the embedded list, so provisioning reads no file.
  */
 export async function applyWorkspaceMigrations(
   client: Client,
   {
-    migrations = readWorkspaceMigrations(),
+    migrations = EMBEDDED_WORKSPACE_MIGRATIONS,
     onApplied,
   }: {
     migrations?: readonly WorkspaceMigration[];

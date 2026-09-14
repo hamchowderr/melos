@@ -1,13 +1,20 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type Client, createClient } from '@libsql/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  EMBEDDED_MIGRATIONS_FILE,
+  generateEmbeddedMigrations,
+} from '../../src/server/db/embed-workspace-migrations';
 import { ensureLocalDatabaseDir } from '../../src/server/db/local-database';
 import {
   applyWorkspaceMigrations,
   readWorkspaceMigrations,
+  WORKSPACE_MIGRATIONS,
 } from '../../src/server/db/workspace-migrations';
+import { EMBEDDED_WORKSPACE_MIGRATIONS } from '../../src/server/db/workspace-migrations.generated';
+import { addPitchOwner, generateFromChangedCopy, replaceIn } from './changed-migrations';
 
 const folders: string[] = [];
 const clients: Client[] = [];
@@ -178,5 +185,32 @@ describe('TEN-003: numbered workspace migrations apply once and record schema_mi
       { event: 'from Ada' },
       { event: 'to Ada Lovelace' },
     ]);
+  });
+});
+
+describe('melos-75e.18: runtime code applies the migrations embedded from the SQL folder', () => {
+  const committed = readFileSync(EMBEDDED_MIGRATIONS_FILE, 'utf8');
+  const STALE = `${EMBEDDED_MIGRATIONS_FILE} does not match ${WORKSPACE_MIGRATIONS}: run npm run db:workspace-migrations`;
+
+  /** The parity check: the committed module holds exactly `folder`'s migrations, as generated. */
+  function expectEmbedded(folder = WORKSPACE_MIGRATIONS) {
+    expect(EMBEDDED_WORKSPACE_MIGRATIONS, STALE).toEqual(readWorkspaceMigrations(folder));
+    expect(generateEmbeddedMigrations(folder), STALE).toBe(committed);
+  }
+
+  it('embeds every migration of the SQL folder and nothing else, byte for byte', () => {
+    expectEmbedded();
+  });
+
+  it.each([
+    ['added', addPitchOwner],
+    ['removed', (folder: string) => rmSync(join(folder, '0003_crm_pitches_messages_reports.sql'))],
+    ['edited', replaceIn('0001_parties_catalog.sql', "DEFAULT 'stage_name'", "DEFAULT 'aka'")],
+  ])('fails, naming the npm script, when a migration is %s in the folder', async (_, change) => {
+    const refused = async (folder: string) => {
+      expect(() => expectEmbedded(folder)).toThrow(STALE);
+      return 'refused';
+    };
+    expect(await generateFromChangedCopy(WORKSPACE_MIGRATIONS, change, refused)).toBe('refused');
   });
 });

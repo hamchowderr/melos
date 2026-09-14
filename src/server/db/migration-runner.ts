@@ -15,9 +15,9 @@ import { openWorkspaceDatabase, WorkspaceHostConfigError } from './workspace-hos
 import {
   applyWorkspaceMigrations,
   readSchemaVersion,
-  readWorkspaceMigrations,
   type WorkspaceMigration,
 } from './workspace-migrations';
+import { EMBEDDED_WORKSPACE_MIGRATIONS } from './workspace-migrations.generated';
 
 type Status = WorkspaceRegistryRow['status'];
 type Run = typeof migrationRuns.$inferSelect;
@@ -240,7 +240,7 @@ async function migrateWorkspace(
  */
 export async function runMigrationBatch({
   batchId = ulid(),
-  migrations = readWorkspaceMigrations(),
+  migrations = EMBEDDED_WORKSPACE_MIGRATIONS,
 }: {
   batchId?: string;
   migrations?: readonly WorkspaceMigration[];
