@@ -20,10 +20,11 @@ export function WorkspacePicker({ workspaces }: { workspaces: Workspace[] }) {
   async function choose(organizationId: string) {
     setPendingId(organizationId);
     setError(null);
-    const active = await authClient.organization.setActive({ organizationId });
-    if (active.error) {
+    // The auth client throws on a network error instead of returning one.
+    const active = await authClient.organization.setActive({ organizationId }).catch(() => null);
+    if (!active || active.error) {
       setPendingId(null);
-      setError(active.error.message ?? 'Could not open the workspace.');
+      setError(active?.error?.message ?? 'Could not open the workspace.');
       return;
     }
     // Full navigation so the server reads the session.

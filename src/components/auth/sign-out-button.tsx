@@ -14,10 +14,11 @@ export function SignOutButton(props: Props) {
   async function signOut() {
     setPending(true);
     setError(null);
-    const result = await authClient.signOut();
-    if (result.error) {
+    // The auth client throws on a network error instead of returning one.
+    const result = await authClient.signOut().catch(() => null);
+    if (!result || result.error) {
       setPending(false);
-      setError(result.error.message ?? 'Could not sign out.');
+      setError(result?.error?.message ?? 'Could not sign out.');
       return;
     }
     // Full navigation so the server reads the cleared session cookie.

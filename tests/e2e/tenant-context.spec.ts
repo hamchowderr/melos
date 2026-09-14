@@ -216,6 +216,25 @@ test('melos-g4u: a user with no workspace signs out from /workspaces/new', async
   await expect(page).toHaveURL(/\/sign-in$/);
 });
 
+const signOutError = (page: Page) =>
+  page.getByRole('alert').filter({ hasText: 'Could not sign out.' });
+
+test('melos-g4u: a sign-out that fails on the network shows its error and can be retried', async ({
+  page,
+}) => {
+  await signUpWithWorkspace(page, 'Offline');
+  const signOut = page.getByRole('button', { name: 'Sign out' });
+  // An aborted request makes the auth client throw instead of returning an error.
+  await page.route('**/api/auth/sign-out', (route) => route.abort());
+  await signOut.click();
+  await expect(signOutError(page)).toBeVisible();
+  await expect(signOut).toBeEnabled();
+
+  await page.unroute('**/api/auth/sign-out');
+  await signOut.click();
+  await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
+});
+
 test('TEN-002: a member of a failed workspace is told why, not sent to /workspaces/new', async ({
   page,
 }) => {
