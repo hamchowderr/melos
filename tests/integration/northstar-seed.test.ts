@@ -183,7 +183,7 @@ describe('melos-cqn.1: the Northstar Demo Catalog seed (§8 phase 3)', () => {
   it('refuses a second seed for the same organization id and changes nothing', async () => {
     const before = [await snapshot(control.$client), await snapshot(workspace)];
     const again = await seed.seedNorthstar({ password: PASSWORD, seedDate: '2026-09-20' });
-    expect(again).toEqual({ status: 'exists', organizationId: ORGANIZATION_ID });
+    expect(again).toEqual({ status: 'exists', table: 'organization', id: ORGANIZATION_ID });
     expect([await snapshot(control.$client), await snapshot(workspace)]).toEqual(before);
   });
 
@@ -403,7 +403,7 @@ describe('melos-cqn.3: db:seed-demo -- --replace replaces an earlier seed, compl
     await expectOneSeed(replace());
   });
 
-  it('replaces a partial seed with no registry row, and a seeded user with no organization', async () => {
+  it('replaces a partial seed with no registry row, and a seeded user with no organization, which a plain seed refuses', async () => {
     // A seed that stopped after its control commit, before provisioning registered the workspace.
     rmSync(fileOf(previous));
     await replaceControl.execute('DELETE FROM workspace_registry');
@@ -415,6 +415,14 @@ describe('melos-cqn.3: db:seed-demo -- --replace replaces an earlier seed, compl
       tables.map((table) => `DELETE FROM "${table}"`),
       'write',
     );
+    // A plain seed refuses the leftover user as it refuses an existing organization.
+    const before = await snapshot(replaceControl);
+    const plain = seed();
+    const exists = `Northstar user ${keys.usr_JORDAN} already exists; nothing was changed`;
+    expect([plain.status, plain.stdout]).toEqual([1, '']);
+    expect(plain.stderr).toContain(`${exists} (--replace replaces it)`);
+    expect(plain.stderr).not.toContain(PASSWORD);
+    expect(await snapshot(replaceControl)).toEqual(before);
     await expectOneSeed(replace());
   });
 });

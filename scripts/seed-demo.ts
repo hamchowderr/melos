@@ -49,8 +49,10 @@ export async function runSeedDemoCommand(
     const { seedNorthstar } = await import('../src/server/db/seed/northstar');
     const seed = await seedNorthstar({ password, seedDate, replace });
     if (seed.status === 'exists') {
+      // A leftover user blocks a seed as the organization does: a replace stopped between deletes.
+      const { table, id } = seed;
       console.error(
-        `Organization ${seed.organizationId} already exists; nothing was changed (--replace replaces it)`,
+        `Northstar ${table} ${id} already exists; nothing was changed (--replace replaces it)`,
       );
       return 1;
     }

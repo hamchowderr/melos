@@ -88,7 +88,7 @@ function valuesOf(table: SQLiteTable, row: Row, days: number, ids: Map<string, s
 }
 
 export type NorthstarSeed =
-  | { status: 'exists'; organizationId: string }
+  | { status: 'exists'; table: 'organization' | 'user'; id: string }
   | { status: 'refused'; organizationId: string; refusal: string }
   | { status: 'seeded'; organizationId: string; workspaceId: string; dateShift: number };
 
@@ -135,8 +135,9 @@ async function deleteNorthstar(organizationId: string, userId: string, password:
  * calendar date and epoch value moved by dateShift, the whole days from the demo date (§8 phase 3).
  * Control rows commit in one transaction, the workspace is provisioned (§7.2), then its rows and
  * catalog_search commit in one workspace transaction, all through IntegrityGuard. When the
- * organization id exists, returns `exists` and writes nothing. With `replace`, an earlier seed is
- * deleted first, a partial one too; a refused delete returns `refused` and seeds nothing.
+ * organization id or the user id exists, returns `exists` naming it and writes nothing. With
+ * `replace`, an earlier seed is deleted first, a partial one too; a refused delete returns
+ * `refused` and seeds nothing.
  */
 export async function seedNorthstar(options: {
   password: string;
@@ -156,9 +157,12 @@ export async function seedNorthstar(options: {
   const at = (row: Row) => new Date(shift('created_at', row.created_at, days) as number);
   const hash = await (await auth.$context).password.hash(options.password);
 
-  const created = await controlDb.transaction(async (tx) => {
+  const existing = await controlDb.transaction(async (tx) => {
     const found = await tx.select().from(organization).where(eq(organization.id, organizationId));
-    if (found.length > 0) return false;
+    if (found.length > 0) return { table: 'organization', id: organizationId } as const;
+    // A replace stopped between its two deletes leaves the user without the organization.
+    const kept = await tx.select().from(user).where(eq(user.id, userId));
+    if (kept.length > 0) return { table: 'user', id: userId } as const;
     for (const [name, rows] of Object.entries(control)) {
       if (owned('control', name)) continue;
       const table = CONTROL_TABLES[name];
@@ -188,9 +192,9 @@ export async function seedNorthstar(options: {
       occurredAt: at(owner).toISOString(),
     };
     await controlIntegrityGuard.insert(tx, controlAuditLog, [{ ...audit, ...target, ...after }]);
-    return true;
+    return null;
   });
-  if (!created) return { status: 'exists', organizationId };
+  if (existing) return { status: 'exists', ...existing };
 
   // Inserted rows fire no Better Auth hook, so the seed provisions as organization creation does.
   const registry = await provisionWorkspace(organizationId, null);
