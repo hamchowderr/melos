@@ -1,4 +1,7 @@
+import Link from 'next/link';
+import { SignOutButton } from '@/components/auth/sign-out-button';
 import { PageCard } from '@/components/page-card';
+import { buttonVariants } from '@/components/ui/button';
 
 type Status = 'provisioning' | 'migrating' | 'failed' | 'suspended' | 'deleting';
 
@@ -37,6 +40,13 @@ export function WorkspaceNotReady({ status }: { status: Status }) {
         <p className="text-muted-foreground" data-testid="workspace-not-ready" data-status={status}>
           {message}
         </p>
+        {/* A member stuck on this workspace can open another one or sign out. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/workspaces" className={buttonVariants({ variant: 'outline' })}>
+            Switch workspace
+          </Link>
+          <SignOutButton variant="ghost" />
+        </div>
       </PageCard>
     </main>
   );
