@@ -334,6 +334,18 @@ describe('parseServerEnv', () => {
       group: 'default',
       tokenKey: TOKEN_KEY,
     });
+    // A gateway key alone still fails this environment; operator scripts drop it first.
+    const keyed = {
+      ...turso,
+      MELOS_WORKSPACE_TOKEN_KEY: TOKEN_KEY,
+      AI_GATEWAY_API_KEY: 'gateway-key',
+    };
+    expect(problemsOf(keyed).problems).toEqual([
+      {
+        name: 'AI_GATEWAY_API_KEY',
+        reason: 'must not be set on Vercel (the OIDC token authenticates the gateway)',
+      },
+    ]);
     expect(branch.auth.baseURL).toBe('https://melos-git-feat-otaku.vercel.app');
     expect(branch.auth.trustedOrigins).toEqual([
       'https://melos-git-feat-otaku.vercel.app',
