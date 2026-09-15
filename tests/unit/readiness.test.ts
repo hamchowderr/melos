@@ -62,7 +62,7 @@ const CASES: [string, Facts][] = [
     'SELF_PARTY_NOT_CONFIGURED MASTER_NOT_CONTROLLED NO_LICENSING_CONTACT',
     facts({ selfParties: { publishing: SELF, master: null } }),
   ],
-  // §6.5: with no master self party there is no implicit contact, even when every row is attested.
+  // The implicit contact (P-28) needs a master self party, even when every master row is attested.
   [
     'SELF_PARTY_NOT_CONFIGURED NO_LICENSING_CONTACT',
     facts({ selfParties: { publishing: SELF, master: null }, masters: [other(10000, true)] }),
