@@ -15,6 +15,8 @@ import {
   releaseTracks,
 } from '../../db/schema/workspace.generated';
 import { requirePermission } from '../permissions';
+import { loadRightsFacts } from '../rights/read';
+import { evaluateRecordingReadiness } from '../rights/readiness';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
 import { getWorkspaceDatabase, sanitized, type WorkspaceDatabase } from '../workspace-connections';
@@ -131,14 +133,18 @@ const artistRows = (database: WorkspaceDatabase, where: SQL | undefined) =>
 
 /**
  * The song list (CAT-009, §3.5): one row per live composition with its live recordings, plus one
- * per live recording without a composition, sorted by normalized title, then id. A refused role
- * never opens the database; the reads share one batch, so one round trip (§1.4).
+ * per live recording without a composition, sorted by normalized title, then id, each recording
+ * with its §6.5 flags. A refused role never opens the database; the reads join the rights facts'
+ * batch for every live recording, so one round trip (§1.4).
  */
 export async function listSongs(tenant: TenantContext): Promise<ServiceResult<SongListItem[]>> {
-  if (!canRead(tenant)) return failure('FORBIDDEN');
-  const reads = sanitized(tenant.workspaceId, async () => {
-    const database = await getWorkspaceDatabase(tenant.workspaceId);
-    return database.batch([
+  // The flags are rights data, so rights:read too, as in getMusicWorkspace (§6.2).
+  const reads = requirePermission(tenant, { catalog: ['read'], rights: ['read'] });
+  if (!reads.ok) return failure('FORBIDDEN');
+  const loaded = loadRightsFacts(
+    tenant.workspaceId,
+    () => ({}),
+    (database) => [
       database.select(COMPOSITION).from(compositions).where(isNull(compositions.deletedAt)),
       database.select().from(compositionAltTitles).orderBy(asc(compositionAltTitles.title)),
       database
@@ -147,10 +153,17 @@ export async function listSongs(tenant: TenantContext): Promise<ServiceResult<So
         .where(isNull(recordings.deletedAt))
         .orderBy(...RECORDING_ORDER),
       artistRows(database, eq(recordingArtists.role, 'primary')),
-    ]);
-  });
+    ],
+  );
   // Only the database work is sanitized, so a bug in the grouping throws as itself.
-  return reads.then(([songs, altTitles, songRecordings, artists]) => {
+  return loaded.then(({ recordings: rights, extra }) => {
+    const [songs, altTitles, songRecordings, artists] = extra;
+    const flags = new Map(
+      rights.map(({ take, facts }) => {
+        const { oneStopReady, syncReady } = evaluateRecordingReadiness(facts);
+        return [take.id, { oneStopReady, syncReady }] as const;
+      }),
+    );
     const altTitlesOf = Map.groupBy(altTitles, (row) => row.compositionId);
     const recordingsOf = Map.groupBy(songRecordings, (row) => row.compositionId);
     const artistsOf = byRecording(artists);
@@ -164,9 +177,12 @@ export async function listSongs(tenant: TenantContext): Promise<ServiceResult<So
         primaryRecordingId: primaryRecording(head.title, list)?.id ?? null,
         altTitles: alternates.map((alternate) => alternate.title),
         primaryArtistNames: [...new Set(credits.map(({ displayName }) => displayName))],
-        recordings: list.map(({ id, title, versionTitle, isrc }) => ({
-          ...{ recordingId: id, title, versionTitle, isrc },
-        })),
+        recordings: list.map(({ id, title, versionTitle, isrc }) => {
+          // Both reads cover every live recording in one batch, so no flags is a bug, not "not ready".
+          const ready = flags.get(id);
+          if (!ready) throw new Error(`No readiness facts for recording ${id}`);
+          return { recordingId: id, title, versionTitle, isrc, ...ready };
+        }),
       };
     };
     const items = [
