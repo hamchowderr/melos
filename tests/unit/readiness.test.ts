@@ -39,10 +39,8 @@ const facts = (change: Partial<Facts> = {}): Facts => ({
   ...change,
 });
 const song = (change: Partial<Composition>) => facts({ composition: { ...SONG, ...change } });
-const codesOf = (input: Facts) =>
-  evaluateRecordingReadiness(input)
-    .issues.map((issue) => issue.code)
-    .join(' ');
+const codeOf = (issue: { code: string }) => issue.code;
+const codesOf = (input: Facts) => evaluateRecordingReadiness(input).issues.map(codeOf).join(' ');
 
 /** Expected codes, in order, for facts that break one rule. */
 const CASES: [string, Facts][] = [
@@ -80,10 +78,12 @@ const CASES: [string, Facts][] = [
 describe('evaluateRecordingReadiness (§6.5)', () => {
   it('lists every code in §6.5 order, as validate.mjs does, with a focused case each', () => {
     const contract = readFileSync('docs/CONTRACT.md', 'utf8');
-    const section = contract.split('### 6.5 ')[1].split('\n### ')[0];
-    const lines = section.match(/^\| `[A-Z_]+`(?: \/ `[A-Z_]+`)? \||^Warning only.*$/gm) ?? [];
-    const listed = lines.flatMap((line) => line.match(/`[A-Z][A-Z_]{3,}`/g) ?? []);
-    expect(listed.map((code) => code.slice(1, -1))).toEqual(ALL_CODES);
+    const [, oneStop, sync] = contract.split(/### 6\.[56] |`syncReady\(R\)` is true/);
+    const row = /^\| `[A-Z_]+`(?: \/ `[A-Z_]+`)? \|/gm;
+    const codes = (s: string, re = row) => (s.match(re) ?? []).join().match(/[A-Z][A-Z_]{3,}/g);
+    expect(codes(oneStop)).toEqual(ONE_STOP_CODES);
+    expect(codes(sync)).toEqual(SYNC_ONLY_CODES);
+    expect(codes(sync, /^Warning only[^`]*`[A-Z_]+`/gm)).toEqual(WARNING_CODES);
     const script = readFileSync('docs/fixtures/validate.mjs', 'utf8');
     const reference = [...script.matchAll(/\[\s*'(blocking|sync|warning)',\s*'([A-Z_]+)'/g)];
     const kinds = { blocking: ONE_STOP_CODES, sync: SYNC_ONLY_CODES, warning: WARNING_CODES };
@@ -107,9 +107,8 @@ describe('evaluateRecordingReadiness (§6.5)', () => {
   it('gives the same issues and details whatever the input order', () => {
     const publishing = pub(['WORLD', [other(9000)]], ['US', [own(6000), other(6000)]]);
     const result = evaluateRecordingReadiness(song({ publishing }));
-    expect(evaluateRecordingReadiness(song({ publishing: [...publishing].reverse() }))).toEqual(
-      result,
-    );
+    const reversed = song({ publishing: [...publishing].reverse() });
+    expect(evaluateRecordingReadiness(reversed)).toEqual(result);
     expect(result.issues.map((issue) => `${issue.code}: ${issue.detail}`)).toEqual([
       'PUBLISHING_TOTAL_INCOMPLETE: Publishing WORLD 9000 bp.',
       'PUBLISHING_TOTAL_OVER: Publishing US 12000 bp.',
@@ -194,19 +193,14 @@ function northstarFacts(recording: Row): Facts {
 
 describe('Northstar readiness (EXPECTED.md §2)', () => {
   it('reproduces the readiness table for the five songs', () => {
-    const md = readFileSync('docs/fixtures/EXPECTED.md', 'utf8').replace(/\r\n/g, '\n');
+    const md = readFileSync('docs/fixtures/EXPECTED.md', 'utf8').replace(/\r|`/g, '');
     const lines = md.split('<!-- check:readiness -->\n')[1].split('\n\n')[0].split('\n').slice(2);
-    const cells = (line: string) =>
-      line
-        .replace(/`/g, '')
-        .split('|')
-        .slice(1, -1)
-        .map((c) => c.trim());
+    const cells = (line: string) => line.split(/\s*\|\s*/).slice(1, -1);
     const list = (items: string[]) => items.join(', ') || 'none';
     const actual = rows('recordings', 'deleted_at', null).map((recording) => {
       const result = evaluateRecordingReadiness(northstarFacts(recording));
       const codes = (from: readonly string[]) =>
-        list(result.issues.map((i) => i.code).filter((code) => from.includes(code)));
+        list(result.issues.map(codeOf).filter((code) => from.includes(code)));
       const contacts = result.licensingContacts.map(
         (c) => `${keyOf.get(c.partyId)}${c.implicit ? ' (implicit)' : ''}`,
       );
