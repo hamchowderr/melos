@@ -201,8 +201,7 @@ function missing(
 /**
  * RightsSummaryDTO (§3.4) for the song a composition or recording id names; a recording resolves to
  * its composition, and one without a composition has no writer or publishing side. Licensing
- * contacts merge per song: the explicit contacts on the composition or any live recording of it;
- * with none, the implicit contact only when every live recording has it (P-28). One batch.
+ * contacts are the union by party of each live recording's own contacts (§3.4). One batch.
  */
 export async function getRightsSummary(
   tenant: TenantContext,
@@ -213,18 +212,26 @@ export async function getRightsSummary(
   if (missing(focus, loaded)) return failure('NOT_FOUND');
   const [song] = loaded.compositions.values();
   const results = loaded.recordings.map(({ facts }) => evaluateRecordingReadiness(facts));
-  const named = new Map(loaded.contacts.map(({ partyId, displayName }) => [partyId, displayName]));
-  const explicit = [...named].map(([partyId, displayName]) => ({ partyId, displayName }));
-  const implicit = results.length > 0 && results.every((r) => r.licensingContacts[0]?.implicit);
+  // With no live recording, the rows that target the composition; a party explicit anywhere stays so.
+  const own = results.length
+    ? results.flatMap(({ licensingContacts }) => licensingContacts)
+    : loaded.contacts.map(({ partyId, displayName }) => ({
+        partyId,
+        displayName,
+        implicit: false,
+      }));
+  const byParty = new Map<string, (typeof own)[number]>();
+  for (const contact of own) {
+    if (!contact.implicit || !byParty.has(contact.partyId)) byParty.set(contact.partyId, contact);
+  }
+  const licensingContacts = [...byParty.values()].sort((a, b) => (a.partyId < b.partyId ? -1 : 1));
   return success({
     compositionId: song?.id ?? null,
     writers: song?.writers ?? [],
     writerTotalBp: song?.writerTotalBp ?? 0,
     publishing: song?.publishing ?? [],
     masters: loaded.recordings.map(({ master }) => master),
-    licensingContacts: explicit.length
-      ? explicit.map((party) => ({ ...party, implicit: false }))
-      : (implicit && results[0].licensingContacts) || [],
+    licensingContacts,
     issues: results.flatMap(({ issues }) => issues),
   });
 }
