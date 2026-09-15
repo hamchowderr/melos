@@ -12,8 +12,8 @@ type Services = Awaited<ReturnType<typeof prepareWorkspaceServices>>;
 type Agreements = typeof import('../../src/server/services/rights/agreements');
 
 const AT = '2026-09-15T12:00:00.000Z';
-/** Parties in the first workspace: Silverline Songs, and one that is soft-deleted. */
-const [SILVERLINE, GONE] = [`pty_${ulid()}`, `pty_${ulid()}`];
+/** In the first workspace: Silverline Songs, a soft-deleted party and an agreement PDF asset. */
+const [SILVERLINE, GONE, ASSET] = [`pty_${ulid()}`, `pty_${ulid()}`, `ast_${ulid()}`];
 const refused = (error: object) => ({ ok: false, error });
 const [FORBIDDEN, NOT_FOUND] = [refused({ code: 'FORBIDDEN' }), refused({ code: 'NOT_FOUND' })];
 const missing = (table: string) => refused({ code: 'NOT_FOUND', counts: { [table]: 1 } });
@@ -49,6 +49,9 @@ beforeAll(async () => {
   const database = await open(owner);
   const [live, gone] = [party(SILVERLINE, 'Silverline Songs'), party(GONE, 'Gone Music', AT)];
   await database.insert(tables.parties).values([live, gone]);
+  const pdf = { id: ASSET, assetType: 'agreement_pdf', storageProvider: 'local', createdAt: AT };
+  const key = `${owner.workspaceId}/${ASSET}/deal.pdf`;
+  await database.insert(tables.assets).values({ ...pdf, storageKey: key, fileName: 'deal.pdf' });
 });
 
 afterAll(() => services?.close());
@@ -78,13 +81,13 @@ describe('melos-rpr.15: agreements that back publishing, master and licensing ro
     expect((await stored(owner, id))[0].notes).toBe('member');
   });
 
-  it('audits a create and an update once each with the full row, and leaves an unchanged patch unwritten (AUD-INT-001, D-4)', async () => {
+  it('audits a create and an update once each with the full row, stores the asset, and leaves an unchanged patch unwritten (AUD-INT-001, D-4)', async () => {
     const earlier = (await audited(owner)).length;
     const input = {
       agreementType: 'representation' as AgreementType,
       title: '  Silverline representation ',
       ...{ counterpartyPartyId: SILVERLINE, effectiveOn: '2026-01-01', expiresOn: '2028-12-31' },
-      ...{ assetId: null, notes: 'Side deal in Personal Notes' },
+      ...{ assetId: ASSET, notes: 'Side deal in Personal Notes' },
     };
     const created = accepted(await service.createAgreement(owner, input));
     const [row] = await stored(owner, created.id);
@@ -107,14 +110,14 @@ describe('melos-rpr.15: agreements that back publishing, master and licensing ro
     ]);
     // An empty or same-value patch from a second user keeps updatedBy, updatedAt and the audit rows.
     const second = { ...owner, userId: `usr_${ulid()}` };
-    for (const same of [{}, { title: after.title, assetId: null, expiresOn: null }]) {
+    for (const same of [{}, { title: after.title, assetId: ASSET, expiresOn: null }]) {
       const result = await service.updateAgreement(second, created.id, same);
       expect(result).toEqual({ ok: true, value: updated });
     }
     expect([await stored(owner, created.id), await audited(owner)]).toEqual([[after], audits]);
   });
 
-  it('refuses a missing or deleted counterparty with NOT_FOUND and broken fields with VALIDATION, writing nothing', async () => {
+  it('refuses a missing or deleted counterparty or asset with NOT_FOUND and broken fields with VALIDATION, writing nothing', async () => {
     const later = { ...DEAL, effectiveOn: '2026-05-01' };
     const kept = accepted(await service.createAgreement(owner, later));
     const [rows, earlier] = [await stored(owner, kept.id), await audited(owner)];
@@ -129,6 +132,7 @@ describe('melos-rpr.15: agreements that back publishing, master and licensing ro
     await refusesBoth([
       [{ counterpartyPartyId: `pty_${ulid()}` }, missing('parties')],
       [{ counterpartyPartyId: GONE }, missing('parties')],
+      [{ assetId: `ast_${ulid()}` }, missing('assets')],
       [{ expiresOn: '2026-04-30' }, early],
     ]);
     const unknown = await service.updateAgreement(owner, `agr_${ulid()}`, { notes: 'x' });
