@@ -28,15 +28,21 @@ export class WorkspaceConnectionError extends Error {
  */
 const connections = new Map<string, Promise<WorkspaceDatabase>>();
 
+/** A libSQL, drizzle query or network error: each has a code in its cause chain, and a bug has none. */
+const fromDatabase = (error: unknown): boolean =>
+  error instanceof Error &&
+  (typeof Reflect.get(error, 'code') === 'string' || fromDatabase(error.cause));
+
 /**
- * Runs `work` and replaces any error with a WorkspaceConnectionError holding its name and code:
- * control-plane and libSQL messages may name a URL, a file path or a token.
+ * Runs `work` and replaces a database error with a WorkspaceConnectionError holding its name and
+ * code: control-plane and libSQL messages may name a URL, a file path or a token. Any other error, a
+ * bug such as a TypeError, throws unchanged for the error boundary, which hides its message (§7.2).
  */
 export async function sanitized<T>(workspaceId: string, work: () => Promise<T>): Promise<T> {
   try {
     return await work();
   } catch (error) {
-    if (error instanceof WorkspaceConnectionError) throw error;
+    if (error instanceof WorkspaceConnectionError || !fromDatabase(error)) throw error;
     throw new WorkspaceConnectionError(workspaceId, errorCode(error));
   }
 }
@@ -49,8 +55,13 @@ function open(workspaceId: string): Promise<WorkspaceDatabase> {
       .from(workspaceRegistry)
       .where(and(eq(id, workspaceId), eq(status, 'active')));
     if (!row) throw new WorkspaceConnectionError(workspaceId, 'WorkspaceNotActive');
-    const client = openWorkspaceDatabase(getServerEnv().workspaceHost, row);
-    return drizzle(client, { schema: WORKSPACE_TABLES });
+    try {
+      const client = openWorkspaceDatabase(getServerEnv().workspaceHost, row);
+      return drizzle(client, { schema: WORKSPACE_TABLES });
+    } catch (error) {
+      // A host, token or environment error leaves the database unopened too (§7.2).
+      throw new WorkspaceConnectionError(workspaceId, errorCode(error));
+    }
   });
 }
 

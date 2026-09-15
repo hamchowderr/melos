@@ -118,12 +118,15 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     const db = await open(member);
     const earlier = await db.select().from(auditLog);
     const neon = song('Neon Static');
-    const boom = () => {
-      throw new Error('boom: file:./data/secret.db');
-    };
-    const hidden = { name: 'WorkspaceConnectionError', message: expect.not.stringMatching(/boom/) };
-    const thrown = write.runWorkspaceWrite(member, CREATE, create(neon, boom));
-    await expect(thrown).rejects.toMatchObject({ ...hidden, code: 'Error' });
+    const bug = new TypeError('boom');
+    // A bug is no database error: it runs once and throws as itself for the error boundary (§7.2).
+    const thrown = vi.fn(
+      create(neon, () => {
+        throw bug;
+      }),
+    );
+    await expect(write.runWorkspaceWrite(member, CREATE, thrown)).rejects.toBe(bug);
+    expect(thrown).toHaveBeenCalledOnce();
     const notFound = () => failure('NOT_FOUND');
     const refused = await write.runWorkspaceWrite(member, CREATE, create(neon, notFound));
     expect(refused).toEqual(failure('NOT_FOUND'));
