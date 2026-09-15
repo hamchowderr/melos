@@ -1,19 +1,15 @@
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
-import { migrate } from 'drizzle-orm/libsql/migrator';
 import { ulid } from 'ulid';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { WorkspaceRole } from '../../src/lib/auth/permissions';
-import { organization } from '../../src/server/db/schema/auth';
 import * as tables from '../../src/server/db/schema/workspace.generated';
 import type { ServiceResult } from '../../src/server/services/service-result';
 import type { TenantContext } from '../../src/server/services/tenant-context';
-import { openWithoutForeignKeys } from './support';
+import { prepareWorkspaceServices, withRole } from './workspace-service';
 
-type Connections = typeof import('../../src/server/services/workspace-connections');
+type Services = Awaited<ReturnType<typeof prepareWorkspaceServices>>;
 type Contacts = typeof import('../../src/server/services/contacts/read');
 
-const DATA_DIR = 'data/test-contacts-read';
 const AT = '2026-09-14T17:00:00.000Z';
 const fixture = JSON.parse(readFileSync('docs/fixtures/northstar-demo.json', 'utf8'));
 const { keys } = fixture as { keys: Record<string, string> };
@@ -23,18 +19,13 @@ const [SAM, EMAIL, OLD_EMAIL] = [`pty_${ulid()}`, ulid(), ulid()];
 const [ALIAS, IPI, BMI] = [ulid(), ulid(), ulid()];
 const FORBIDDEN = { ok: false, error: { code: 'FORBIDDEN' } };
 const NOT_FOUND = { ok: false, error: { code: 'NOT_FOUND' } };
-const getWorkspaceDatabase = vi.fn<Connections['getWorkspaceDatabase']>();
-let control: Awaited<ReturnType<typeof openWithoutForeignKeys>>;
-let connections: Connections;
+let services: Services;
+let connections: Services['connections'];
+let getWorkspaceDatabase: Services['getWorkspaceDatabase'];
 let contacts: Contacts;
 let northstar: TenantContext;
 let other: TenantContext;
 
-/** A role TenantContextResolver refuses can still reach a service called another way. */
-const withRole = (tenant: TenantContext, role: string) => ({
-  ...tenant,
-  workspaceRole: role as WorkspaceRole,
-});
 function accepted<T>(result: ServiceResult<T>): T {
   if (!result.ok) throw new Error(`Refused with ${result.error.code}`);
   return result.value;
@@ -43,23 +34,11 @@ const list = async (tenant: TenantContext, options?: Parameters<Contacts['listPa
   accepted(await contacts.listParties(tenant, options));
 
 beforeAll(async () => {
-  rmSync(DATA_DIR, { recursive: true, force: true });
-  process.env.MELOS_WORKSPACE_DATA_DIR = `${DATA_DIR}/workspaces`;
-  // One in-memory control connection with foreign keys off, as in catalog-read.test.ts.
-  const migrationsFolder = './src/server/db/migrations/control';
-  control = await openWithoutForeignKeys((db) => migrate(db, { migrationsFolder }));
-  const controlClient = { controlDb: control, controlDatabaseClient: control.$client };
-  vi.doMock('../../src/server/db/client', () => controlClient);
-  // Records every request for a workspace database.
-  vi.doMock('../../src/server/services/workspace-connections', async (importOriginal) => {
-    const original = await importOriginal<Connections>();
-    getWorkspaceDatabase.mockImplementation(original.getWorkspaceDatabase);
-    return { ...original, getWorkspaceDatabase };
-  });
-  connections = await import('../../src/server/services/workspace-connections');
+  // Every request for a workspace database is recorded through getWorkspaceDatabase.
+  services = await prepareWorkspaceServices('contacts-read');
+  ({ connections, getWorkspaceDatabase } = services);
   contacts = await import('../../src/server/services/contacts/read');
   const { seedNorthstar } = await import('../../src/server/db/seed/northstar');
-  const { provisionWorkspace } = await import('../../src/server/services/workspace-provisioner');
 
   const seeded = await seedNorthstar({ password: 'contacts-password', seedDate: '2026-09-14' });
   expect(seeded).toMatchObject({ status: 'seeded', dateShift: 0 });
@@ -67,11 +46,8 @@ beforeAll(async () => {
   const tenant = { userId: keys.usr_JORDAN, workspaceRole: 'owner', requestId: 'people' } as const;
   northstar = { ...tenant, organizationId, workspaceId };
 
-  const created = { id: `organization_${ulid()}`, name: 'Other', slug: 'other' };
-  await control.insert(organization).values({ ...created, createdAt: new Date() });
-  const registry = await provisionWorkspace(created.id);
-  other = { ...tenant, organizationId: created.id, workspaceId: registry.id };
-  const database = await connections.getWorkspaceDatabase(registry.id);
+  other = await services.provision('owner');
+  const database = await connections.getWorkspaceDatabase(other.workspaceId);
   const [partyId, createdAt, updatedAt] = [SAM, AT, AT];
   const email = (id: string, value: string, isPrimary: number, at = AT) => ({
     ...{ id, partyId, methodType: 'email', value, isPrimary, createdAt: at, updatedAt: at },
@@ -101,10 +77,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  for (const tenant of [northstar, other]) {
-    if (tenant) await connections.closeWorkspaceDatabase(tenant.workspaceId);
-  }
-  control?.$client.close();
+  // services.close() closes the workspaces it provisioned, then melos-control.
+  if (northstar) await connections.closeWorkspaceDatabase(northstar.workspaceId);
+  await services?.close();
 });
 
 describe('melos-rpr.6: ContactService reads people and organizations (§2.3 /people, D-5)', () => {
