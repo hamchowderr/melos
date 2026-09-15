@@ -24,10 +24,12 @@ export const table = (name: string) =>
     .split('\n')
     .slice(2)
     .map((line) => line.split(/\s*\|\s*/).slice(1, -1));
-/** Second workspace rows, self party S: song C1 has an S and an O master, C2 two S and a deleted O. */
-export const ID = Object.fromEntries(
-  ['S', 'O', 'C1', 'C2', 'R1', 'R2', 'R3', 'R4', 'GONE', 'LONE'].map((n) => [n, `${n}_${ulid()}`]),
-);
+/**
+ * Second workspace rows, self party S: song C1 has an S and an O master, C2 two S and a deleted O,
+ * C3 no recording; RX belongs to the deleted composition CX, and LONE to no composition.
+ */
+const NAMES = ['S', 'O', 'C1', 'C2', 'C3', 'CX', 'R1', 'R2', 'R3', 'R4', 'RX', 'GONE', 'LONE'];
+export const ID = Object.fromEntries(NAMES.map((n) => [n, `${n}_${ulid()}`]));
 export const refused = (code: 'FORBIDDEN' | 'NOT_FOUND') => ({ ok: false, error: { code } });
 /** Records every request for a workspace database. */
 export const getWorkspaceDatabase = vi.fn<Connections['getWorkspaceDatabase']>();
@@ -100,12 +102,15 @@ export function rightsWorkspaces(dataDir: string) {
       database.insert(ws.workspaceSelfParties).values([self('publishing'), self('master')]),
       database
         .insert(ws.compositions)
-        .values([row(ID.C1, { title: 'C1' }), row(ID.C2, { title: 'C2' })]),
+        .values([
+          ...[row(ID.C1, { title: 'C1' }), row(ID.C2, { title: 'C2' })],
+          ...[row(ID.C3, { title: 'C3' }), row(ID.CX, { title: 'CX', deletedAt: AT })],
+        ]),
       database
         .insert(ws.recordings)
         .values([
           ...[take(ID.R1, ID.C1), take(ID.R2, ID.C1), take(ID.R3, ID.C2), take(ID.R4, ID.C2)],
-          ...[take(ID.GONE, ID.C2, AT), take(ID.LONE, null)],
+          ...[take(ID.GONE, ID.C2, AT), take(ID.LONE, null), take(ID.RX, ID.CX)],
         ]),
       database.insert(ws.publishingInterests).values([publisher(ID.C1), publisher(ID.C2)]),
       database

@@ -43,27 +43,51 @@ describe('melos-rpr.7: RightsService summarizes every song shape (RGT-001 to RGT
     expect(holders).toEqual(table('holders').map(blank));
   });
 
-  it('merges contacts per song: every recording qualifies, one does not, an explicit contact wins (P-28)', async () => {
-    const contactsOf = async (id: string) =>
-      accepted(await summary(env.other, 'composition', id)).licensingContacts;
+  it("lists each live recording's own contacts once per party, explicit over implicit (§3.4, P-28)", async () => {
+    const database = await env.connections.getWorkspaceDatabase(env.other.workspaceId);
+    const [S, O] = [
+      { partyId: ID.S, displayName: 'S' },
+      { partyId: ID.O, displayName: 'O' },
+    ];
+    type Target = { partyId: string; recordingId?: string; compositionId?: string };
+    /** Song `id`'s contacts while the `targets` rows exist. */
+    const contactsWith = async (id: string, targets: Target[] = []) => {
+      const rows = targets.map((t) => ({
+        id: `lic_${ulid()}`,
+        ...t,
+        createdAt: AT,
+        updatedAt: AT,
+      }));
+      if (rows.length) await database.insert(licensingContacts).values(rows);
+      try {
+        return accepted(await summary(env.other, 'composition', id)).licensingContacts;
+      } finally {
+        await database.delete(licensingContacts);
+      }
+    };
+    // C2: every live recording qualifies; the deleted recording's O master is left out.
     const c2 = accepted(await summary(env.other, 'recording', ID.R3));
-    // The deleted recording's O master would otherwise leave C2 without the implicit contact.
     expect(c2.masters.map(({ recordingId }) => recordingId)).toEqual([ID.R3, ID.R4]);
-    expect(c2.licensingContacts).toEqual([{ partyId: ID.S, displayName: 'S', implicit: true }]);
-    // R1 alone has the implicit contact, but R2's master is not controlled, so song C1 has none.
+    expect(c2.licensingContacts).toEqual([{ ...S, implicit: true }]);
+    // C1: R1 qualifies and R2's master is not controlled, so only R1 brings a contact.
     const c1 = accepted(await summary(env.other, 'composition', ID.C1));
     const uncovered = c1.issues.filter(({ code }) => code === 'NO_LICENSING_CONTACT');
     const byRecording = uncovered.map(({ recordingId }) => recordingId);
-    expect([c1.licensingContacts, byRecording]).toEqual([[], [ID.R2]]);
-    const database = await env.connections.getWorkspaceDatabase(env.other.workspaceId);
-    const contact = { id: `lic_${ulid()}`, recordingId: ID.R2, partyId: ID.O };
-    await database.insert(licensingContacts).values({ ...contact, createdAt: AT, updatedAt: AT });
-    try {
-      const explicit = [{ partyId: ID.O, displayName: 'O', implicit: false }];
-      expect(await contactsOf(ID.C1)).toEqual(explicit);
-    } finally {
-      await database.delete(licensingContacts);
-    }
+    expect([c1.licensingContacts, byRecording]).toEqual([[{ ...S, implicit: true }], [ID.R2]]);
+    // A row wins only for the recording or composition it targets.
+    const mixed = [
+      { ...O, implicit: false },
+      { ...S, implicit: true },
+    ];
+    expect(await contactsWith(ID.C1, [{ partyId: ID.O, recordingId: ID.R2 }])).toEqual(mixed);
+    const once = await contactsWith(ID.C1, [{ partyId: ID.S, recordingId: ID.R2 }]);
+    expect(once).toEqual([{ ...S, implicit: false }]);
+    const song = await contactsWith(ID.C1, [{ partyId: ID.O, compositionId: ID.C1 }]);
+    expect(song).toEqual([{ ...O, implicit: false }]);
+    // A composition without live recordings lists the rows that target it.
+    expect(await contactsWith(ID.C3)).toEqual([]);
+    const unrecorded = await contactsWith(ID.C3, [{ partyId: ID.O, compositionId: ID.C3 }]);
+    expect(unrecorded).toEqual([{ ...O, implicit: false }]);
   });
 
   it('gives a recording without a composition only its master side', async () => {
@@ -75,9 +99,11 @@ describe('melos-rpr.7: RightsService summarizes every song shape (RGT-001 to RGT
     expect(lone.issues.map(({ code }) => code)).toEqual(codes);
   });
 
-  it('answers NOT_FOUND for a soft-deleted id or one from the other workspace (TEN-001)', async () => {
+  it('answers NOT_FOUND for a soft-deleted id, a recording of a deleted composition or another workspace id', async () => {
     const lookups: Focus[] = [
       [env.other, 'recording', ID.GONE],
+      [env.other, 'composition', ID.CX],
+      [env.other, 'recording', ID.RX],
       [env.northstar, 'composition', ID.C1],
       [env.northstar, 'recording', ID.LONE],
       [env.other, 'composition', keys.cmp_OCEAN],
