@@ -128,7 +128,7 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     const db = await open(member);
     const earlier = await db.select().from(auditLog);
     const glass = song('Glass House');
-    // As a COMMIT refused by a lock; an extended code is a lock too.
+    // Simulates a lock error raised after core ran; an extended code counts as a lock too.
     const locked = Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY_SNAPSHOT' });
     let runs = 0;
     const retried = create(glass, () => {
