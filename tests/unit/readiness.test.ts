@@ -44,14 +44,18 @@ const codesOf = (input: Facts) => evaluateRecordingReadiness(input).issues.map(c
 
 /** Expected codes, in order, for facts that break one rule. */
 const CASES: [string, Facts][] = [
-  ['NO_COMPOSITION', facts({ composition: null })],
+  // Short of 100% of both sides, P-28 gives no implicit contact (supervisor decision 2026-09-14).
+  ['NO_COMPOSITION NO_LICENSING_CONTACT', facts({ composition: null })],
   ['WRITER_TOTAL_INCOMPLETE', song({ writers: [{ shareBp: 5000 }, { shareBp: null }] })],
   ['WRITER_TOTAL_OVER', song({ writers: [{ shareBp: 10000 }, { shareBp: 1 }] })],
-  ['PUBLISHING_TOTAL_INCOMPLETE', song({ publishing: [] })],
-  ['PUBLISHING_TOTAL_OVER', song({ publishing: pub(['WORLD', [own(), other(500)]]) })],
+  ['PUBLISHING_TOTAL_INCOMPLETE NO_LICENSING_CONTACT', song({ publishing: [] })],
+  [
+    'PUBLISHING_TOTAL_OVER NO_LICENSING_CONTACT',
+    song({ publishing: pub(['WORLD', [own(), other(500)]]) }),
+  ],
   ['PUBLISHING_TERRITORY_MIXED', song({ publishing: pub(['WORLD', [own()]], ['US', [own()]]) })],
   ['MASTER_TOTAL_INCOMPLETE MASTER_NOT_CONTROLLED NO_LICENSING_CONTACT', facts({ masters: [] })],
-  ['MASTER_TOTAL_OVER', facts({ masters: [own(), other(2500)] })],
+  ['MASTER_TOTAL_OVER NO_LICENSING_CONTACT', facts({ masters: [own(), other(2500)] })],
   [
     'SELF_PARTY_NOT_CONFIGURED PUBLISHING_NOT_CONTROLLED NO_LICENSING_CONTACT',
     facts({ selfParties: { publishing: null, master: SELF } }),
@@ -137,6 +141,21 @@ describe('evaluateRecordingReadiness (§6.5)', () => {
     expect(named.licensingContacts).toEqual([OTHER, SELF].map((p) => ({ ...p, implicit: false })));
     const uncontrolled = facts({ licensingContacts: [OTHER], masters: [other(10000)] });
     expect(codesOf(uncontrolled)).toBe('MASTER_NOT_CONTROLLED');
+  });
+
+  it('gives no implicit contact without a composition, publishing rows or a complete total', () => {
+    const partial = [
+      facts({ composition: null }),
+      song({ publishing: [] }),
+      song({ publishing: pub(['WORLD', [own(), other(500)]]) }),
+      facts({ masters: [own(), other(2500)] }),
+    ];
+    for (const input of partial) {
+      expect(evaluateRecordingReadiness(input).licensingContacts).toEqual([]);
+      const named = evaluateRecordingReadiness({ ...input, licensingContacts: [OTHER] });
+      expect(named.licensingContacts).toEqual([{ ...OTHER, implicit: false }]);
+      expect(named.issues.map(codeOf)).not.toContain('NO_LICENSING_CONTACT');
+    }
   });
 });
 
