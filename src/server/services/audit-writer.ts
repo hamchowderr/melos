@@ -75,7 +75,8 @@ function canonical(value: unknown): string | undefined {
 /**
  * The AuditWriter of one workspace transaction: each entry is one `aud_<ulid>` row, inserted through
  * the workspace IntegrityGuard with the actor, the request id, the time, and before and after as
- * canonical JSON, so it commits or rolls back with the mutation it records.
+ * canonical JSON, so it commits or rolls back with the mutation it records. The row is an object
+ * literal in the insert call, so a column name `audit_log` lacks does not compile.
  */
 export function createAuditWriter(
   tx: GuardTransaction,
@@ -85,17 +86,22 @@ export function createAuditWriter(
   const json = (state: object | null) => (state === null ? null : canonicalJson(state));
   return {
     async write({ action, entityType, entityId, before, after }) {
-      const { agentRunId = null, approvalToolCallId = null } = actor;
-      const row = {
-        ...{ id: `aud_${ulid()}`, actorType: actor.type, actorUserId: actor.userId, agentRunId },
-        ...{ approvalToolCallId, action, entityType, entityId, requestId },
-        ...{
+      await workspaceIntegrityGuard.insert(tx, auditLog, [
+        {
+          id: `aud_${ulid()}`,
+          actorType: actor.type,
+          actorUserId: actor.userId,
+          agentRunId: actor.agentRunId ?? null,
+          approvalToolCallId: actor.approvalToolCallId ?? null,
+          action,
+          entityType,
+          entityId,
           beforeJson: json(before),
           afterJson: json(after),
+          requestId,
           occurredAt: new Date().toISOString(),
         },
-      };
-      await workspaceIntegrityGuard.insert(tx, auditLog, [row]);
+      ]);
     },
   };
 }
