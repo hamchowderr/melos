@@ -10,6 +10,17 @@ import {
 /** 100% in basis points (§1.4). */
 const FULL_BP = 10000;
 
+/** Codes that rule out the implicit contact: no composition, an incomplete side, or partial control. */
+const NOT_FULL_CONTROL: readonly ReadinessCode[] = [
+  'NO_COMPOSITION',
+  'PUBLISHING_TOTAL_INCOMPLETE',
+  'PUBLISHING_TOTAL_OVER',
+  'MASTER_TOTAL_INCOMPLETE',
+  'MASTER_TOTAL_OVER',
+  'PUBLISHING_NOT_CONTROLLED',
+  'MASTER_NOT_CONTROLLED',
+];
+
 export type PartyFact = { partyId: string; displayName: string };
 /** A publishing or master row, with the RightsSummaryDTO holder fields readiness reads. */
 export type ShareFact = { partyId: string; shareBp: number; representationAttested: boolean };
@@ -94,10 +105,10 @@ export function evaluateRecordingReadiness(facts: RecordingReadinessFacts): Reco
   flag('PUBLISHING_NOT_CONTROLLED', uncontrolled.length > 0, publishingControlled);
   flag('MASTER_NOT_CONTROLLED', ownMaster < FULL_BP, `Controlled master ${ownMaster} bp.`);
 
-  // P-28: explicit contacts win; otherwise the master self party when both sides are controlled.
+  // P-28: explicit contacts win; otherwise the master self party, only at 100% of both sides.
   const explicit = [...new Map(facts.licensingContacts.map((p) => [p.partyId, p])).values()];
-  const controlsBoth = uncontrolled.length === 0 && ownMaster >= FULL_BP;
-  const implicit = controlsBoth && selfParties.master ? [selfParties.master] : [];
+  const partial = NOT_FULL_CONTROL.some((code) => found.has(code));
+  const implicit = !partial && selfParties.master ? [selfParties.master] : [];
   const licensingContacts = explicit.length
     ? explicit.sort((a, b) => (a.partyId < b.partyId ? -1 : 1)).map(contact(false))
     : implicit.map(contact(true));

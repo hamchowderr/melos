@@ -150,7 +150,10 @@ mst AS (SELECT t.recording_id AS rid, t.master_total_bp AS total,
 flags AS (SELECT rec.rid,
             EXISTS (SELECT 1 FROM pub WHERE pub.cid = rec.cid AND pub.controlled < 10000) AS pub_not_controlled,
             (SELECT controlled FROM mst WHERE mst.rid = rec.rid) < 10000 AS master_not_controlled,
-            EXISTS (SELECT 1 FROM licensing_contacts lc WHERE lc.recording_id = rec.rid OR lc.composition_id = rec.cid) AS explicit_contact
+            EXISTS (SELECT 1 FROM licensing_contacts lc WHERE lc.recording_id = rec.rid OR lc.composition_id = rec.cid) AS explicit_contact,
+            EXISTS (SELECT 1 FROM sm) AND EXISTS (SELECT 1 FROM pub WHERE pub.cid = rec.cid)
+              AND NOT EXISTS (SELECT 1 FROM pub WHERE pub.cid = rec.cid AND (pub.total <> 10000 OR pub.controlled < 10000))
+              AND (SELECT total = 10000 AND controlled = 10000 FROM mst WHERE mst.rid = rec.rid) AS full_control
           FROM rec)`;
 const READINESS_CODES = [
   ['blocking', 'NO_COMPOSITION', 'SELECT rid FROM rec WHERE cid IS NULL'],
@@ -191,7 +194,7 @@ const READINESS_CODES = [
   [
     'blocking',
     'NO_LICENSING_CONTACT',
-    'SELECT rid FROM flags WHERE NOT explicit_contact AND (pub_not_controlled OR master_not_controlled OR NOT EXISTS (SELECT 1 FROM sm))',
+    'SELECT rid FROM flags WHERE NOT explicit_contact AND NOT full_control',
   ],
   ['sync', 'MISSING_ISRC', 'SELECT rid FROM rec WHERE isrc IS NULL'],
   [
@@ -368,7 +371,7 @@ async function readiness(db) {
     );
     r.licensingContact = explicit.length
       ? explicit.map((e) => K(e.party_id)).join(', ')
-      : !f.pub_not_controlled && !f.master_not_controlled && f.sm
+      : f.full_control
         ? `${K(f.sm)} (implicit)`
         : 'none';
   }
