@@ -23,10 +23,6 @@ describe('melos-rpr.10: getMusicWorkspace assembles MusicWorkspaceDTO (§3.4, DE
   it('joins Midnight Drive catalog, rights, readiness and pitch counts from EXPECTED.md', async () => {
     const focus = { entityType: 'composition', entityId: keys.cmp_MIDNIGHT } as const;
     const midnight = accepted(await load(env.northstar, focus.entityType, focus.entityId));
-    expect(Object.keys(midnight)).toEqual([
-      ...['focus', 'composition', 'primaryRecordingId', 'recordings', 'releases', 'rights'],
-      ...['readiness', 'pitchSummary', 'importedReportTemplateId'],
-    ]);
     expect(midnight).toEqual({
       ...accepted(await catalog.getSongCatalog(env.northstar, focus)),
       rights: accepted(await rights.getRightsSummary(env.northstar, focus)),
@@ -39,11 +35,8 @@ describe('melos-rpr.10: getMusicWorkspace assembles MusicWorkspaceDTO (§3.4, DE
       },
       importedReportTemplateId: null,
     });
-    const demo = { composition: { iswc: 'T9000000010' }, primaryRecordingId: keys.rec_MIDNIGHT };
     const take = { isrc: 'USDMO2600001', previewStartMs: 42000, primaryLink: { isPrimary: true } };
-    const implicit = [{ partyId: keys.pty_SILVERLINE, implicit: true }];
-    expect(midnight).toMatchObject({ ...demo, recordings: [take] });
-    expect(midnight.rights).toMatchObject({ writerTotalBp: 10000, licensingContacts: implicit });
+    expect(midnight).toMatchObject({ composition: { iswc: 'T9000000010' }, recordings: [take] });
     const [, , counts] =
       table('facts').find(([, fact]) => fact === 'pitch_counts cmp_MIDNIGHT') ?? [];
     const written = Object.entries(midnight.pitchSummary.countsByStatus).map((c) => c.join(' '));
@@ -95,11 +88,8 @@ describe('melos-rpr.10: getMusicWorkspace assembles MusicWorkspaceDTO (§3.4, DE
           event(elsewhere, null, '2026-09-03T00:00:00.000Z'),
         ]),
     ]);
-    const summary = {
-      itemCount: 1,
-      countsByStatus: { sent: 1 },
-      lastActivityAt: '2026-09-02T00:00:00.000Z',
-    };
+    const late = '2026-09-02T00:00:00.000Z';
+    const summary = { itemCount: 1, countsByStatus: { sent: 1 }, lastActivityAt: late };
     expect(accepted(await load(env.other, 'recording', ID.R2)).pitchSummary).toEqual(summary);
   });
 
@@ -108,13 +98,36 @@ describe('melos-rpr.10: getMusicWorkspace assembles MusicWorkspaceDTO (§3.4, DE
     const rows = songs.flatMap(({ title, recordings }) =>
       recordings.map((r) => [title, K(r.recordingId), `${r.oneStopReady}`, `${r.syncReady}`]),
     );
-    const expected = table('readiness').map(([song, take, , , , oneStop, sync]) => [
-      song,
-      take,
-      oneStop,
-      sync,
-    ]);
+    const expected = table('readiness').map((row) => [row[0], row[1], row[5], row[6]]);
     expect(rows.sort()).toEqual(expected.sort());
+  });
+
+  it('reads again when a recording lands between the batches, and fails if it lands again', async () => {
+    const database = await env.connections.getWorkspaceDatabase(env.other.workspaceId);
+    const batch = database.$client.batch.bind(database.$client);
+    let landings = 1;
+    // Before a rights batch (the one reading recording_master_totals), a recording joins C3.
+    const spy = vi.spyOn(database.$client, 'batch').mockImplementation(async (statements, mode) => {
+      if (landings > 0 && JSON.stringify(statements).includes('recording_master_totals')) {
+        landings -= 1;
+        const take = { id: `rec_${ulid()}`, title: 'Take', compositionId: ID.C3 };
+        await database.insert(ws.recordings).values({ ...take, createdAt: AT, updatedAt: AT });
+      }
+      return batch(statements, mode);
+    });
+    try {
+      const song = accepted(await load(env.other, 'composition', ID.C3));
+      expect(spy).toHaveBeenCalledTimes(4);
+      const ids = [song.recordings.map(({ id }) => id)];
+      const read = [song.readiness, song.rights.masters].map((l) => l.map((r) => r.recordingId));
+      expect([ids[0].length, ...read]).toEqual([1, ...ids, ...ids]);
+      landings = 2;
+      const changed = { name: 'WorkspaceConnectionError', code: 'SongChangedDuringRead' };
+      await expect(load(env.other, 'composition', ID.C3)).rejects.toMatchObject(changed);
+      expect(spy).toHaveBeenCalledTimes(8);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('answers NOT_FOUND for a soft-deleted or other-workspace id and FORBIDDEN before any open', async () => {

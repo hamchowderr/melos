@@ -3,6 +3,7 @@ import { requirePermission } from '../permissions';
 import { loadRightsFacts, missing, scopeOf, summarizeRights } from '../rights/read';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
+import { WorkspaceConnectionError } from '../workspace-connections';
 import { pitchSummaryOf, pitchSummaryRead } from './pitch-summary';
 import { getSongCatalog } from './read';
 
@@ -19,17 +20,28 @@ export async function getMusicWorkspace(
 ): Promise<ServiceResult<MusicWorkspaceDTO>> {
   const reads = requirePermission(tenant, { catalog: ['read'], rights: ['read'], pitch: ['read'] });
   if (!reads.ok) return failure('FORBIDDEN');
-  const [song, loaded] = await Promise.all([
-    getSongCatalog(tenant, focus),
-    loadRightsFacts(
-      tenant.workspaceId,
-      (database) => scopeOf(database, focus),
-      (database, ids) => [pitchSummaryRead(database, ids)],
-    ),
-  ]);
-  // Two batches can see different commits: the song must be live in both.
+  const read = () =>
+    Promise.all([
+      getSongCatalog(tenant, focus),
+      loadRightsFacts(
+        tenant.workspaceId,
+        (database) => scopeOf(database, focus),
+        (database, ids) => [pitchSummaryRead(database, ids)],
+      ),
+    ]);
+  // Each batch is its own stream, so a write can land between them. They agree when the catalog
+  // finds no song, or both find it live with the same live recordings.
+  const agree = ([song, loaded]: Awaited<ReturnType<typeof read>>) =>
+    !song.ok ||
+    (!missing(focus, loaded) &&
+      `${song.value.recordings.map(({ id }) => id)}` ===
+        `${loaded.recordings.map((r) => r.take.id)}`);
+  let both = await read();
+  if (!agree(both)) both = await read();
+  // A song that changes again fails as a transient database error, never as a mixed DTO.
+  if (!agree(both)) throw new WorkspaceConnectionError(tenant.workspaceId, 'SongChangedDuringRead');
+  const [song, loaded] = both;
   if (!song.ok) return song;
-  if (missing(focus, loaded)) return failure('NOT_FOUND');
   const { summary, results } = summarizeRights(loaded);
   const readiness = loaded.recordings.map(({ take }, index) => {
     const { oneStopReady, syncReady, issues } = results[index];
