@@ -60,6 +60,16 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     expect(services.getWorkspaceDatabase.mock.calls).toEqual([[member.workspaceId]]);
   });
 
+  it('runs with foreign keys off inside core, on another connection meanwhile and outside (§4.4, DAT-INT-001)', async () => {
+    const db = await open(member);
+    const pragma = sql`PRAGMA foreign_keys`;
+    const read: WorkspaceWrite<unknown[]> = async (tx) =>
+      success([await tx.all(pragma), await db.all(pragma)]);
+    const off = [{ foreign_keys: 0 }];
+    expect(await write.runWorkspaceWrite(member, CREATE, read)).toEqual(success([off, off]));
+    expect(await db.all(pragma)).toEqual(off);
+  });
+
   it('commits each write with one audit_log row: actor, request id, action, entity, canonical before and after', async () => {
     const db = await open(member);
     const earlier = await db.select().from(auditLog);
@@ -112,6 +122,23 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     const ids = pair.map(({ id }) => id).sort();
     expect(audited.map(({ entityId }) => entityId).sort()).toEqual(ids);
     expect(await db.all(sql`PRAGMA foreign_key_check`)).toEqual([]);
+  });
+
+  it('runs core again when a lock refuses the transaction after core ran, keeping one audit row', async () => {
+    const db = await open(member);
+    const earlier = await db.select().from(auditLog);
+    const glass = song('Glass House');
+    // Simulates a lock error raised after core ran; an extended code counts as a lock too.
+    const locked = Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY_SNAPSHOT' });
+    let runs = 0;
+    const retried = create(glass, () => {
+      runs += 1;
+      if (runs === 1) throw locked;
+      return success(glass.id);
+    });
+    expect(await write.runWorkspaceWrite(member, CREATE, retried)).toEqual(success(glass.id));
+    const audited = (await db.select().from(auditLog)).slice(earlier.length);
+    expect([runs, audited]).toMatchObject([2, [{ entityId: glass.id }]]);
   });
 
   it('leaves neither the row nor its audit row when the write throws or refuses after inserting', async () => {
