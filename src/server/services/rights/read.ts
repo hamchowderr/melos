@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm';
 import type { CatalogFocus } from '../../../lib/dto/catalog';
-import type { RightsSummaryDTO } from '../../../lib/dto/rights';
+import type { ReadinessReportDTO, RightsSummaryDTO } from '../../../lib/dto/rights';
 import {
   compositionContributors,
   compositions,
@@ -23,15 +23,19 @@ type Scope = { composition?: SQL; recording?: SQL };
 /** rights:read for the role resolved for this request (§6.2); a comma role fails closed (P-30). */
 const canRead = (tenant: TenantContext) => requirePermission(tenant, { rights: ['read'] }).ok;
 
-/** A composition and its recordings; a recording id covers its composition and all its recordings. */
-function scopeOf(database: WorkspaceDatabase, { entityType, entityId }: CatalogFocus): Scope {
+/**
+ * A composition and its recordings; a recording id covers its composition and, for a `song`, all its
+ * recordings, otherwise only itself.
+ */
+function scopeOf(database: WorkspaceDatabase, { entityType, entityId }: CatalogFocus, song = true) {
   if (entityType === 'composition') {
     const recording = eq(recordings.compositionId, entityId);
     return { composition: eq(compositions.id, entityId), recording };
   }
   const named = and(eq(recordings.id, entityId), isNull(recordings.deletedAt));
   const owner = database.select({ id: recordings.compositionId }).from(recordings).where(named);
-  const recording = or(inArray(recordings.compositionId, owner), eq(recordings.id, entityId));
+  const alone = eq(recordings.id, entityId);
+  const recording = song ? or(inArray(recordings.compositionId, owner), alone) : alone;
   return { composition: inArray(compositions.id, owner), recording };
 }
 
@@ -234,4 +238,42 @@ export async function getRightsSummary(
     licensingContacts,
     issues: results.flatMap(({ issues }) => issues),
   });
+}
+
+/**
+ * ReadinessReportDTO (§3.4) for one live recording, the live recordings of a composition, or every
+ * live recording, by title; a recording of a deleted composition is left out, as in listSongs.
+ * `onlyNotReady` keeps recordings that are not sync ready, which include every recording that is not
+ * one-stop ready; `limit`, an integer from 1 to 200 (otherwise 50), applies after it. One batch.
+ */
+export async function getReadinessIssues(
+  tenant: TenantContext,
+  query: {
+    recordingId?: string;
+    compositionId?: string;
+    onlyNotReady?: boolean;
+    limit?: number;
+  } = {},
+): Promise<ServiceResult<ReadinessReportDTO>> {
+  if (!canRead(tenant)) return failure('FORBIDDEN');
+  const { recordingId, compositionId, onlyNotReady = true, limit: asked } = query;
+  // The /rights page calls this directly, so a missing or invalid limit takes the default.
+  const valid = asked !== undefined && Number.isInteger(asked) && asked >= 1;
+  const limit = valid ? Math.min(asked, 200) : 50;
+  const focus: CatalogFocus | null = recordingId
+    ? { entityType: 'recording', entityId: recordingId }
+    : compositionId
+      ? { entityType: 'composition', entityId: compositionId }
+      : null;
+  const scope = (db: WorkspaceDatabase): Scope => (focus ? scopeOf(db, focus, false) : {});
+  const loaded = await loadRightsFacts(tenant.workspaceId, scope);
+  if (focus && missing(focus, loaded)) return failure('NOT_FOUND');
+  const live = loaded.recordings.filter(({ orphaned }) => !orphaned);
+  const report = live.map(({ take, facts }) => {
+    const { oneStopReady, syncReady, issues } = evaluateRecordingReadiness(facts);
+    const ids = { recordingId: take.id, compositionId: facts.composition?.id ?? null };
+    return { ...ids, title: take.title, oneStopReady, syncReady, issues };
+  });
+  const listed = report.filter(({ syncReady }) => !onlyNotReady || !syncReady);
+  return success({ generatedAt: new Date().toISOString(), recordings: listed.slice(0, limit) });
 }
