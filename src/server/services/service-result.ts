@@ -13,7 +13,8 @@ export type RowCounts = Readonly<Record<string, number>>;
 export type ServiceError =
   | { code: 'FORBIDDEN' }
   | { code: 'NOT_FOUND'; counts?: RowCounts }
-  | { code: 'REFERENCED' | 'SONG_LEVEL_CONFLICT'; counts: RowCounts };
+  | { code: 'REFERENCED' | 'SONG_LEVEL_CONFLICT'; counts: RowCounts }
+  | { code: 'VALIDATION'; field: string; reason: string };
 
 export type ServiceErrorCode = ServiceError['code'];
 
