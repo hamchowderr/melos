@@ -1,16 +1,6 @@
-import {
-  and,
-  asc,
-  eq,
-  inArray,
-  isNotNull,
-  isNull,
-  or,
-  type SQL,
-  type SQLWrapper,
-  sql,
-} from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
+import type { SQLWrapper } from 'drizzle-orm/sql';
 import type { CatalogFocus } from '../../../lib/dto/catalog';
 import type { ReadinessReportDTO, RightsSummaryDTO } from '../../../lib/dto/rights';
 import {
@@ -41,11 +31,8 @@ const canRead = (tenant: TenantContext) => requirePermission(tenant, { rights: [
  * A composition and its recordings; a recording id covers its composition and, for a `song`, all its
  * recordings, otherwise only itself.
  */
-export function scopeOf(
-  database: WorkspaceDatabase,
-  { entityType, entityId }: CatalogFocus,
-  song = true,
-) {
+export function scopeOf(database: WorkspaceDatabase, focus: CatalogFocus, song = true) {
+  const { entityType, entityId } = focus;
   if (entityType === 'composition') {
     const recording = eq(recordings.compositionId, entityId);
     return { composition: eq(compositions.id, entityId), recording };
@@ -184,6 +171,8 @@ export async function loadRightsFacts<const E extends readonly BatchItem<'sqlite
   const writersOf = Map.groupBy(writers, (row) => row.compositionId);
   const publishingOf = Map.groupBy(publishing, (row) => row.compositionId);
   const mastersOf = Map.groupBy(masters, (row) => row.recordingId);
+  const takeContactsOf = Map.groupBy(contacts, (row) => row.recordingId);
+  const songContactsOf = Map.groupBy(contacts, (row) => row.compositionId);
   const songRights = songs.map(({ id, iswc, writerTotalBp }) => {
     const sets = Map.groupBy(publishingOf.get(id) ?? [], (row) => row.territory);
     const song = {
@@ -206,9 +195,10 @@ export async function loadRightsFacts<const E extends readonly BatchItem<'sqlite
     const facts = {
       ...{ recordingId: take.id, isrc: take.isrc, hasPrimaryLink: Boolean(take.hasPrimaryLink) },
       ...{ selfParties, composition, masters: holders },
-      licensingContacts: contacts.filter(
-        (contact) => contact.recordingId === take.id || contact.compositionId === composition?.id,
-      ),
+      licensingContacts: [
+        ...(takeContactsOf.get(take.id) ?? []),
+        ...(composition ? (songContactsOf.get(composition.id) ?? []) : []),
+      ],
     };
     const master = { recordingId: take.id, totalBp: take.masterTotalBp, holders };
     return { take, facts, master, orphaned: take.compositionId !== null && !composition };
