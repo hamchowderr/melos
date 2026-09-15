@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { posix, resolve } from 'node:path';
 import { expandConfig, isInMemoryConfig } from '@libsql/core/config';
 import { encodeBaseUrl } from '@libsql/core/uri';
 import { z } from 'zod';
@@ -58,6 +58,10 @@ const rawEnvSchema = z.object({
       .default('outbox'),
   ),
   MELOS_SIGNUP_ALLOWED_EMAILS: optionalText,
+  MELOS_ASSET_STORAGE: z.preprocess(
+    blankToUndefined,
+    z.enum(['local', 'r2'], { error: 'must be one of: local, r2' }).optional(),
+  ),
 });
 
 type RawEnv = z.infer<typeof rawEnvSchema>;
@@ -117,6 +121,10 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
     if (env.MELOS_LLM_BASE_URL) {
       flag('MELOS_LLM_BASE_URL', 'is test-only and must not be set on Vercel');
     }
+    // Unset selects r2 on Vercel, checked on the first asset call, so no deploy needs it (D-7).
+    if (env.MELOS_ASSET_STORAGE === 'local') {
+      flag('MELOS_ASSET_STORAGE', 'must not be local on Vercel (local files are not allowed)');
+    }
     // The gateway provider prefers a present key, even a blank one, over the OIDC token used here.
     if (env.AI_GATEWAY_API_KEY !== undefined) {
       flag(
@@ -151,8 +159,12 @@ export type ChatModelSetting =
 /** A chat model whose variables are missing or invalid; `requireChatModel` throws its problems. */
 export type UnconfiguredChatModel = { provider: 'unconfigured'; problems: EnvProblem[] };
 
+/** Files under the workspace data folder off Vercel; R2 on Vercel, resolved on first use (D-7). */
+export type AssetStorageSetting = { kind: 'local'; rootDir: string } | { kind: 'r2' };
+
 export type ServerEnv = {
   onVercel: boolean;
+  assetStorage: AssetStorageSetting;
   auth: { secret: string; baseURL: string; trustedOrigins: string[] };
   controlDatabase: DatabaseSetting;
   agentDatabase: DatabaseSetting;
@@ -284,9 +296,15 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
     );
   }
   const env = result.data;
+  const workspaceHost = resolveWorkspaceHost(env);
 
   return {
     onVercel: Boolean(env.VERCEL),
+    // Only an off-Vercel host is local, and local assets on Vercel were refused above.
+    assetStorage:
+      env.MELOS_ASSET_STORAGE === 'r2' || workspaceHost.kind !== 'local'
+        ? { kind: 'r2' }
+        : { kind: 'local', rootDir: posix.join(workspaceHost.dataDir, 'assets') },
     auth: { secret: env.BETTER_AUTH_SECRET, ...resolveAuthUrls(env) },
     controlDatabase: {
       url: env.MELOS_CONTROL_DATABASE_URL ?? LOCAL_CONTROL_DATABASE_URL,
@@ -296,7 +314,7 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
       url: env.MELOS_AGENT_DATABASE_URL ?? LOCAL_AGENT_DATABASE_URL,
       authToken: env.MELOS_AGENT_DATABASE_AUTH_TOKEN,
     },
-    workspaceHost: resolveWorkspaceHost(env),
+    workspaceHost,
     chatModel: resolveChatModel(env),
     emailTransport: env.MELOS_EMAIL_TRANSPORT,
     authMailer: env.MELOS_AUTH_MAILER,
