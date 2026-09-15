@@ -1,5 +1,5 @@
 import type { Client } from '@libsql/client';
-import { and, eq } from 'drizzle-orm';
+import { and, DrizzleQueryError, eq } from 'drizzle-orm';
 import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
 import { controlDb } from '../db/client';
 import { workspaceRegistry } from '../db/schema/control';
@@ -28,15 +28,20 @@ export class WorkspaceConnectionError extends Error {
  */
 const connections = new Map<string, Promise<WorkspaceDatabase>>();
 
-/** A libSQL, drizzle query or network error: each has a code in its cause chain, and a bug has none. */
+/**
+ * A database error anywhere in the cause chain: a drizzle query error, whose message holds the SQL
+ * and its values even when libSQL refused a value without a code, or an error with a code.
+ */
 const fromDatabase = (error: unknown): boolean =>
   error instanceof Error &&
-  (typeof Reflect.get(error, 'code') === 'string' || fromDatabase(error.cause));
+  (error instanceof DrizzleQueryError ||
+    typeof Reflect.get(error, 'code') === 'string' ||
+    fromDatabase(error.cause));
 
 /**
- * Runs `work` and replaces a database error with a WorkspaceConnectionError holding its name and
- * code: control-plane and libSQL messages may name a URL, a file path or a token. Any other error, a
- * bug such as a TypeError, throws unchanged for the error boundary, which hides its message (§7.2).
+ * Runs `work` and replaces a database or registry error with a WorkspaceConnectionError holding
+ * its name and code, never its message, which may hold SQL, values, a URL or a token (§7.2). Any
+ * other error, such as a TypeError thrown outside a query, throws unchanged.
  */
 export async function sanitized<T>(workspaceId: string, work: () => Promise<T>): Promise<T> {
   try {

@@ -119,7 +119,7 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     const earlier = await db.select().from(auditLog);
     const neon = song('Neon Static');
     const bug = new TypeError('boom');
-    // A bug is no database error: it runs once and throws as itself for the error boundary (§7.2).
+    // A TypeError thrown outside a query is no database error: it runs once and throws as itself.
     const thrown = vi.fn(
       create(neon, () => {
         throw bug;
@@ -163,19 +163,20 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     expect(await db.all(sql`PRAGMA foreign_key_check`)).toEqual([]);
   });
 
-  it('throws a libSQL error once as WorkspaceConnectionError with its name and code, never its SQL or message (§7.2)', async () => {
+  it('throws a libSQL or drizzle query error once as WorkspaceConnectionError with its name and code, never its SQL, values or message (§7.2)', async () => {
     const db = await open(member);
     const paper = song('Paper Planes');
     await db.insert(compositions).values(paper);
-    // Probe: the raw error names the constraint the duplicate id breaks.
-    const raw = await db
-      .insert(compositions)
-      .values(paper)
-      .then(
-        () => null,
-        (error: Error) => error,
-      );
-    expect(`${raw} ${raw?.cause}`).toMatch(/UNIQUE constraint failed: compositions\.id/);
+    // Probes: the raw errors name the constraint a duplicate id breaks, or the SQL and its values.
+    const failed = (row: Song) =>
+      db
+        .insert(compositions)
+        .values(row)
+        .catch((error: Error) => `${error} ${error.cause}`);
+    expect(await failed(paper)).toMatch(/UNIQUE constraint failed: compositions\.id/);
+    // libSQL refuses NaN before SQLite sees it, so drizzle's query error has no code.
+    const nan = { ...song('Private Song Title'), updatedAt: Number.NaN as unknown as string };
+    expect(await failed(nan)).toMatch(/Failed query: insert[\s\S]*Private Song Title,[^ ]*,NaN /);
     const core = vi.fn(create(paper));
     const duplicate = write.runWorkspaceWrite(member, CREATE, core);
     const error = (await duplicate.catch((thrown) => thrown)) as WorkspaceConnectionError;
@@ -183,6 +184,9 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     expect(error.code).toMatch(/^\w+ SQLITE_CONSTRAINT\w*$/);
     const text = `Workspace ${member.workspaceId} database is unavailable: ${error.code}`;
     expect([error.message, error.cause, core.mock.calls.length]).toEqual([text, undefined, 1]);
+    const refused = await write.runWorkspaceWrite(member, CREATE, create(nan)).catch((e) => e);
+    expect(refused).toBeInstanceOf(services.connections.WorkspaceConnectionError);
+    expect(refused.message).not.toMatch(/insert|Private Song Title|NaN/);
   });
 
   it('writes only the tenant database: a composition id from another workspace is NOT_FOUND (TEN-001)', async () => {
