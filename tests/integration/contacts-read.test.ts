@@ -231,18 +231,21 @@ describe('melos-rpr.6: ContactService reads people and organizations (§2.3 /peo
     }
   });
 
-  it('drops a soft-deleted company from the contact, then a soft-deleted contact with its roles', async () => {
+  it('drops a soft-deleted company, then a soft-deleted contact with its roles, from the list and the detail', async () => {
     const { contacts: contactTable, parties } = tables;
     const database = await connections.getWorkspaceDatabase(northstar.workspaceId);
     const rebecca = async () => (await list(northstar, { query: 'Rebecca' }))[0];
+    const detail = async () => accepted(await contacts.getParty(northstar, keys.pty_REBECCA));
     const company = eq(parties.id, keys.pty_CARTER_SYNC);
     const contact = eq(contactTable.id, keys.con_REBECCA);
     await database.update(parties).set({ deletedAt: AT }).where(company);
     try {
-      const noCompany = { organizationPartyId: null, organizationName: null };
-      expect((await rebecca()).contact).toEqual({ ...REBECCA.contact, ...noCompany });
+      const noCompany = { ...REBECCA.contact, organizationPartyId: null, organizationName: null };
+      expect((await rebecca()).contact).toEqual(noCompany);
+      expect((await detail()).contact).toEqual(noCompany);
       await database.update(contactTable).set({ deletedAt: AT }).where(contact);
       expect(await rebecca()).toEqual({ ...REBECCA, contact: null });
+      expect((await detail()).contact).toBeNull();
     } finally {
       await database.update(parties).set({ deletedAt: null }).where(company);
       await database.update(contactTable).set({ deletedAt: null }).where(contact);
