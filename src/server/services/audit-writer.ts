@@ -43,33 +43,46 @@ export type AuditEntry = {
 export type AuditWriter = { write(entry: AuditEntry): Promise<void> };
 
 /**
- * Canonical JSON (§7.4): keys sorted by UTF-16 code unit at every depth, array order kept, no
- * whitespace. PROPOSED, as §7.4 does not say: values serialize as JSON.stringify serializes them
- * (`toJSON` applies; an undefined, function or symbol is left out of an object and null in an
- * array), so a value and its JSON round trip give the same text. Throws for a value with no JSON
- * text, such as undefined.
+ * Canonical JSON (§7.4), the text phase 7 hashes: object keys sorted by UTF-16 code unit at every
+ * depth, array order kept, no whitespace. PROPOSED, as §7.4 does not say how values serialize: a
+ * `toJSON` method is applied first (a Date becomes its ISO string); strings, finite numbers, booleans
+ * and null are written as JSON.stringify writes them; an undefined, function or symbol is left out
+ * of an object and written as null in an array; any other object is written from its own enumerable
+ * string keys, each time it appears. Throws a TypeError for NaN, Infinity or -Infinity, a bigint, a
+ * boxed primitive (never unwrapped), a cycle, and a value with no JSON text such as undefined.
  */
 export function canonicalJson(value: unknown): string {
-  const text = canonical(value);
+  const text = canonical(value, new Set());
   if (text === undefined) throw new TypeError('canonicalJson needs a value with a JSON form');
   return text;
 }
 
-function canonical(value: unknown): string | undefined {
+const BOXED = [Number, String, Boolean, BigInt, Symbol];
+
+/** A value's canonical text, or undefined where an object leaves the value out. */
+function canonical(value: unknown, path: Set<object>): string | undefined {
   const toJSON = (value as { toJSON?: unknown } | null | undefined)?.toJSON;
   const plain: unknown = typeof toJSON === 'function' ? toJSON.call(value) : value;
-  if (plain === null || typeof plain !== 'object') return JSON.stringify(plain);
-  if (Array.isArray(plain)) {
-    return `[${Array.from(plain, (item) => canonical(item) ?? 'null').join(',')}]`;
+  if (typeof plain === 'number' && !Number.isFinite(plain)) {
+    throw new TypeError(`canonicalJson cannot represent ${plain}`);
   }
+  if (plain === null || typeof plain !== 'object') return JSON.stringify(plain);
+  if (BOXED.some((type) => plain instanceof type)) {
+    throw new TypeError('canonicalJson refuses a boxed primitive');
+  }
+  if (path.has(plain)) throw new TypeError('canonicalJson cannot serialize a cycle');
+  path.add(plain);
   const record = plain as Record<string, unknown>;
-  const members = Object.keys(record)
-    .sort()
-    .flatMap((key) => {
-      const member = canonical(record[key]);
-      return member === undefined ? [] : [`${JSON.stringify(key)}:${member}`];
-    });
-  return `{${members.join(',')}}`;
+  const members = Array.isArray(plain)
+    ? Array.from(plain, (item) => canonical(item, path) ?? 'null')
+    : Object.keys(record)
+        .sort()
+        .flatMap((key) => {
+          const member = canonical(record[key], path);
+          return member === undefined ? [] : [`${JSON.stringify(key)}:${member}`];
+        });
+  path.delete(plain);
+  return Array.isArray(plain) ? `[${members.join(',')}]` : `{${members.join(',')}}`;
 }
 
 /**
