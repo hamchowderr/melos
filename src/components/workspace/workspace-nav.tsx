@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
 
-export type WorkspaceSection = 'chat' | 'catalog' | 'settings';
+export type WorkspaceSection = 'chat' | 'catalog' | 'people' | 'settings';
 
 const SECTIONS: { section: WorkspaceSection; href: string; label: string }[] = [
   { section: 'chat', href: '/', label: 'Chat' },
   { section: 'catalog', href: '/catalog', label: 'Catalog' },
+  { section: 'people', href: '/people', label: 'People' },
   { section: 'settings', href: '/settings', label: 'Settings' },
 ];
 
