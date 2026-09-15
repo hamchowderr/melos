@@ -440,7 +440,7 @@ Field lists are the contract. Exact TypeScript types are derived from the tool s
 - `MusicSearchResult`: `compositionId` (null for a recording without a composition), `primaryRecordingId` (§3.5, nullable), `recordingIds`, `title`, `altTitles`, `primaryArtistNames`, `iswc`, `matchType` (exact_title, exact_alt_title, text), `recordings[]` (`recordingId`, `title`, `versionTitle`, `isrc`, `oneStopReady`, `syncReady`).
 - `MusicWorkspaceDTO`: `focus` (`entityType`, `entityId`); `composition` (`id`, `title`, `altTitles`, `iswc`, `copyrightRegistrationNumber`, `copyrightDate`, `description`, `hasLyrics`) or null; `primaryRecordingId`; `recordings[]` (`id`, `title`, `versionTitle`, `isrc`, `durationMs`, `bpm`, `musicalKey`, `previewStartMs`, `primaryLink`, `links`, `artists`, `contributors`, `terms`); `releases[]` (`id`, `title`, `releaseType`, `upcEan`, `releaseDate`, `discNumber`, `trackNumber`); `rights` (`RightsSummaryDTO`); `readiness[]` (`recordingId`, `oneStopReady`, `syncReady`, `issues`); `pitchSummary` (`itemCount`, `countsByStatus`, `lastActivityAt`); `importedReportTemplateId` or null.
 - `RightsSummaryDTO`: `compositionId`; `writers[]` (`contributorId`, `partyId`, `displayName`, `roles`, `shareBp`); `writerTotalBp`; `publishing[]` per territory (`territory`, `totalBp`, `holders[]`: `interestId`, `partyId`, `displayName`, `shareBp`, `isSelf`, `representationAttested`, `agreementId`); `masters[]` per recording (`recordingId`, `totalBp`, `holders[]` with the same fields); `licensingContacts[]` (`partyId`, `displayName`, `implicit`); `issues[]`.
-- `ReadinessIssue`: `code`, `severity` (blocking or warning), `recordingId`, `compositionId`, `detail`.
+- `ReadinessIssue`: `code`, `severity` (blocking or warning), `recordingId`, `compositionId`, `detail`. A sync-only code (§6.5) is also blocking; readers tell it from a one-stop code by `code`, using the §6.5 code lists that `src/lib/dto/rights.ts` exports (PROPOSED P-42).
 - `ReadinessReportDTO`: `generatedAt`, `recordings[]` (`recordingId`, `compositionId`, `title`, `oneStopReady`, `syncReady`, `issues`).
 - `DefaultOwnershipProposal`: `selfParties` per side; `writerShares`, `publishingShares`, `masterShares` (each null when that side already has rows or has no self party configured); `blockedReasons[]`.
 - `PitchEligibilityDTO`: `item` (`itemType`, `itemId`, `title`); `plannedNotContacted[]` (`contactId`, `displayName`, `roles`, `pitchId`, `pitchItemId`, `currentStatus`); `neverPitched[]` (`contactId`, `displayName`, `roles`). Both lists are ordered by role rank (§3.7).
@@ -1826,7 +1826,7 @@ Let `R` be a recording, `C` its composition, `SP` the workspace self party for s
 
 Warning only (never blocks): `MISSING_ISWC` when `C.iswc IS NULL`.
 
-**Implicit licensing contact (P-28).** When neither `PUBLISHING_NOT_CONTROLLED` nor `MASTER_NOT_CONTROLLED` applies, the workspace controls 100% of both sides, which is the legacy "can you just deal with me" case ([SRC-002]). The master self party `SM` is then the licensing contact, `NO_LICENSING_CONTACT` does not apply, and `RightsSummaryDTO.licensingContacts` lists `SM` with `implicit: true`. An explicit `licensing_contacts` row always takes precedence. In every other case an explicit contact is required.
+**Implicit licensing contact (P-28).** When `SM` is set and neither `PUBLISHING_NOT_CONTROLLED` nor `MASTER_NOT_CONTROLLED` applies, the workspace controls 100% of both sides, which is the legacy "can you just deal with me" case ([SRC-002]). The master self party `SM` is then the licensing contact, `NO_LICENSING_CONTACT` does not apply, and `RightsSummaryDTO.licensingContacts` lists `SM` with `implicit: true`. An explicit `licensing_contacts` row always takes precedence. In every other case an explicit contact is required.
 
 **Expected readiness for the rebuilt demo fixture (`melos-73v`).** Seed assumptions: the self parties are Jordan Taylor (writer), Silverline Songs (publishing) and Silverline Songs (master). Midnight Drive, Home Again and Paper Planes at 2AM have Jordan Taylor at 10000 as writer, Silverline Songs at 10000 WORLD publishing and Silverline Songs at 10000 master. Ocean Blue and Neon Static use FX `rightsExamples`, with Ocean Blue writers reseeded 50/50 (§5.6). No explicit licensing contacts and no attestations are seeded. If `melos-73v` seeds anything differently, it updates this table in the same change.
 
@@ -1834,7 +1834,7 @@ Warning only (never blocks): `MISSING_ISWC` when `C.iswc IS NULL`.
 |---|---|---|---|---|---|
 | Midnight Drive | 100 / 100 / 100 | none | true | true | true |
 | Ocean Blue | 100 / 85 / 100 | `PUBLISHING_TOTAL_INCOMPLETE`, `PUBLISHING_NOT_CONTROLLED`, `NO_LICENSING_CONTACT`; sync adds `MISSING_ISRC` | false | false | false |
-| Neon Static | 100 / 100 / 75 | `PUBLISHING_NOT_CONTROLLED`, `MASTER_TOTAL_INCOMPLETE`, `MASTER_NOT_CONTROLLED`, `NO_LICENSING_CONTACT` | false | false | false |
+| Neon Static | 100 / 100 / 75 | `MASTER_TOTAL_INCOMPLETE`, `PUBLISHING_NOT_CONTROLLED`, `MASTER_NOT_CONTROLLED`, `NO_LICENSING_CONTACT` | false | false | false |
 | Home Again | 100 / 100 / 100 | none (implicit licensing contact) | true | true | true |
 | Paper Planes at 2AM | 100 / 100 / 100 | none | true | true | true |
 
@@ -2307,6 +2307,7 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | P-39 | Default workspace follow-up interval of 7 days (`workspace_settings.follow_up_interval_days`) | §4.3, §6.4 |
 | P-40 | Import orphans: unedited orphaned relationship targets are deleted and entity targets soft-deleted; pitch cells are never removed; CSV missing-row orphans only for uploads marked as the full catalog; orphans only for target kinds whose columns the file maps | §7.6, IMP-004 |
 | P-41 | Cross-instance connect polls finished runs once per second; on `melos.run_pending` the chat shell reconnects after 2 s, at most 5 times | §7.9 |
+| P-42 | `ReadinessIssue.severity` keeps two values; sync-only codes are blocking and are told apart by the exported §6.5 code lists | §3.4, §6.5 |
 
 ### 10.2 UNVERIFIED
 

@@ -191,7 +191,7 @@ const READINESS_CODES = [
   [
     'blocking',
     'NO_LICENSING_CONTACT',
-    'SELECT rid FROM flags WHERE NOT explicit_contact AND (pub_not_controlled OR master_not_controlled)',
+    'SELECT rid FROM flags WHERE NOT explicit_contact AND (pub_not_controlled OR master_not_controlled OR NOT EXISTS (SELECT 1 FROM sm))',
   ],
   ['sync', 'MISSING_ISRC', 'SELECT rid FROM rec WHERE isrc IS NULL'],
   [
