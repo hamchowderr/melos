@@ -124,6 +124,23 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     expect(await db.all(sql`PRAGMA foreign_key_check`)).toEqual([]);
   });
 
+  it('runs core again when a lock refuses the transaction after core ran, keeping one audit row', async () => {
+    const db = await open(member);
+    const earlier = await db.select().from(auditLog);
+    const glass = song('Glass House');
+    // As a COMMIT refused by a lock; an extended code is a lock too.
+    const locked = Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY_SNAPSHOT' });
+    let runs = 0;
+    const retried = create(glass, () => {
+      runs += 1;
+      if (runs === 1) throw locked;
+      return success(glass.id);
+    });
+    expect(await write.runWorkspaceWrite(member, CREATE, retried)).toEqual(success(glass.id));
+    const audited = (await db.select().from(auditLog)).slice(earlier.length);
+    expect([runs, audited]).toMatchObject([2, [{ entityId: glass.id }]]);
+  });
+
   it('leaves neither the row nor its audit row when the write throws or refuses after inserting', async () => {
     const db = await open(member);
     const earlier = await db.select().from(auditLog);
