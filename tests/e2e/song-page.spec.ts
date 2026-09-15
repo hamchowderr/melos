@@ -37,6 +37,10 @@ test('melos-rpr.5: Midnight Drive opens from Catalog with its identifiers, artis
 
 test('melos-rpr.5: Ocean Blue shows Alex Ramirez as featured and no ISRC', async ({ page }) => {
   await openFromCatalog(page, 'Ocean Blue');
+  // Ocean Blue is the fixture song with lyrics: the page says they're on file but never shows them.
+  const composition = page.getByRole('region', { name: 'Composition' });
+  await expect(detail(composition, 'Lyrics')).toHaveText('On file');
+  await expect(page.locator('body')).not.toContainText('Salt on the window');
   const recording = page.getByRole('region', { name: 'Ocean Blue', exact: true });
   await expect(artists(recording)).toHaveText(['Jordan Taylor', 'feat. Alex Ramirez']);
   await expect(artists(recording).nth(1)).toHaveAttribute('data-role', 'featured');
