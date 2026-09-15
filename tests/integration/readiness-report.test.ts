@@ -52,7 +52,18 @@ describe('melos-rpr.7: RightsService reports readiness issues (RGT-005, DEMO-003
     ]);
     const limited = accepted(await issues(env.northstar, { onlyNotReady: false, limit: 2 }));
     expect(limited.recordings).toHaveLength(2);
-    // Every live recording of the second workspace by title: the deleted one is left out.
+    // limit applies after onlyNotReady: the first recording by title, Home Again, is ready.
+    const first = accepted(await issues(env.northstar, { onlyNotReady: true, limit: 1 }));
+    expect(first.recordings.map(({ recordingId }) => K(recordingId))).toEqual(['rec_NEON']);
+    for (const invalid of [-1, 0]) {
+      const all = accepted(await issues(env.northstar, { onlyNotReady: false, limit: invalid }));
+      expect(all.recordings, `limit ${invalid} takes the default`).toHaveLength(5);
+    }
+    // A recording id leaves out the other recordings of its song.
+    const r1 = accepted(await issues(env.other, { recordingId: ID.R1, onlyNotReady: false }));
+    expect(r1.recordings.map(({ recordingId }) => recordingId)).toEqual([ID.R1]);
+    // Every live recording of the second workspace by title, without GONE (deleted) and RX (its
+    // composition is deleted).
     const other = accepted(await issues(env.other, { onlyNotReady: false }));
     const live = other.recordings.map(({ recordingId, compositionId }) => [
       recordingId,

@@ -242,8 +242,9 @@ export async function getRightsSummary(
 
 /**
  * ReadinessReportDTO (§3.4) for one live recording, the live recordings of a composition, or every
- * live recording, by title. `onlyNotReady` keeps recordings that are not sync ready, which include
- * every recording that is not one-stop ready; `limit` applies after it. One batch.
+ * live recording, by title; a recording of a deleted composition is left out, as in listSongs.
+ * `onlyNotReady` keeps recordings that are not sync ready, which include every recording that is not
+ * one-stop ready; `limit`, an integer from 1 to 200 (otherwise 50), applies after it. One batch.
  */
 export async function getReadinessIssues(
   tenant: TenantContext,
@@ -255,7 +256,10 @@ export async function getReadinessIssues(
   } = {},
 ): Promise<ServiceResult<ReadinessReportDTO>> {
   if (!canRead(tenant)) return failure('FORBIDDEN');
-  const { recordingId, compositionId, onlyNotReady = true, limit = 50 } = query;
+  const { recordingId, compositionId, onlyNotReady = true, limit: asked } = query;
+  // The /rights page calls this directly, so a missing or invalid limit takes the default.
+  const valid = asked !== undefined && Number.isInteger(asked) && asked >= 1;
+  const limit = valid ? Math.min(asked, 200) : 50;
   const focus: CatalogFocus | null = recordingId
     ? { entityType: 'recording', entityId: recordingId }
     : compositionId
@@ -264,7 +268,8 @@ export async function getReadinessIssues(
   const scope = (db: WorkspaceDatabase): Scope => (focus ? scopeOf(db, focus, false) : {});
   const loaded = await loadRightsFacts(tenant.workspaceId, scope);
   if (focus && missing(focus, loaded)) return failure('NOT_FOUND');
-  const report = loaded.recordings.map(({ take, facts }) => {
+  const live = loaded.recordings.filter(({ orphaned }) => !orphaned);
+  const report = live.map(({ take, facts }) => {
     const { oneStopReady, syncReady, issues } = evaluateRecordingReadiness(facts);
     const ids = { recordingId: take.id, compositionId: facts.composition?.id ?? null };
     return { ...ids, title: take.title, oneStopReady, syncReady, issues };
