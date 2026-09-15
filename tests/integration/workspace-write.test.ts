@@ -60,6 +60,16 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     expect(services.getWorkspaceDatabase.mock.calls).toEqual([[member.workspaceId]]);
   });
 
+  it('runs with foreign keys off inside core, on another connection meanwhile and outside (§4.4, DAT-INT-001)', async () => {
+    const db = await open(member);
+    const pragma = sql`PRAGMA foreign_keys`;
+    const read: WorkspaceWrite<unknown[]> = async (tx) =>
+      success([await tx.all(pragma), await db.all(pragma)]);
+    const off = [{ foreign_keys: 0 }];
+    expect(await write.runWorkspaceWrite(member, CREATE, read)).toEqual(success([off, off]));
+    expect(await db.all(pragma)).toEqual(off);
+  });
+
   it('commits each write with one audit_log row: actor, request id, action, entity, canonical before and after', async () => {
     const db = await open(member);
     const earlier = await db.select().from(auditLog);
