@@ -2074,6 +2074,8 @@ interface AssetStorage {
 
 Production startup fails when either variable selects `sandbox` or `local` (owner decision 2026-09-12).
 
+`LocalAssetStorage` keeps objects under `<MELOS_WORKSPACE_DATA_DIR>/assets` (`.data/assets` by default). Its URLs carry an HMAC-SHA256 signature over the method, storage key, content type and `expires` (epoch seconds), with expiries from 1 second to 7 days as on R2; the signing key is derived from `BETTER_AUTH_SECRET` with the label `melos local asset url` (P-44). The route `/api/assets/local/<key>` (GET, PUT) also requires the session's active workspace, a key under its prefix, and `catalog:read` to download or `catalog:update` to upload (D-5). With `MELOS_ASSET_STORAGE` unset, storage is `local` off Vercel and `r2` on Vercel. Storage is built on the first asset call, which throws `AssetStorageUnavailableError` while `r2` is selected, until `R2AssetStorage` exists (melos-rpr.12). Startup refuses `local` on every Vercel deploy, preview included.
+
 **Auth email and sign-up.** Better Auth's verification and invitation emails go through `sendAuthEmail` (`src/server/auth/mailer.ts`), selected by `MELOS_AUTH_MAILER`: `outbox` (development default, `.data/auth-outbox/`), `memory` (tests) or `disabled`, which sends and writes nothing. Until phase 8 wires Resend, production startup accepts only `disabled` (owner decision 2026-09-12): sign-up sends no verification email, and a `hooks.before` handler refuses `/organization/invite-member` with 403 `INVITATIONS_UNAVAILABLE` before Better Auth writes or extends an invitation. `MELOS_SIGNUP_ALLOWED_EMAILS` lists the addresses that may sign up, comma-separated and compared case-insensitively; `databaseHooks.user.create.before`, which every Better Auth user-creation path runs, refuses any other address with 422 `SIGN_UP_NOT_ALLOWED`. Unset, anyone may sign up outside production and nobody may in production. Signing in never consults the list.
 
 ### 7.6 Import pipeline (Airtable and CSV)
@@ -2318,6 +2320,7 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | P-41 | Cross-instance connect polls finished runs once per second; on `melos.run_pending` the chat shell reconnects after 2 s, at most 5 times | §7.9 |
 | P-42 | `ReadinessIssue.severity` keeps two values; sync-only codes are blocking and are told apart by the exported §6.5 code lists | §3.4, §6.5 |
 | P-43 | Canonical JSON as `canonicalJson` writes it: keys sorted by UTF-16 code unit at every depth, array order kept, no whitespace, `toJSON` applied, undefined left out of objects and written as null in arrays; NaN, Infinity, bigints, boxed primitives and cycles refused | §7.4, §7.6 |
+| P-44 | Local asset URLs: HMAC-SHA256 over method, storage key, content type and `expires`, with expiries from 1 s to 7 days; the signing key is HMAC-SHA256 of the label `melos local asset url` keyed with `BETTER_AUTH_SECRET`, so local storage needs no secret of its own | §7.5 |
 
 ### 10.2 UNVERIFIED
 

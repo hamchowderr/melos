@@ -274,6 +274,34 @@ describe('parseServerEnv', () => {
     ).toEqual(['owner@example.com']);
   });
 
+  it('selects local assets off Vercel and r2 on Vercel, where local is refused (D-7)', () => {
+    const local = parseServerEnv({ ...TEST_MODEL, MELOS_WORKSPACE_DATA_DIR: 'data/ws' });
+    expect(local.assetStorage).toEqual({ kind: 'local', rootDir: 'data/ws/assets' });
+    const r2 = parseServerEnv({ ...TEST_MODEL, MELOS_ASSET_STORAGE: 'r2' });
+    expect(r2.assetStorage).toEqual({ kind: 'r2' });
+    expect(problemsOf({ ...TEST_MODEL, MELOS_ASSET_STORAGE: 's3' }).problems).toEqual([
+      { name: 'MELOS_ASSET_STORAGE', reason: 'must be one of: local, r2' },
+    ]);
+    // Production starts with no asset variable; the storage call reports what is missing.
+    const production = {
+      BETTER_AUTH_SECRET: SECRET,
+      VERCEL: '1',
+      VERCEL_ENV: 'production',
+      MELOS_AUTH_MAILER: 'disabled',
+      MELOS_CONTROL_DATABASE_URL: 'libsql://control-example.turso.io',
+      MELOS_CONTROL_DATABASE_AUTH_TOKEN: 'control-token-for-test',
+      MELOS_AGENT_DATABASE_URL: 'libsql://agent-example.turso.io',
+      MELOS_AGENT_DATABASE_AUTH_TOKEN: 'agent-token-for-test',
+    };
+    expect(parseServerEnv(production).assetStorage).toEqual({ kind: 'r2' });
+    expect(problemsOf({ ...production, MELOS_ASSET_STORAGE: 'local' }).problems).toEqual([
+      {
+        name: 'MELOS_ASSET_STORAGE',
+        reason: 'must not be local on Vercel (local files are not allowed)',
+      },
+    ]);
+  });
+
   it('refuses local files, the local workspace host, the test model endpoint and a gateway key on Vercel', () => {
     const error = problemsOf({
       VERCEL: '1',
