@@ -7,6 +7,7 @@ import type { WorkspacePermissions } from '@/lib/auth/permissions';
 import { auth } from '@/server/auth/auth';
 import { getServerEnv } from '@/server/env';
 import { requirePermission } from '@/server/services/permissions';
+import { SettingsNav } from './settings-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,7 +52,8 @@ export default async function SettingsPage() {
   return (
     <main>
       <WorkspaceHeader workspaceName={workspace.workspaceName} current="settings" />
-      <div className="flex justify-center px-4 py-6">
+      <div className="flex flex-col items-center gap-4 px-4 py-6">
+        <SettingsNav current="members" />
         <MembersPanel
           members={list.members}
           invitations={pending}
