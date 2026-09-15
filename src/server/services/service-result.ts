@@ -7,7 +7,9 @@ export type RowCounts = Readonly<Record<string, number>>;
  * id names no live row in the active workspace database (§3.1); from IntegrityGuard, `counts` holds
  * the missing parents per table. REFERENCED: the rows per child table still referencing what a write
  * changes or deletes (§4.4 rules 1 and 2). SONG_LEVEL_CONFLICT: the written rows that would hold a
- * song at both levels in a pitch (rule 3). requirePermission's FORBIDDEN adds a fixed sentence for
+ * song at both levels in a pitch (rule 3). VALIDATION: an input rule with no code of its own
+ * (identifiers keep INVALID_*), refused before writing (§3.1, P-45); `field` names the input and
+ * `reason` is a stable snake_case code. requirePermission's FORBIDDEN adds a fixed sentence for
  * pages; services return the code alone, so every service refuses with the same value.
  */
 export type ServiceError =
