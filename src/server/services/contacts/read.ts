@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { PartyContactDTO, PartyKind, PartyListItem } from '../../../lib/dto/contacts';
 import {
@@ -74,15 +74,14 @@ export async function listParties(
       database
         .select({ partyId: contactMethods.partyId, value: contactMethods.value })
         .from(contactMethods)
-        .where(and(eq(contactMethods.methodType, 'email'), eq(contactMethods.isPrimary, 1)))
-        .orderBy(desc(contactMethods.createdAt), desc(contactMethods.id)),
+        // uq_contact_methods_primary allows one primary email per party (§4.3).
+        .where(and(eq(contactMethods.methodType, 'email'), eq(contactMethods.isPrimary, 1))),
       contactRows(database),
     ]);
   });
   // Only the database work is sanitized, so a bug in the mapping throws as itself.
   return reads.then(([rows, emails, contactRead]) => {
     const needle = query?.trim().toLowerCase() ?? '';
-    // Newest first, so the earliest primary email is the one the map keeps.
     const emailOf = new Map(emails.map(({ partyId, value }) => [partyId, value]));
     const contactOf = contactsByParty(contactRead);
     const named = rows.filter(({ displayName }) => displayName.toLowerCase().includes(needle));

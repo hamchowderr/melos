@@ -166,4 +166,52 @@ describe('melos-rpr.6: ContactService reads people and organizations (§2.3 /peo
       for (const spy of spies) spy.mockRestore();
     }
   });
+
+  it('drops a soft-deleted company from the contact, then a soft-deleted contact with its roles', async () => {
+    const { contacts: contactTable, parties } = tables;
+    const database = await connections.getWorkspaceDatabase(northstar.workspaceId);
+    const rebecca = async () => (await list(northstar, { query: 'Rebecca' }))[0];
+    const company = eq(parties.id, keys.pty_CARTER_SYNC);
+    const contact = eq(contactTable.id, keys.con_REBECCA);
+    await database.update(parties).set({ deletedAt: AT }).where(company);
+    try {
+      const noCompany = { organizationPartyId: null, organizationName: null };
+      expect((await rebecca()).contact).toEqual({ ...REBECCA.contact, ...noCompany });
+      await database.update(contactTable).set({ deletedAt: AT }).where(contact);
+      expect(await rebecca()).toEqual({ ...REBECCA, contact: null });
+    } finally {
+      await database.update(parties).set({ deletedAt: null }).where(company);
+      await database.update(contactTable).set({ deletedAt: null }).where(contact);
+    }
+    expect(await rebecca()).toEqual(REBECCA);
+  });
+
+  it('lists the primary email, not a newer email that is not primary', async () => {
+    const { contactMethods, parties } = tables;
+    const database = await connections.getWorkspaceDatabase(other.workspaceId);
+    const [partyId, createdAt, updatedAt] = [`pty_${ulid()}`, AT, AT];
+    const email = (value: string, isPrimary: number, at: string) => ({
+      ...{ id: ulid(), partyId, methodType: 'email', value, isPrimary },
+      ...{ createdAt: at, updatedAt: at },
+    });
+    const party = { id: partyId, partyKind: 'organization', displayName: 'Two Inboxes' };
+    // uq_contact_methods_primary allows one primary email per party (§4.3). The other email is
+    // written last and sorts last by value, so only the is_primary filter keeps it out.
+    await database.batch([
+      database.insert(parties).values({ ...party, createdAt, updatedAt }),
+      database
+        .insert(contactMethods)
+        .values([
+          email('a-primary@example.test', 1, '2026-09-13T17:00:00.000Z'),
+          email('z-other@example.test', 0, '2026-09-14T18:00:00.000Z'),
+        ]),
+    ]);
+    try {
+      const organizations = await list(other, { kind: 'organization' });
+      expect(organizations).toMatchObject([{ partyId, primaryEmail: 'a-primary@example.test' }]);
+    } finally {
+      await database.delete(contactMethods).where(eq(contactMethods.partyId, partyId));
+      await database.delete(parties).where(eq(parties.id, partyId));
+    }
+  });
 });
