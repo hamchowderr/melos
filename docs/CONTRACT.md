@@ -25,7 +25,7 @@ Document abbreviations used in alias columns:
 
 1. Owner decisions recorded in §1.2.
 2. This contract.
-3. The owner's downloaded copy of the GIZMO+ Airtable base (`appbeH0hdkwTdCfv6`) for legacy behavior and field intent.
+3. The owner's copy of the GIZMO+ Airtable base (`appbeH0hdkwTdCfv6`) for legacy behavior and field intent.
 4. TS for requirement IDs, tests, gates and the auth baseline.
 5. BP for product architecture and the domain model. SA §7 already ranks BP below TS wherever TS supersedes it.
 6. SA for external-source status, version cautions and gates A–F.
@@ -49,11 +49,11 @@ Document abbreviations used in alias columns:
 
 ### 1.2.1 Origin research used by this contract
 
-Supplied by the coordinator on 2026-09-12 and checked against the video transcripts and frames on 2026-09-14. Sources: the GIZMO creator's videos and archived GIZMO+ pages [SRC-002], and a GIZMO+ user's videos [SRC-003].
+Supplied by the coordinator on 2026-09-12 and checked against the video transcripts and frames on 2026-09-14. Sources: the GIZMO creator's videos and archived GIZMO+ pages [SRC-002], and a GIZMO user's videos [SRC-003].
 
-- "One Stop Ready" is a Yes/No field on legacy SONGS. The creator's report prints it in the sync licensing section under one licensing contact, including for songs where a co-writer, co-publisher or master co-owner holds a share [SRC-002]. A GIZMO+ user describes it as "do I own everything … can you just deal with me" [SRC-003]. In both, a licensee deals with a single contact who clears the master side and the publishing/sync side. §6.5 derives readiness from this.
+- "One Stop Ready" is a Yes/No field on legacy SONGS. The creator's report prints it in the sync licensing section under the song's licensing contacts, usually one, including for songs where a co-writer, co-publisher or master co-owner holds a share [SRC-002]. A GIZMO user describes it as "do I own everything … can you just deal with me" [SRC-003]. In both, a licensee usually deals with one contact who clears the master side and the publishing/sync side. §6.5 derives readiness from this.
 - The legacy report is plain text first. The creator pastes it into emails to a licensing agency, which asked for text instead of PDF, and into Disco: the Comments field in a track's metadata and a comment clients can see on a shared link [SRC-002]. Sections toggle on and off, and lyrics come last. §7.7 keeps text primary and PDF secondary.
-- The legacy pitch model is a song × client matrix. Licensing agents are the main client type; music supervisors, music libraries, ad briefs, labels, bloggers and radio are also targets. GIZMO+ sales copy tracks "who passed or would like more info". §6.4 keeps `requested_more`.
+- The legacy pitch model is a song × client matrix. Licensing agents are the main client type; music supervisors, music libraries, ad briefs, labels, bloggers and radio are also targets. GIZMO+ sales copy tracks "who passed or would like more info" [SRC-002]. §6.4 keeps `requested_more`.
 
 ### 1.3 Labels
 
@@ -1476,7 +1476,7 @@ Requirement IDs from TS are kept verbatim and never renumbered. Requirement text
 | RGT-002 | Unlimited publisher shares per composition. | Publishing junction | `publishing_interests` | `RightsService` | `updatePublishingShares` | `RightsPanel`, `RightsSplitEditor` | RGT-E2E-002 |
 | RGT-003 | Unlimited master owners per recording. | MasterOwner junction | `master_interests` | `RightsService` | `updateMasterShares` | `RightsPanel`, `RightsSplitEditor` | RGT-E2E-003 |
 | RGT-004 | Validate ownership totals. | Airtable Writers/Publishing/Master Total % rollups | `composition_writer_totals`, `composition_publishing_totals`, `recording_master_totals` | `RightsService` | `getRightsSummary` | `RightsPanel` | RGT-E2E-004 |
-| RGT-005 NEW | One-stop and sync readiness are derived by the rule in §6.5 and returned as deterministic issue codes; they are never stored. | GIZMO creator material [SRC-002]; GIZMO+ user material [SRC-003]; BP §6 | views, `workspace_self_parties`, interest attestation columns, `licensing_contacts`, `recording_links` | `RightsService` | `getReadinessIssues`, `getRightsSummary`, `attestRepresentation`, `updateLicensingContacts` | `ReadinessChecklist`, `RightsPanel` | RGT-E2E-005 |
+| RGT-005 NEW | One-stop and sync readiness are derived by the rule in §6.5 and returned as deterministic issue codes; they are never stored. | GIZMO creator material [SRC-002]; GIZMO user material [SRC-003]; BP §6 | views, `workspace_self_parties`, interest attestation columns, `licensing_contacts`, `recording_links` | `RightsService` | `getReadinessIssues`, `getRightsSummary`, `attestRepresentation`, `updateLicensingContacts` | `ReadinessChecklist`, `RightsPanel` | RGT-E2E-005 |
 | RGT-006 NEW | Agreements link to publishing interests, master interests, licensing contacts and representation attestations. | BP §3.3, App A.2, A.6 | `agreements` | `RightsService` | `updatePublishingShares`, `updateMasterShares`, `attestRepresentation` | `RightsPanel` | RGT-INT-006 |
 | RGT-007 NEW | Publishing totals validate to 10000 per territory set; a composition cannot mix a WORLD set with country sets. | BP §5 territory column; P-05 | `publishing_interests` | `RightsService` | `updatePublishingShares` | `RightsSplitEditor` | RGT-INT-007 |
 | RGT-008 NEW | Default-owner autofill: when the workspace's own party owns 100%, an explicit user action fills empty writer, publishing and master share sets for that party. The proposal is shown for review, is saved only through the normal share tools with validation, approval (agent path) and audit, and never overwrites existing rows. The agent calls `proposeDefaultOwnership` only when the user asks and never infers ownership silently. | Owner decision 2026-09-12 | `workspace_self_parties`, share tables, `audit_log` | `RightsService` | `proposeDefaultOwnership`, then `updateWriterShares`, `updatePublishingShares`, `updateMasterShares` | `RightsSplitEditor` ("Fill with my ownership"), `/settings/ownership` | RGT-E2E-008 |
@@ -1799,7 +1799,7 @@ Legacy mapping (IMP-009, P-03):
 
 **Conflict.** BP §6 says not to copy the legacy Yes/No and to derive readiness with an explicit representation attestation; FX stores `oneStopReady: true` for Home Again, which has no licensing contact; TS DEMO-004 treats a missing ISRC as a reason a song is not ready.
 
-**Decision.** Both flags are derived per recording and never stored (RGT-005). The rule follows the legacy field: a GIZMO+ user describes it as "do I own everything … can you just deal with me" ([SRC-003]), and the creator marks songs with co-owned shares as one-stop ready under a single licensing contact ([SRC-002]). It means the workspace's own party controls both the master side and the publishing/sync side and a licensee has one contact.
+**Decision.** Both flags are derived per recording and never stored (RGT-005). The rule follows the legacy field: a GIZMO user describes it as "do I own everything … can you just deal with me" ([SRC-003]), and the creator marks songs with co-owned shares as one-stop ready, usually under one licensing contact ([SRC-002]). It means the workspace's own party controls both the master side and the publishing/sync side and a licensee has one contact.
 
 Let `R` be a recording, `C` its composition, `SP` the workspace self party for side `publishing`, `SM` the self party for side `master` (`workspace_self_parties`).
 
@@ -2177,7 +2177,7 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | 7 | Sensitive writes: suspend and resume approvals, `ConfirmationCard`, audit. | WRITE-VS-001 passes (SA Gate D); SA Gate E failure cases pass (tool error, unauthorized mutation, malformed model call, interrupted approval, stale approval); AUD-002 and AUD-003 pass; TEN-011 passes on a preview deploy (U-25); TST-AI-006 is a required CI check. |
 | 8 | Contact UI; pitches (song × contact cells); outreach with `SandboxEmailTransport`, `ResendEmailTransport` and `updateMessageDraft`; report engine with text-first output and multi-song reports. | CRM-001 to CRM-006, OUT-001 to OUT-005, RPT-001 to RPT-003 and RPT-005 pass; DAT-001 passes for pitch, outreach and report writes. |
 | 9 | Disco-ready block. | U-20 closed first; then RPT-004 passes. |
-| 10 | Import pipeline: Airtable and CSV readers, dry-run, validation report, apply, re-import (§7.6). | IMP-001 to IMP-013, IMP-E2E-001 and DAT-001 for import writes pass against recorded fixtures; one dry-run, apply and re-apply against the live GIZMO+ base yields zero duplicates, using an access token the owner provides; U-10, U-16 and U-17 closed. |
+| 10 | Import pipeline: Airtable and CSV readers, dry-run, validation report, apply, re-import (§7.6). | IMP-001 to IMP-013, IMP-E2E-001 and DAT-001 for import writes pass against recorded fixtures; one dry-run, apply and re-apply against the owner's GIZMO+ base yields zero duplicates, using an access token the owner provides; U-10, U-16 and U-17 closed. |
 | 11 | **MVP exit gate.** | TS §25 final traceability gate as one traced vertical slice: Better Auth workspace resolution, Turso isolation and provisioning, canonical catalog/rights queries, Mastra tool invocation, CopilotKit rendering, AIMock/AGUIMock regression, one approved write. DEMO-001 to DEMO-010 pass as Playwright E2E with AIMock on a Vercel preview deploy backed by Turso Cloud and R2. One live Resend send to an owner-controlled address passes (U-28). SA Gate F real-model eval (TST-AI-005) runs at least once. CI is green and the preview is live; production promotion is a separate human step. |
 | 12 | Post-MVP: production reply ingestion (U-29), CopilotKit Channels, A2UI surfaces (BP §16 phases 9–10), production hardening. | External integration tests and a threat review pass. |
 
@@ -2187,9 +2187,9 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 
 | Ref | Source | URL or location | BP S# | TS S# | SA | Checked 2026-09-12 |
 |---|---|---|---|---|---|---|
-| SRC-001 | The owner's downloaded copy of the GIZMO+ Airtable base (GIZMO is no longer maintained) | `appbeH0hdkwTdCfv6` | — | — | §2 | no |
+| SRC-001 | The owner's copy of the GIZMO+ Airtable base (GIZMO is no longer maintained) | `appbeH0hdkwTdCfv6` | — | — | §2 | no |
 | SRC-002 | GIZMO creator material (Zion Brock) and archived GIZMO+ pages (origin research supplied by the coordinator) | YouTube `KuLKK8H0_Q4` ("How I Upload Metadata in Disco", 2021-06-11) and `IAOHw4k0BOI` ("Quickly Send Song Lyrics and Metadata On Request", 2021-07-27); archived GIZMO+ pages | — | — | — | videos checked 2026-09-14 (transcripts and frames); pages coordinator-checked |
-| SRC-003 | GIZMO+ user material (Mark Rushton, not the creator) | YouTube `O4byGh9mOc4` ("Using Airtable and Gizmo for Song Data Management", 2021-11-25) and `tFU2wFozD7w` ("Signed Up for DISCO.AC Lite and Airtable PRO", 2021-12-19) | — | — | — | transcripts checked 2026-09-14 |
+| SRC-003 | GIZMO user material (Mark Rushton, not the creator; he later bought GIZMO+) | YouTube `O4byGh9mOc4` ("Using Airtable and Gizmo for Song Data Management", 2021-11-25) and `tFU2wFozD7w` ("Signed Up for DISCO.AC Lite and Airtable PRO", 2021-12-19) | — | — | — | transcripts checked 2026-09-14 |
 | SRC-010 | Turso Platform API introduction | https://docs.turso.tech/api-reference/introduction | S1 | — | listed | no |
 | SRC-011 | Turso database per tenant | https://turso.tech/multi-tenancy | S2 | — | — | no |
 | SRC-012 | Turso multi-tenancy at scale | https://turso.tech/blog/multi-tenancy-at-scale | — | S12 | — | no |
