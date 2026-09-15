@@ -44,7 +44,7 @@ export type AuditWriter = { write(entry: AuditEntry): Promise<void> };
 
 /**
  * Canonical JSON (§7.4), the text phase 7 hashes: object keys sorted by UTF-16 code unit at every
- * depth, array order kept, no whitespace. PROPOSED, as §7.4 does not say how values serialize: a
+ * depth, array order kept, no whitespace. Value serialization is PROPOSED default P-43 (§7.4): a
  * `toJSON` method is applied first (a Date becomes its ISO string); strings, finite numbers, booleans
  * and null are written as JSON.stringify writes them; an undefined, function or symbol is left out
  * of an object and written as null in an array; any other object is written from its own enumerable
