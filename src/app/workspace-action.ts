@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { notReadyStatus } from '@/app/workspace-status';
 import {
   type TenantContext,
   tenantContextResolver,
@@ -20,16 +21,8 @@ export type WorkspaceAction =
  */
 export async function resolveWorkspaceAction(): Promise<WorkspaceAction> {
   const resolved = await tenantContextResolver.resolve(await headers());
-  switch (resolved.status) {
-    case 'ok':
-      return { status: 'ready', tenant: resolved.context };
-    case 'unauthenticated':
-      return { status: 'unauthenticated' };
-    case 'workspace-unavailable':
-      return { status: 'not-ready', workspaceStatus: resolved.workspaceStatus };
-    case 'workspace-not-provisioned':
-      return { status: 'not-ready', workspaceStatus: 'failed' };
-    default:
-      return { status: 'no-workspace' };
-  }
+  if (resolved.status === 'ok') return { status: 'ready', tenant: resolved.context };
+  if (resolved.status === 'unauthenticated') return { status: 'unauthenticated' };
+  const workspaceStatus = notReadyStatus(resolved);
+  return workspaceStatus ? { status: 'not-ready', workspaceStatus } : { status: 'no-workspace' };
 }

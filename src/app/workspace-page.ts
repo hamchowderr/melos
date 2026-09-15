@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
+import { notReadyStatus } from '@/app/workspace-status';
 import { auth } from '@/server/auth/auth';
 import {
   type TenantContext,
@@ -21,12 +22,8 @@ export const resolveWorkspacePage = cache(async (): Promise<WorkspacePage> => {
   const requestHeaders = await headers();
   const tenant = await tenantContextResolver.resolve(requestHeaders);
   if (tenant.status === 'unauthenticated') redirect('/sign-in');
-  if (tenant.status === 'workspace-unavailable') {
-    return { status: 'not-ready', workspaceStatus: tenant.workspaceStatus };
-  }
-  if (tenant.status === 'workspace-not-provisioned') {
-    return { status: 'not-ready', workspaceStatus: 'failed' };
-  }
+  const workspaceStatus = notReadyStatus(tenant);
+  if (workspaceStatus) return { status: 'not-ready', workspaceStatus };
   if (tenant.status !== 'ok') redirect('/workspaces');
 
   // Read server-side for the session's active organization; Better Auth checks membership.
