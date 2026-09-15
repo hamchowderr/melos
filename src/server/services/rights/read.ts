@@ -1,4 +1,16 @@
-import { and, asc, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  type SQL,
+  type SQLWrapper,
+  sql,
+} from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import type { CatalogFocus } from '../../../lib/dto/catalog';
 import type { ReadinessReportDTO, RightsSummaryDTO } from '../../../lib/dto/rights';
 import {
@@ -19,6 +31,8 @@ import { evaluateRecordingReadiness } from './readiness';
 
 /** Conditions on `compositions` and `recordings` for the rows a read covers; none covers all. */
 type Scope = { composition?: SQL; recording?: SQL };
+/** Subqueries for the ids of a scope's live compositions and live recordings. */
+export type ScopeIds = { songIds: SQLWrapper; takeIds: SQLWrapper };
 
 /** rights:read for the role resolved for this request (§6.2); a comma role fails closed (P-30). */
 const canRead = (tenant: TenantContext) => requirePermission(tenant, { rights: ['read'] }).ok;
@@ -27,7 +41,11 @@ const canRead = (tenant: TenantContext) => requirePermission(tenant, { rights: [
  * A composition and its recordings; a recording id covers its composition and, for a `song`, all its
  * recordings, otherwise only itself.
  */
-function scopeOf(database: WorkspaceDatabase, { entityType, entityId }: CatalogFocus, song = true) {
+export function scopeOf(
+  database: WorkspaceDatabase,
+  { entityType, entityId }: CatalogFocus,
+  song = true,
+) {
   if (entityType === 'composition') {
     const recording = eq(recordings.compositionId, entityId);
     return { composition: eq(compositions.id, entityId), recording };
@@ -56,8 +74,13 @@ const holderOf = (interest: typeof publishingInterests | typeof masterInterests,
  * per territory and masters per recording with holders and attestation, totals from the §4.3 views,
  * self parties, explicit licensing contacts and primary links. Builds the §6.5 facts per recording,
  * with one publishing entry per territory; a recording whose composition is not live gets none.
+ * `alongside` adds the caller's statements to the same batch; their rows come back as `extra`.
  */
-async function loadRightsFacts(workspaceId: string, scopeFor: (db: WorkspaceDatabase) => Scope) {
+export async function loadRightsFacts<const E extends readonly BatchItem<'sqlite'>[]>(
+  workspaceId: string,
+  scopeFor: (db: WorkspaceDatabase) => Scope,
+  alongside: (db: WorkspaceDatabase, ids: ScopeIds) => E,
+) {
   const rows = await sanitized(workspaceId, async () => {
     const database = await getWorkspaceDatabase(workspaceId);
     const scope = scopeFor(database);
@@ -151,10 +174,11 @@ async function loadRightsFacts(workspaceId: string, scopeFor: (db: WorkspaceData
           ),
         )
         .orderBy(asc(parties.id)),
+      ...alongside(database, { songIds, takeIds }),
     ]);
   });
   // Only the database work is sanitized, so a bug in the mapping throws as itself.
-  const [songs, takes, writers, publishing, masters, selves, contacts] = rows;
+  const [songs, takes, writers, publishing, masters, selves, contacts, ...extra] = rows;
   const selfOf = (side: string) => selves.find((party) => party.side === side) ?? null;
   const selfParties = { publishing: selfOf('publishing'), master: selfOf('master') };
   const writersOf = Map.groupBy(writers, (row) => row.compositionId);
@@ -189,11 +213,11 @@ async function loadRightsFacts(workspaceId: string, scopeFor: (db: WorkspaceData
     const master = { recordingId: take.id, totalBp: take.masterTotalBp, holders };
     return { take, facts, master, orphaned: take.compositionId !== null && !composition };
   });
-  return { compositions: rights, recordings: recordingRights, contacts };
+  return { compositions: rights, recordings: recordingRights, contacts, extra };
 }
 
 /** No live row for the id in the tenant's own database, or a recording of a deleted composition. */
-function missing(
+export function missing(
   { entityType, entityId }: CatalogFocus,
   loaded: Awaited<ReturnType<typeof loadRightsFacts>>,
 ) {
@@ -204,16 +228,27 @@ function missing(
 
 /**
  * RightsSummaryDTO (§3.4) for the song a composition or recording id names; a recording resolves to
- * its composition, and one without a composition has no writer or publishing side. Licensing
- * contacts are the union by party of each live recording's own contacts (§3.4). One batch.
+ * its composition, and one without a composition has no writer or publishing side. One batch.
  */
 export async function getRightsSummary(
   tenant: TenantContext,
   focus: CatalogFocus,
 ): Promise<ServiceResult<RightsSummaryDTO>> {
   if (!canRead(tenant)) return failure('FORBIDDEN');
-  const loaded = await loadRightsFacts(tenant.workspaceId, (db) => scopeOf(db, focus));
+  const loaded = await loadRightsFacts(
+    tenant.workspaceId,
+    (db) => scopeOf(db, focus),
+    () => [],
+  );
   if (missing(focus, loaded)) return failure('NOT_FOUND');
+  return success(summarizeRights(loaded).summary);
+}
+
+/**
+ * A song's RightsSummaryDTO from its loaded facts, with each loaded recording's readiness in load
+ * order. Licensing contacts are the union by party of each live recording's own contacts (§3.4).
+ */
+export function summarizeRights(loaded: Awaited<ReturnType<typeof loadRightsFacts>>) {
   const [song] = loaded.compositions.values();
   const results = loaded.recordings.map(({ facts }) => evaluateRecordingReadiness(facts));
   // With no live recording, the rows that target the composition; a party explicit anywhere stays so.
@@ -229,7 +264,7 @@ export async function getRightsSummary(
     if (!contact.implicit || !byParty.has(contact.partyId)) byParty.set(contact.partyId, contact);
   }
   const licensingContacts = [...byParty.values()].sort((a, b) => (a.partyId < b.partyId ? -1 : 1));
-  return success({
+  const summary: RightsSummaryDTO = {
     compositionId: song?.id ?? null,
     writers: song?.writers ?? [],
     writerTotalBp: song?.writerTotalBp ?? 0,
@@ -237,7 +272,8 @@ export async function getRightsSummary(
     masters: loaded.recordings.map(({ master }) => master),
     licensingContacts,
     issues: results.flatMap(({ issues }) => issues),
-  });
+  };
+  return { summary, results };
 }
 
 /**
@@ -266,7 +302,7 @@ export async function getReadinessIssues(
       ? { entityType: 'composition', entityId: compositionId }
       : null;
   const scope = (db: WorkspaceDatabase): Scope => (focus ? scopeOf(db, focus, false) : {});
-  const loaded = await loadRightsFacts(tenant.workspaceId, scope);
+  const loaded = await loadRightsFacts(tenant.workspaceId, scope, () => []);
   if (focus && missing(focus, loaded)) return failure('NOT_FOUND');
   const live = loaded.recordings.filter(({ orphaned }) => !orphaned);
   const report = live.map(({ take, facts }) => {
