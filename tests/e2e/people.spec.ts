@@ -2,9 +2,10 @@ import { expect, test } from '@playwright/test';
 import { AUTH_REDIRECT, signInAsJordan } from './support';
 
 const THEO_GRANT = /\/people\/pty_01KZ45YEP05X66A2C5QX8249JJ$/;
+const REBECCA_CARTER = /\/people\/pty_01KZ45Y6W0QJ76S7EXD971BEYF$/;
 
 // A read spec on the seeded Northstar parties (D-9): 7 people and 7 organizations.
-test('melos-rpr.6: Jordan opens People: both tabs, then Theo Grant, a music supervisor', async ({
+test('melos-rpr.6, melos-rpr.45: Jordan opens People: both tabs, Theo Grant, then Rebecca Carter', async ({
   page,
 }) => {
   await signInAsJordan(page);
@@ -27,6 +28,17 @@ test('melos-rpr.6: Jordan opens People: both tabs, then Theo Grant, a music supe
     }).toPass(AUTH_REDIRECT);
   await openTab('Organizations', 'Blue Lantern Studios');
   await expect(rows).toHaveCount(7);
+  await expect(table.getByRole('columnheader')).toHaveText([
+    ...['Name', 'Type', 'People', 'Primary email'],
+  ]);
+  const organization = (name: string) => rows.filter({ hasText: name });
+  // No demo organization has an email.
+  await expect(organization('Carter Sync Agency').getByRole('cell')).toHaveText([
+    ...['Carter Sync Agency', 'Sync agency', 'Rebecca Carter', ''],
+  ]);
+  await expect(organization('Blue Lantern Studios').getByRole('cell')).toHaveText([
+    ...['Blue Lantern Studios', 'Other', 'Theo Grant', ''],
+  ]);
   await openTab('People', 'Alex Ramirez');
   await expect(table.getByRole('columnheader')).toHaveText([
     ...['Name', 'Primary email', 'Company', 'Contact roles'],
@@ -49,4 +61,12 @@ test('melos-rpr.6: Jordan opens People: both tabs, then Theo Grant, a music supe
 
   const missing = await page.goto('/people/pty_UNKNOWN', AUTH_REDIRECT);
   expect(missing?.status()).toBe(404);
+
+  // A person's name in the Organizations tab opens their page.
+  await page.goto('/people', AUTH_REDIRECT);
+  await openTab('Organizations', 'Blue Lantern Studios');
+  const carter = organization('Carter Sync Agency');
+  await carter.getByRole('link', { name: 'Rebecca Carter' }).click();
+  await expect(page).toHaveURL(REBECCA_CARTER, AUTH_REDIRECT);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Rebecca Carter');
 });
