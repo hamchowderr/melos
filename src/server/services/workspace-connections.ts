@@ -1,5 +1,5 @@
 import type { Client } from '@libsql/client';
-import { and, eq } from 'drizzle-orm';
+import { and, DrizzleQueryError, eq } from 'drizzle-orm';
 import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
 import { controlDb } from '../db/client';
 import { workspaceRegistry } from '../db/schema/control';
@@ -29,14 +29,25 @@ export class WorkspaceConnectionError extends Error {
 const connections = new Map<string, Promise<WorkspaceDatabase>>();
 
 /**
- * Runs `work` and replaces any error with a WorkspaceConnectionError holding its name and code:
- * control-plane and libSQL messages may name a URL, a file path or a token.
+ * A database error anywhere in the cause chain: a drizzle query error, whose message holds the SQL
+ * and its values even when libSQL refused a value without a code, or an error with a code.
+ */
+const fromDatabase = (error: unknown): boolean =>
+  error instanceof Error &&
+  (error instanceof DrizzleQueryError ||
+    typeof Reflect.get(error, 'code') === 'string' ||
+    fromDatabase(error.cause));
+
+/**
+ * Runs `work` and replaces a database or registry error with a WorkspaceConnectionError holding
+ * its name and code, never its message, which may hold SQL, values, a URL or a token (§7.2). Any
+ * other error, such as a TypeError thrown outside a query, throws unchanged.
  */
 export async function sanitized<T>(workspaceId: string, work: () => Promise<T>): Promise<T> {
   try {
     return await work();
   } catch (error) {
-    if (error instanceof WorkspaceConnectionError) throw error;
+    if (error instanceof WorkspaceConnectionError || !fromDatabase(error)) throw error;
     throw new WorkspaceConnectionError(workspaceId, errorCode(error));
   }
 }
@@ -49,8 +60,13 @@ function open(workspaceId: string): Promise<WorkspaceDatabase> {
       .from(workspaceRegistry)
       .where(and(eq(id, workspaceId), eq(status, 'active')));
     if (!row) throw new WorkspaceConnectionError(workspaceId, 'WorkspaceNotActive');
-    const client = openWorkspaceDatabase(getServerEnv().workspaceHost, row);
-    return drizzle(client, { schema: WORKSPACE_TABLES });
+    try {
+      const client = openWorkspaceDatabase(getServerEnv().workspaceHost, row);
+      return drizzle(client, { schema: WORKSPACE_TABLES });
+    } catch (error) {
+      // A host, token or environment error leaves the database unopened too (§7.2).
+      throw new WorkspaceConnectionError(workspaceId, errorCode(error));
+    }
   });
 }
 
