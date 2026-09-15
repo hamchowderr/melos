@@ -23,7 +23,7 @@ const WRITE: WorkspacePermissions = { rights: ['update'] };
 const refuse = (field: string, reason: string) => failure({ code: 'VALIDATION', field, reason });
 
 /** A real calendar date written `YYYY-MM-DD` (§1.4). */
-function isCalendarDate(value: string) {
+export function isCalendarDate(value: string) {
   const date = new Date(`${value}T00:00:00.000Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(date.getTime())) return false;
   return date.toISOString().startsWith(value);
