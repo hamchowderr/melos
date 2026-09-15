@@ -19,7 +19,10 @@ const fixture = JSON.parse(readFileSync('docs/fixtures/northstar-demo.json', 'ut
 const { keys } = fixture as { keys: Record<string, string> };
 /** The second workspace's only party, Sam Rivera: a primary email and an older one that is not. */
 const [SAM, EMAIL, OLD_EMAIL] = [`pty_${ulid()}`, ulid(), ulid()];
+/** Sam's artist alias, the IPI that belongs to it and a society affiliation. */
+const [ALIAS, IPI, BMI] = [ulid(), ulid(), ulid()];
 const FORBIDDEN = { ok: false, error: { code: 'FORBIDDEN' } };
+const NOT_FOUND = { ok: false, error: { code: 'NOT_FOUND' } };
 const getWorkspaceDatabase = vi.fn<Connections['getWorkspaceDatabase']>();
 let control: Awaited<ReturnType<typeof openWithoutForeignKeys>>;
 let connections: Connections;
@@ -79,6 +82,16 @@ beforeAll(async () => {
       .values({ id: SAM, partyKind: 'person', displayName: 'Sam Rivera', createdAt, updatedAt }),
     database.insert(tables.people).values({ partyId, legalName: 'Samuel Rivera' }),
     database
+      .insert(tables.artistAliases)
+      .values({ id: ALIAS, partyId, aliasName: 'DJ Sam', createdAt }),
+    database.insert(tables.partyIdentifiers).values({
+      ...{ id: IPI, partyId, artistAliasId: ALIAS, createdAt },
+      ...{ identifierType: 'IPI', identifierValue: '00012345678' },
+    }),
+    database
+      .insert(tables.partySocietyAffiliations)
+      .values({ id: BMI, partyId, societyCode: 'BMI', role: 'writer', createdAt }),
+    database
       .insert(tables.contactMethods)
       .values([
         email(OLD_EMAIL, 'sam.old@example.test', 0, '2026-09-01T17:00:00.000Z'),
@@ -120,7 +133,50 @@ describe('melos-rpr.6: ContactService reads people and organizations (§2.3 /peo
     ]);
   });
 
-  it('leaves a soft-deleted party out of the list', async () => {
+  it('reads Rebecca Carter as a person and Carter Sync Agency as an organization', async () => {
+    const { primaryEmail, ...rebecca } = REBECCA;
+    const method = (key: string, methodType: string, value: string) => ({
+      ...{ id: keys[`contact_methods:${key}`], methodType, label: 'work', value, isPrimary: true },
+    });
+    expect(accepted(await contacts.getParty(northstar, keys.pty_REBECCA))).toEqual({
+      ...{ ...rebecca, notes: 'Sync licensing agent (FX ICP-03)', organization: null },
+      person: { legalName: 'Rebecca Carter', givenName: 'Rebecca', familyName: 'Carter' },
+      methods: [
+        method('REBECCA_EMAIL', 'email', primaryEmail),
+        method('REBECCA_PHONE', 'phone', '+1 310-555-0127'),
+      ],
+      ...{ aliases: [], identifiers: [], societyAffiliations: [] },
+    });
+    const fields = { legalName: 'Carter Sync Agency', organizationType: 'sync_agency' };
+    const agency = accepted(await contacts.getParty(northstar, keys.pty_CARTER_SYNC));
+    expect(agency).toMatchObject({ person: null, organization: fields, contact: null });
+  });
+
+  it('reads an alias, an identifier with its alias, a society and primary methods first', async () => {
+    const email = { methodType: 'email', label: null };
+    expect(accepted(await contacts.getParty(other, SAM))).toEqual({
+      ...{ partyId: SAM, partyKind: 'person', displayName: 'Sam Rivera', notes: null },
+      person: { legalName: 'Samuel Rivera', givenName: null, familyName: null },
+      organization: null,
+      methods: [
+        { ...email, id: EMAIL, value: 'sam@example.test', isPrimary: true },
+        { ...email, id: OLD_EMAIL, value: 'sam.old@example.test', isPrimary: false },
+      ],
+      aliases: [{ id: ALIAS, aliasName: 'DJ Sam', aliasType: 'stage_name', isPrimary: false }],
+      identifiers: [
+        {
+          ...{ id: IPI, identifierType: 'IPI', identifierValue: '00012345678', issuingBody: null },
+          ...{ isPrimary: false, artistAliasId: ALIAS, aliasName: 'DJ Sam' },
+        },
+      ],
+      societyAffiliations: [
+        { id: BMI, societyCode: 'BMI', role: 'writer', startsOn: null, endsOn: null },
+      ],
+      contact: null,
+    });
+  });
+
+  it('leaves a soft-deleted party out of the list and answers NOT_FOUND for it', async () => {
     const { parties } = tables;
     const database = await connections.getWorkspaceDatabase(northstar.workspaceId);
     const setDeletedAt = (deletedAt: string | null) =>
@@ -130,28 +186,35 @@ describe('melos-rpr.6: ContactService reads people and organizations (§2.3 /peo
       const people = await list(northstar, { kind: 'person' });
       expect(people.map(({ partyId }) => partyId)).not.toContain(keys.pty_SOPHIA);
       expect(people).toHaveLength(6);
+      expect(await contacts.getParty(northstar, keys.pty_SOPHIA)).toEqual(NOT_FOUND);
     } finally {
       await setDeletedAt(null);
     }
     expect(await list(northstar)).toHaveLength(14);
   });
 
-  it('lists only the tenant workspace parties, each with its primary email (TEN-001)', async () => {
+  it('keeps each workspace to its own parties; an id from the other one is NOT_FOUND (TEN-001)', async () => {
     const sam = { partyId: SAM, partyKind: 'person', displayName: 'Sam Rivera', contact: null };
     expect(await list(other)).toEqual([{ ...sam, primaryEmail: 'sam@example.test' }]);
     expect((await list(northstar)).map(({ partyId }) => partyId)).not.toContain(SAM);
+    expect(await contacts.getParty(northstar, SAM)).toEqual(NOT_FOUND);
+    expect(await contacts.getParty(other, keys.pty_REBECCA)).toEqual(NOT_FOUND);
   });
 
   it('lets viewer, member and owner read and refuses owner,viewer with FORBIDDEN before opening the database (§6.2, P-30)', async () => {
     getWorkspaceDatabase.mockClear();
+    const theo = { roles: ['music_supervisor'], organizationName: 'Blue Lantern Studios' };
     for (const role of ['viewer', 'member', 'owner']) {
       expect(await list(withRole(northstar, role))).toHaveLength(14);
+      const party = accepted(await contacts.getParty(withRole(northstar, role), keys.pty_THEO));
+      expect(party.contact).toMatchObject(theo);
     }
     // Probe: each read asks for the database through the recorded function.
-    expect(getWorkspaceDatabase).toHaveBeenCalledTimes(3);
+    expect(getWorkspaceDatabase).toHaveBeenCalledTimes(6);
     getWorkspaceDatabase.mockClear();
     const refused = withRole(northstar, 'owner,viewer');
     expect(await contacts.listParties(refused)).toEqual(FORBIDDEN);
+    expect(await contacts.getParty(refused, keys.pty_REBECCA)).toEqual(FORBIDDEN);
     expect(getWorkspaceDatabase).not.toHaveBeenCalled();
   });
 
@@ -161,7 +224,8 @@ describe('melos-rpr.6: ContactService reads people and organizations (§2.3 /peo
     const spies = methods.map((method) => vi.spyOn($client, method));
     try {
       await contacts.listParties(northstar, { kind: 'organization', query: 'north' });
-      expect(spies.map((spy) => spy.mock.calls.length)).toEqual([1, 0, 0]);
+      await contacts.getParty(northstar, keys.pty_REBECCA);
+      expect(spies.map((spy) => spy.mock.calls.length)).toEqual([2, 0, 0]);
     } finally {
       for (const spy of spies) spy.mockRestore();
     }

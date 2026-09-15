@@ -21,3 +21,52 @@ export type PartyListItem = {
   primaryEmail: string | null;
   contact: PartyContactDTO | null;
 };
+
+export type ContactMethodDTO = {
+  id: string;
+  methodType: string;
+  label: string | null;
+  value: string;
+  isPrimary: boolean;
+};
+
+export type ArtistAliasDTO = {
+  id: string;
+  aliasName: string;
+  aliasType: string;
+  isPrimary: boolean;
+};
+
+/** `aliasName` names the artist alias the identifier belongs to, when it belongs to one. */
+export type PartyIdentifierDTO = {
+  id: string;
+  identifierType: string;
+  identifierValue: string;
+  issuingBody: string | null;
+  isPrimary: boolean;
+  artistAliasId: string | null;
+  aliasName: string | null;
+};
+
+export type SocietyAffiliationDTO = {
+  id: string;
+  societyCode: string;
+  role: string | null;
+  startsOn: string | null;
+  endsOn: string | null;
+};
+
+/** A live party with its subtype row: `person` for a person, `organization` for an organization. */
+export type PartyDetailDTO = Omit<PartyListItem, 'primaryEmail'> & {
+  notes: string | null;
+  person: { givenName: string | null; familyName: string | null; legalName: string } | null;
+  organization: {
+    legalName: string;
+    organizationType: string | null;
+    websiteUrl: string | null;
+  } | null;
+  methods: ContactMethodDTO[];
+  aliases: ArtistAliasDTO[];
+  identifiers: PartyIdentifierDTO[];
+  societyAffiliations: SocietyAffiliationDTO[];
+};
