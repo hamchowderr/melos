@@ -9,12 +9,12 @@ const COPY: Record<Status, { title: string; message: string }> = {
   provisioning: {
     title: 'Your workspace is still being set up',
     message:
-      'Chat opens once its database is ready. If it stays unavailable, try again later, or contact the workspace owner.',
+      'This workspace opens once its database is ready. If it stays unavailable, try again later, or contact the workspace owner.',
   },
   migrating: {
     title: 'Your workspace is being updated',
     message:
-      'Chat opens again once the update finishes. If it stays unavailable, try again later, or contact the workspace owner.',
+      'This workspace opens again once the update finishes. If it stays unavailable, try again later, or contact the workspace owner.',
   },
   failed: {
     title: 'Your workspace is not available right now',
@@ -23,15 +23,15 @@ const COPY: Record<Status, { title: string; message: string }> = {
   },
   suspended: {
     title: 'This workspace is suspended',
-    message: 'Chat is unavailable while the workspace is suspended.',
+    message: 'The workspace cannot be opened while it is suspended.',
   },
   deleting: {
     title: 'This workspace is being deleted',
-    message: 'Chat is no longer available for this workspace.',
+    message: 'The workspace can no longer be opened.',
   },
 };
 
-/** Shown instead of the chat while the active workspace has no active database (§7.1 step 2.3). */
+/** Shown instead of a workspace page while the active workspace has no active database (§7.1 step 2.3). */
 export function WorkspaceNotReady({ status }: { status: Status }) {
   const { title, message } = COPY[status];
   return (

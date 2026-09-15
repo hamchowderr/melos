@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import {
   Table,
@@ -8,6 +9,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { SongListItem } from '@/lib/dto/catalog';
+
+/** A song's page (D-12): its composition's, or its only recording's when it has no composition. */
+const songHref = ({ compositionId, recordings }: SongListItem) =>
+  compositionId
+    ? `/catalog/compositions/${compositionId}`
+    : `/catalog/recordings/${recordings[0].recordingId}`;
 
 /** The catalog's songs (§2.3, CAT-009), in the order CatalogService lists them. */
 export function SongGrid({ songs }: { songs: SongListItem[] }) {
@@ -35,7 +42,12 @@ export function SongGrid({ songs }: { songs: SongListItem[] }) {
         {songs.map((song) => (
           <TableRow key={song.compositionId ?? song.primaryRecordingId}>
             <TableCell className="whitespace-normal">
-              <span className="font-medium">{song.title}</span>
+              <Link
+                href={songHref(song)}
+                className="font-medium underline-offset-4 hover:underline"
+              >
+                {song.title}
+              </Link>
               {song.altTitles.length > 0 ? (
                 <span className="block text-xs text-muted-foreground">
                   Also known as {song.altTitles.join(', ')}

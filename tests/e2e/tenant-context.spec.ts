@@ -290,7 +290,7 @@ test('TEN-002: a member of a migrating workspace is not told a reload opens chat
   const message = page.getByTestId('workspace-not-ready');
   await expect(message).toHaveAttribute('data-status', 'migrating');
   await expect(message).toHaveText(
-    'Chat opens again once the update finishes. If it stays unavailable, try again later, or contact the workspace owner.',
+    'This workspace opens again once the update finishes. If it stays unavailable, try again later, or contact the workspace owner.',
   );
   await expect(page.getByRole('textbox')).toHaveCount(0);
 });
@@ -309,7 +309,7 @@ test('TEN-002: a member of a provisioning workspace is not told a reload opens c
   const message = page.getByTestId('workspace-not-ready');
   await expect(message).toHaveAttribute('data-status', 'provisioning');
   await expect(message).toHaveText(
-    'Chat opens once its database is ready. If it stays unavailable, try again later, or contact the workspace owner.',
+    'This workspace opens once its database is ready. If it stays unavailable, try again later, or contact the workspace owner.',
   );
   await expect(page.getByRole('textbox')).toHaveCount(0);
 });
