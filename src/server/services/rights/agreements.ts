@@ -68,13 +68,11 @@ const withCounterparty = (db: Pick<WorkspaceTransaction, 'select'>) =>
 
 type Loaded = Awaited<ReturnType<typeof withCounterparty>>[number];
 
-const toDTO = ({ agreement, counterpartyName }: Loaded): AgreementDTO => {
-  return {
-    ...agreement,
-    agreementType: agreement.agreementType as AgreementType,
-    counterpartyName,
-  };
-};
+const toDTO = ({ agreement, counterpartyName }: Loaded): AgreementDTO => ({
+  ...agreement,
+  agreementType: agreement.agreementType as AgreementType,
+  counterpartyName,
+});
 
 /** The agreement an id names in this transaction; undefined when there is none. */
 const load = async (tx: WorkspaceTransaction, id: string): Promise<Loaded | undefined> =>
@@ -112,8 +110,8 @@ export async function createAgreement(
 }
 
 /**
- * Edits an agreement in one audited write transaction, auditing agreement.update with the full row
- * before and after (D-4). rights:update (D-5) and VALIDATION of the patch come before the database
+ * Edits an agreement and audits agreement.update with the full row before and after (D-4); a patch
+ * that changes nothing writes nothing. rights:update (D-5) and VALIDATION come before the database
  * opens. In the transaction, an id with no row in the tenant's own database is NOT_FOUND (§3.1,
  * TEN-001), `expiresOn` before `effectiveOn` once patched is VALIDATION, and IntegrityGuard refuses
  * a counterparty or asset with no live row.
@@ -133,9 +131,12 @@ export async function updateAgreement(
       patch[field] === undefined ? before.agreement[field] : patch[field];
     if (reversed(kept('effectiveOn'), kept('expiresOn')))
       return refuse('expiresOn', 'expires_before_effective');
+    const set = columns(patch);
+    const keys = Object.keys(set) as (keyof typeof set)[];
+    if (keys.every((key) => [undefined, before.agreement[key]].includes(set[key])))
+      return success(toDTO(before));
     const stamp = { updatedAt: new Date().toISOString(), updatedBy: tenant.userId };
-    const byId = eq(agreements.id, agreementId);
-    await guard.update(tx, agreements, { ...columns(patch), ...stamp }, byId);
+    await guard.update(tx, agreements, { ...set, ...stamp }, eq(agreements.id, agreementId));
     const updated = await load(tx, agreementId);
     if (!updated) throw new Error(`Agreement ${agreementId} was not stored`);
     await audit.write({
