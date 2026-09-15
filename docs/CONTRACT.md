@@ -256,7 +256,7 @@ The same React components render in chat (tool rendering) and in full-page views
 | `SongGrid` | "SongGrid / RecordingGrid": BP §9.2 · `RecordingGrid`: BP §9.2 · `CompositionGrid`: TS §11, §12 · `SongCards`: TS §12 · `GizmoSongGrid`: BP §7 Figure 3 | Catalog search results with readiness badges. |
 | `SearchResults` | same name: BP §9.2 | Full-page search view in `/catalog`. Not rendered in chat at MVP. |
 | `ArtistChips` | same name: TS §8 CAT-003 | |
-| `AudioPlayer` | same name: TS §8 CAT-005 · "player": BP §9.1 | Plays the primary recording link from `previewStartMs`. |
+| `AudioPlayer` | same name: TS §8 CAT-005 · "player": BP §9.1 | Plays an uploaded audio asset from `previewStartMs` through a presigned URL (§7.5). The primary recording link is a player page, not an audio file, and shows as an external Open player link with its start time (owner decision 2026-09-14, D-8). |
 | `RightsPanel` | same name: BP §8.1, §9.1, §9.2; TS §7 TST-AI-003, §8 RGT-001..003 · `OwnershipValidator`: TS §8 RGT-004, §11, §12, §16 DEMO-004 | Writer, publishing and master totals, holders, representation state, validation issues. |
 | `RightsSplitEditor` | same name: BP §9.1, §9.2 · `RightsEditor`: TS §11 | Share editing with a total meter. Hosts the default-owner autofill action (RGT-008). |
 | `ReadinessChecklist` | same name: BP §9.2 | Blocking issues and warnings per recording (§6.5). |
@@ -1358,11 +1358,12 @@ CREATE INDEX idx_import_issues_run        ON import_issues(import_run_id, severi
 - **Share replacement.** The share tools replace a full set by upserting on the natural key: (`composition_id`, `party_id`) for writers, (`composition_id`, `publisher_party_id`, `territory`) for publishing, (`recording_id`, `owner_party_id`) for masters. Rows in both sets keep their id; rows missing from the new set are deleted. `external_references` points at share rows by natural key (`<compositionId>|<partyId>`, `<compositionId>|<partyId>|<territory>`, `<recordingId>|<partyId>`).
 - **Writer shares count once.** `composition_contributors` has one row per writer party per composition; the roles a writer holds live in `composition_contributor_roles`. A composer who is also the lyricist contributes one share.
 - **Identifier uniqueness.** ISRC, ISWC and UPC/EAN are unique among live rows through partial unique indexes with `deleted_at IS NULL`, so a soft-deleted song does not block re-entering its identifier.
+- **Identifier checks (owner decisions 2026-09-14, D-1 and D-2; closes U-11).** Services store the value the pure normalizers in `src/lib/identifiers.ts` return, and refuse an input they reject with `INVALID_ISRC`, `INVALID_ISWC` or `INVALID_UPC_EAN`. `normalizeIsrc` removes hyphens and spaces, uppercases, and requires the `recordings.isrc` shape; an ISRC has no check digit ([SRC-080]). `normalizeIswc` accepts `T-123.456.789-C` or `T1234567890` in either case and checks the ISO 15707 check digit, (10 − (1 + Σ i·dᵢ) mod 10) mod 10 over the nine work digits ([SRC-110]), only on a new or changed value: an input equal to the stored value passes on its shape, because existing values such as the demo fixture's ISWCs fail the check. `normalizeUpcEan` removes hyphens and spaces and requires 12 digits (UPC) or 13 (EAN) ending in the GS1 mod-10 check digit: weights 3 and 1 alternate leftward from the digit before it, and it brings the sum up to a multiple of ten ([SRC-109]). A UPC/EAN stays TEXT so leading zeros survive (BP §2.2). The `releases.upc_ean` CHECK still admits 8 or more digits, and legacy values that fail the check become import issues in phase 10.
 - **Deliberate polymorphic tables.** `audit_log`, `control_audit_log` and `external_references` keep `entity_type` + `entity_id` without foreign keys. Audit rows must survive the deletion of what they describe. Services remove `external_references` rows in the same transaction as a hard delete.
-- **Publishing territory (RGT-007, P-05).** A composition has either one `WORLD` share set or one share set per country, not both. Each set totals 10000.
+- **Publishing territory (RGT-007, P-05).** A composition has either one `WORLD` share set or one share set per country, not both. Each set is complete at 10000.
+- **Share totals (owner decision 2026-09-14, D-3).** A share-set replace refuses a set, or a territory set, whose total exceeds 10000 basis points and accepts a total below 10000; readiness then reports the incomplete set (`WRITER_TOTAL_INCOMPLETE`, `PUBLISHING_TOTAL_INCOMPLETE`, `MASTER_TOTAL_INCOMPLETE`; §6.5).
 - **Pitch cells (§6.10).** `pitch_items` holds exactly one of composition or recording. Within one pitch a song appears once: triggers reject a composition cell next to a cell for one of its recordings, and the partial unique indexes reject duplicates at the same level. Cell targets are immutable. `PitchService` also refuses a second open cell (status not in closed_won, closed_lost, archived) for the same contact and song across different pitches.
 - **Messages.** `sent` requires `sent_at`; inbound messages are exactly the `received` ones and require `received_at`.
-- **UPC/EAN** is non-empty TEXT of digits so leading zeros survive (BP §2.2).
 - **Runner tables.** `agent_threads.thread_id` is the primary key, so a thread id has exactly one owning resource. Every runner read and write filters on both `thread_id` and `resource_id` (§7.9).
 
 ### 4.5 Blueprint Appendix A target remap
@@ -1730,6 +1731,8 @@ Better Auth stores several roles on one member as a comma-separated string ([SRC
 
 Asterisks keep TS §13's meaning: the policy may change later. Services check the role resolved for this request (§7.1) against these definitions on every write (AUTH-004). Better Auth has no supported header-free permission check (U-06, closed by ADR-028), so services, tools and the importer call `requirePermission`, which evaluates the same role objects in Melos code. `auth.api.hasPermission({ headers, body: { permissions } })` is the verified request-bound check ([SRC-021](https://better-auth.com/docs/plugins/organization)).
 
+Owner decision 2026-09-14 (D-5) places the phase 4 records: parties, artist aliases and contact methods use the `contact` permissions (`contact:read`, `contact:create`, `contact:update`, `contact:delete`); the workspace self parties and agreements use `rights:update`; metadata terms and assets are written with `catalog:update` and read with `catalog:read`.
+
 ### 6.3 Approval for rights edits
 
 **Conflict.** BP App B marks share updates "Write/approval for bulk". TS §11 marks them `write-sensitive` with HITL "Yes", and BP §7.4 lists "overwrite ownership" among actions requiring explicit confirmation.
@@ -1850,7 +1853,7 @@ DEMO-003 therefore lists Ocean Blue and Neon Static.
 
 **Decision.** `audit_log` (§4.3) in each workspace database and `control_audit_log` in `melos-control`. `AuditWriter` writes the row inside the service transaction that performs the mutation. `pitch_events` remains the domain history for pitch cells, notes and messages; those changes do not also write `audit_log` (AUD-001). Approvals and declines always write `audit_log` (AUD-002).
 
-Action vocabulary (`<entity>.<verb>`): `composition.create`, `composition.update`, `composition.delete`, `recording.create`, `recording.update`, `recording.delete`, `release.create`, `release.update`, `recording_artists.replace`, `asset.attach`, `writer_shares.replace`, `publishing_shares.replace`, `master_shares.replace`, `representation.attest`, `representation.clear`, `licensing_contacts.replace`, `self_parties.update`, `contact.create`, `contact.update`, `contact.delete`, `report.generate`, `import.apply`, `approval.requested`, `approval.granted`, `approval.declined`, `approval.stale`, `message.draft_updated`. Rights actions store the full share set before and after.
+Action vocabulary (`<entity>.<verb>`): `composition.create`, `composition.update`, `composition.delete`, `recording.create`, `recording.update`, `recording.delete`, `release.create`, `release.update`, `release.delete`, `recording_artists.replace`, `metadata_term.create`, `asset.create`, `asset.attach`, `writer_shares.replace`, `publishing_shares.replace`, `master_shares.replace`, `representation.attest`, `representation.clear`, `licensing_contacts.replace`, `self_parties.update`, `agreement.create`, `agreement.update`, `party.create`, `party.update`, `party.delete`, `contact.create`, `contact.update`, `contact.delete`, `report.generate`, `import.apply`, `approval.requested`, `approval.granted`, `approval.declined`, `approval.stale`, `message.draft_updated`. Rights actions store the full share set before and after. Owner decision 2026-09-14 (D-4) added `release.delete`, `metadata_term.create`, `asset.create`, `agreement.create`, `agreement.update`, `party.create`, `party.update` and `party.delete`; `AuditAction` in `src/server/services/audit-writer.ts` types the same list.
 
 ### 6.7 Source numbering
 
@@ -2029,6 +2032,8 @@ Shared context shape sent from the app (BP §8.2, canonical names):
 7. An interrupt nobody resolves leaves only `approval.requested`. The resume may arrive on a different instance (TEN-011, §7.9).
 8. Tool results render through `useRenderTool` from `@copilotkit/react-core/v2`, keyed by tool name, receiving `status` and `args` ([SRC-062](https://docs.copilotkit.ai/mastra/generative-ui/backend-tools)). How the render callback receives the tool result is U-03.
 
+**Canonical JSON (P-43).** The hashes above, the §7.6 import hashes and the `audit_log` before and after values (§6.6) use the text `canonicalJson` in `src/server/services/audit-writer.ts` writes. Object keys are sorted by UTF-16 code unit at every depth, array order is kept, and no whitespace is written. A `toJSON` method is applied first, so a Date becomes its ISO string. Strings, finite numbers, booleans and null are written as `JSON.stringify` writes them. An undefined, function or symbol is left out of an object and written as null in an array; any other object is written from its own enumerable string keys, each time it appears. `canonicalJson` throws a `TypeError` for NaN, Infinity or -Infinity, a bigint, a boxed primitive (never unwrapped), a cycle, and a top-level value with no JSON text.
+
 ### 7.5 Email and asset adapters
 
 Owner decision 2026-09-12: Resend and Cloudflare R2 are the first production adapters (ADR-011, ADR-012).
@@ -2083,7 +2088,7 @@ Owner decisions 2026-09-12. One pipeline, two readers.
    - several targets of one role from one source row use `target_key` = the normalized party name from that row (writers, publishers, master owners, artists) or `<role>:<normalized name>` (recording credits);
    - all other targets use `''`;
    - share targets store their natural key in `entity_id` (§4.4).
-4. **Plan.** Each mapped target is compared with `external_references` (P-19). The *current hash* is SHA-256 of the canonical JSON (sorted keys) of the target's mapped fields as read from Melos now, by the same reader that sets `applied_row_sha256`:
+4. **Plan.** Each mapped target is compared with `external_references` (P-19). The *current hash* is SHA-256 of the canonical JSON (§7.4, P-43) of the target's mapped fields as read from Melos now, by the same reader that sets `applied_row_sha256`:
    - `create`: no reference;
    - `unchanged`: `source_payload_sha256` equals the stored value; nothing is written;
    - `update`: the payload hash differs and the current hash equals `applied_row_sha256`;
@@ -2260,6 +2265,8 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | SRC-106 | Vercel `@vercel/functions` reference (`waitUntil`; `after` recommended for Next.js 15.1+) | https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package | — | — | — | yes |
 | SRC-107 | `@copilotkit/core` 1.71.1 installed package (`isDynamicSuggestionsConfig` gates suggestion generation) | Gate A worktree `node_modules/@copilotkit/core/dist/index.mjs` | — | — | — | yes |
 | SRC-108 | `@better-auth/core` and `@better-auth/drizzle-adapter` 1.7.4 installed packages (`runWithTransaction`, endpoint context, adapter `transaction` option) | Melos `node_modules/@better-auth/core/dist/`, `node_modules/@better-auth/drizzle-adapter/dist/index.mjs` | — | — | — | yes |
+| SRC-109 | GS1 check digit calculation: GS1 US "How to Calculate a Check Digit Manually"; GS1 UK "What is a check digit?" | https://www.gs1us.org/content/dam/gs1us/documents/tools-resources/check-digit-calculator/How-to-Calculate-a-Check-Digit.pdf, https://www.gs1uk.org/knowledge-hub/standards/what-is-a-check-digit | — | — | — | yes: weights 3 and 1 alternate from the right, starting with 3; the check digit is the sum subtracted from the nearest equal or higher multiple of ten (`501234567000` → 3) |
+| SRC-110 | ISWC check digit (ISO 15707), as given by Wikipedia's ISWC article citing the UNIMARC Manual: Authorities Format (IFLA 2009, p. 54) | https://en.wikipedia.org/wiki/International_Standard_Musical_Work_Code | — | — | — | yes: C = (10 − (1 + Σ i·dᵢ) mod 10) mod 10 over the nine work digits; gives 1 for the [SRC-081] example `T-034.524.680-1` |
 
 ## 10. Index of PROPOSED defaults and UNVERIFIED claims
 
@@ -2309,6 +2316,7 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | P-40 | Import orphans: unedited orphaned relationship targets are deleted and entity targets soft-deleted; pitch cells are never removed; CSV missing-row orphans only for uploads marked as the full catalog; orphans only for target kinds whose columns the file maps | §7.6, IMP-004 |
 | P-41 | Cross-instance connect polls finished runs once per second; on `melos.run_pending` the chat shell reconnects after 2 s, at most 5 times | §7.9 |
 | P-42 | `ReadinessIssue.severity` keeps two values; sync-only codes are blocking and are told apart by the exported §6.5 code lists | §3.4, §6.5 |
+| P-43 | Canonical JSON as `canonicalJson` writes it: keys sorted by UTF-16 code unit at every depth, array order kept, no whitespace, `toJSON` applied, undefined left out of objects and written as null in arrays; NaN, Infinity, bigints, boxed primitives and cycles refused | §7.4, §7.6 |
 
 ### 10.2 UNVERIFIED
 
@@ -2324,7 +2332,7 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | U-08 | Closed: `@libsql/client` 0.18.0 bundles SQLite 3.45.1 built with `ENABLE_FTS5`, so local libSQL files support FTS5. In a local file migrated to workspace version 2, a prefix `MATCH` on `catalog_search` built as §3.5 describes returns the inserted row (`tests/integration/workspace-schema.test.ts`) | — |
 | U-09 | Closed: workspace databases use per-database tokens, because a Turso group token opens every database in its group (ADR-031) | — |
 | U-10 | Airtable Web API endpoints, pagination and rate limits | Phase 10 |
-| U-11 | UPC (12-digit) and EAN (13-digit) length rules | Phase 4 |
+| U-11 | Closed: owner decision 2026-09-14 (D-1): a UPC is 12 digits and an EAN 13, each ending in the GS1 mod-10 check digit, which `normalizeUpcEan` checks on service writes (§4.4, [SRC-109]) | — |
 | U-12 | Closed: Better Auth table names are in the Gate A schema (§11, [SRC-103]) | — |
 | U-13, U-14 | Withdrawn: they applied only to the standalone server topology | — |
 | U-15 | Closed: Better Auth 1.7.4 hooks for invitation, member and role events have no transaction-bound variant, and leaving calls none (ADR-029); its adapter deletes an organization's `member` and `invitation` rows and a user's `session` and `account` rows, never a Melos row (ADR-030) | — |
