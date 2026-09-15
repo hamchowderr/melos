@@ -18,8 +18,7 @@ export default async function OwnershipPage() {
   }
   const { tenant } = workspace;
   // The services check rights:read and contact:read for this request's role (§6.2, D-5).
-  const selfParties = await getSelfParties(tenant);
-  const parties = await listParties(tenant);
+  const [selfParties, parties] = await Promise.all([getSelfParties(tenant), listParties(tenant)]);
 
   return (
     <main>
