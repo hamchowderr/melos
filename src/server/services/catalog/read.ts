@@ -138,7 +138,9 @@ const artistRows = (database: WorkspaceDatabase, where: SQL | undefined) =>
  * batch for every live recording, so one round trip (§1.4).
  */
 export async function listSongs(tenant: TenantContext): Promise<ServiceResult<SongListItem[]>> {
-  if (!canRead(tenant)) return failure('FORBIDDEN');
+  // The flags are rights data, so rights:read too, as in getMusicWorkspace (§6.2).
+  const reads = requirePermission(tenant, { catalog: ['read'], rights: ['read'] });
+  if (!reads.ok) return failure('FORBIDDEN');
   const loaded = loadRightsFacts(
     tenant.workspaceId,
     () => ({}),
@@ -175,11 +177,12 @@ export async function listSongs(tenant: TenantContext): Promise<ServiceResult<So
         primaryRecordingId: primaryRecording(head.title, list)?.id ?? null,
         altTitles: alternates.map((alternate) => alternate.title),
         primaryArtistNames: [...new Set(credits.map(({ displayName }) => displayName))],
-        // Both reads cover every live recording in one batch, so a listed one always has flags.
-        recordings: list.map(({ id, title, versionTitle, isrc }) => ({
-          ...{ recordingId: id, title, versionTitle, isrc },
-          ...(flags.get(id) ?? { oneStopReady: false, syncReady: false }),
-        })),
+        recordings: list.map(({ id, title, versionTitle, isrc }) => {
+          // Both reads cover every live recording in one batch, so no flags is a bug, not "not ready".
+          const ready = flags.get(id);
+          if (!ready) throw new Error(`No readiness facts for recording ${id}`);
+          return { recordingId: id, title, versionTitle, isrc, ...ready };
+        }),
       };
     };
     const items = [
