@@ -1834,7 +1834,7 @@ Warning only (never blocks): `MISSING_ISWC` when `C.iswc IS NULL`.
 |---|---|---|---|---|---|
 | Midnight Drive | 100 / 100 / 100 | none | true | true | true |
 | Ocean Blue | 100 / 85 / 100 | `PUBLISHING_TOTAL_INCOMPLETE`, `PUBLISHING_NOT_CONTROLLED`, `NO_LICENSING_CONTACT`; sync adds `MISSING_ISRC` | false | false | false |
-| Neon Static | 100 / 100 / 75 | `PUBLISHING_NOT_CONTROLLED`, `MASTER_TOTAL_INCOMPLETE`, `MASTER_NOT_CONTROLLED`, `NO_LICENSING_CONTACT` | false | false | false |
+| Neon Static | 100 / 100 / 75 | `MASTER_TOTAL_INCOMPLETE`, `PUBLISHING_NOT_CONTROLLED`, `MASTER_NOT_CONTROLLED`, `NO_LICENSING_CONTACT` | false | false | false |
 | Home Again | 100 / 100 / 100 | none (implicit licensing contact) | true | true | true |
 | Paper Planes at 2AM | 100 / 100 / 100 | none | true | true | true |
 

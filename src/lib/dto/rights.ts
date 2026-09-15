@@ -30,7 +30,7 @@ export type ReadinessCode = CodeLists[number];
 
 /**
  * One §6.5 finding for a recording. One-stop and sync-only codes are both `blocking`; the code
- * lists above tell them apart (G-11, PROPOSED P-42). `compositionId` is null for NO_COMPOSITION.
+ * lists above tell them apart (PROPOSED P-42). `compositionId` is null for NO_COMPOSITION.
  */
 export type ReadinessIssue = {
   code: ReadinessCode;
