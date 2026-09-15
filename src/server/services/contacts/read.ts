@@ -1,6 +1,7 @@
 import { and, asc, type Column, desc, eq, isNull, type SQL, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type {
+  LinkedPersonDTO,
   PartyContactDTO,
   PartyDetailDTO,
   PartyKind,
@@ -67,8 +68,10 @@ function contactsByParty(rows: ContactRow[]) {
 
 /**
  * The live parties at /people (§2.3), by case-insensitive name then id, each with its primary email
- * and its contact. `query` keeps the names that contain it, compared case-insensitively in
- * JavaScript. A refused role never opens the database; the reads share one batch, so one round trip.
+ * and its contact. An organization also carries its type and the live people whose live contact
+ * links to it, by name. `kind` and `query` (names that contain it, ignoring case) filter in
+ * JavaScript, so those people are listed whatever the filter. A refused role never opens the
+ * database; the reads share one batch, so one round trip.
  */
 export async function listParties(
   tenant: TenantContext,
@@ -79,9 +82,10 @@ export async function listParties(
     const database = await getWorkspaceDatabase(tenant.workspaceId);
     return database.batch([
       database
-        .select(PARTY)
+        .select({ ...PARTY, organizationType: organizations.organizationType })
         .from(parties)
-        .where(and(isNull(parties.deletedAt), kind ? eq(parties.partyKind, kind) : undefined))
+        .leftJoin(organizations, eq(organizations.partyId, parties.id))
+        .where(isNull(parties.deletedAt))
         .orderBy(asc(sql`lower(${parties.displayName})`), asc(parties.id)),
       database
         .select({ partyId: contactMethods.partyId, value: contactMethods.value })
@@ -96,12 +100,27 @@ export async function listParties(
     const needle = query?.trim().toLowerCase() ?? '';
     const emailOf = new Map(emails.map(({ partyId, value }) => [partyId, value]));
     const contactOf = contactsByParty(contactRead);
-    const named = rows.filter(({ displayName }) => displayName.toLowerCase().includes(needle));
+    // Rows are live and in name order; a contact's company is set only while it is live.
+    const peopleOf = new Map<string, LinkedPersonDTO[]>();
+    for (const { partyId, partyKind, displayName } of rows) {
+      const organizationId = contactOf.get(partyId)?.organizationPartyId;
+      if (partyKind !== 'person' || !organizationId) continue;
+      const linked = peopleOf.get(organizationId) ?? [];
+      linked.push({ partyId, displayName });
+      peopleOf.set(organizationId, linked);
+    }
+    const listed = rows.filter(
+      ({ partyKind, displayName }) =>
+        (!kind || partyKind === kind) && displayName.toLowerCase().includes(needle),
+    );
     return success(
-      named.map((party) => ({
+      listed.map(({ organizationType, ...party }) => ({
         ...party,
         primaryEmail: emailOf.get(party.partyId) ?? null,
         contact: contactOf.get(party.partyId) ?? null,
+        ...(party.partyKind === 'organization'
+          ? { organizationType, people: peopleOf.get(party.partyId) ?? [] }
+          : {}),
       })),
     );
   });

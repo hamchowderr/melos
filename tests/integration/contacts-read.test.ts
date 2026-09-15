@@ -126,11 +126,12 @@ describe('melos-rpr.6: ContactService reads people and organizations (§2.3 /peo
     expect(people.find(({ partyId }) => partyId === keys.pty_REBECCA)).toEqual(REBECCA);
     expect(await list(northstar, { kind: 'organization' })).toHaveLength(7);
     // query keeps the names that contain it, ignoring case and surrounding spaces.
-    const agency = { partyId: keys.pty_CARTER_SYNC, partyKind: 'organization', primaryEmail: null };
-    expect(await list(northstar, { query: ' CARTER ' })).toEqual([
-      { ...agency, displayName: 'Carter Sync Agency', contact: null },
-      REBECCA,
-    ]);
+    const agency = {
+      ...{ partyId: keys.pty_CARTER_SYNC, partyKind: 'organization', primaryEmail: null },
+      ...{ displayName: 'Carter Sync Agency', contact: null, organizationType: 'sync_agency' },
+      people: [{ partyId: keys.pty_REBECCA, displayName: 'Rebecca Carter' }],
+    };
+    expect(await list(northstar, { query: ' CARTER ' })).toEqual([agency, REBECCA]);
   });
 
   it('reads Rebecca Carter as a person and Carter Sync Agency as an organization', async () => {
@@ -280,5 +281,54 @@ describe('melos-rpr.6: ContactService reads people and organizations (§2.3 /peo
       await database.delete(contactMethods).where(eq(contactMethods.partyId, partyId));
       await database.delete(parties).where(eq(parties.id, partyId));
     }
+  });
+});
+
+describe('melos-rpr.45: organizations list their type and linked people (§4.2, §4.3)', () => {
+  const person = (key: string, displayName: string) => ({
+    ...{ partyId: keys[`pty_${key}`], displayName },
+  });
+  const [rebecca, sophia] = [person('REBECCA', 'Rebecca Carter'), person('SOPHIA', 'Sophia Lee')];
+
+  it('lists each organization with its type and the people whose live contact links to it', async () => {
+    const organizations = await list(northstar, { kind: 'organization' });
+    const listed = organizations.map(({ displayName, organizationType, people }) => [
+      ...[displayName, organizationType, people],
+    ]);
+    expect(listed).toEqual([
+      ['Blue Lantern Studios', 'other', [person('THEO', 'Theo Grant')]],
+      ['Carter Sync Agency', 'sync_agency', [rebecca]],
+      ['NextWave Records', 'label', [person('MALIK', 'Malik Johnson')]],
+      ['Nightshift Audio', 'publisher', []],
+      ['Northlight Pictures', 'other', [person('MAYA', 'Maya Chen')]],
+      ['Northstar Management', 'management', []],
+      ['Silverline Songs', 'publisher', []],
+    ]);
+  });
+
+  it('lists people by name whatever the query, leaving out a soft-deleted contact or person', async () => {
+    const { contacts: contactTable, parties } = tables;
+    const database = await connections.getWorkspaceDatabase(northstar.workspaceId);
+    const carterPeople = async () => (await list(northstar, { query: 'carter sync' }))[0].people;
+    const [id, createdAt, updatedAt] = [`con_${ulid()}`, AT, AT];
+    const sophiaParty = eq(parties.id, keys.pty_SOPHIA);
+    const rebeccaContact = eq(contactTable.id, keys.con_REBECCA);
+    // Sophia Lee has no contact in the fixture. This one has no roles, so it is the first contact
+    // row (NULL sorts first); only the name order puts her after Rebecca Carter.
+    const organizationPartyId = keys.pty_CARTER_SYNC;
+    const contact = { id, partyId: keys.pty_SOPHIA, organizationPartyId, createdAt, updatedAt };
+    await database.insert(contactTable).values(contact);
+    try {
+      expect(await carterPeople()).toEqual([rebecca, sophia]);
+      await database.update(contactTable).set({ deletedAt: AT }).where(rebeccaContact);
+      expect(await carterPeople()).toEqual([sophia]);
+      await database.update(parties).set({ deletedAt: AT }).where(sophiaParty);
+      expect(await carterPeople()).toEqual([]);
+    } finally {
+      await database.update(parties).set({ deletedAt: null }).where(sophiaParty);
+      await database.update(contactTable).set({ deletedAt: null }).where(rebeccaContact);
+      await database.delete(contactTable).where(eq(contactTable.id, id));
+    }
+    expect(await carterPeople()).toEqual([rebecca]);
   });
 });
