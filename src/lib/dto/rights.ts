@@ -83,6 +83,54 @@ export type RightsSummaryDTO = {
   issues: ReadinessIssue[];
 };
 
+/** The `agreements.agreement_type` values the §4.3 CHECK allows. */
+export const AGREEMENT_TYPES = [
+  'publishing',
+  'master',
+  'representation',
+  'licensing',
+  'other',
+] as const;
+
+export type AgreementType = (typeof AGREEMENT_TYPES)[number];
+
+/**
+ * An `agreements` row (§4.3) with its counterparty's display name. PROPOSED (melos-rpr.15): §3.3 and
+ * §3.4 define no agreement tool or DTO. Dates are `YYYY-MM-DD` (§1.4).
+ */
+export type AgreementDTO = {
+  id: string;
+  agreementType: AgreementType;
+  title: string;
+  counterpartyPartyId: string | null;
+  counterpartyName: string | null;
+  effectiveOn: string | null;
+  expiresOn: string | null;
+  assetId: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+};
+
+/** createAgreement input (PROPOSED). An omitted optional field is stored as NULL. */
+export type AgreementInput = {
+  agreementType: AgreementType;
+  title: string;
+  counterpartyPartyId?: string | null;
+  effectiveOn?: string | null;
+  expiresOn?: string | null;
+  assetId?: string | null;
+  notes?: string | null;
+};
+
+/** updateAgreement patch (PROPOSED): an omitted field keeps its value; null clears a nullable one. */
+export type AgreementPatch = Partial<AgreementInput>;
+
+/** listAgreements filter (PROPOSED). */
+export type AgreementFilter = { agreementType?: AgreementType; counterpartyPartyId?: string };
+
 /** Recordings with both readiness flags and their issues (§3.4). */
 export type ReadinessReportDTO = {
   generatedAt: string;
