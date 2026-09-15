@@ -5,13 +5,11 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { RecordingDTO } from '@/lib/dto/catalog';
 import { formatIsrc, formatPlaybackTime } from '@/lib/identifiers';
+import { words } from '@/lib/words';
 
 /** A recording's title with its version title, if any. */
 export const recordingTitle = ({ title, versionTitle }: RecordingDTO) =>
   versionTitle ? `${title} (${versionTitle})` : title;
-
-/** A stored code as words: `sounds_like` → `Sounds like`. */
-const words = (code: string) => code.charAt(0).toUpperCase() + code.slice(1).replaceAll('_', ' ');
 
 /** One of the song's recordings (§3.4): identifiers, musical details, links, credits and terms. */
 export function RecordingSection({ recording }: { recording: RecordingDTO }) {

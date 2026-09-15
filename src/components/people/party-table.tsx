@@ -10,14 +10,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { PartyListItem } from '@/lib/dto/contacts';
+import { words } from '@/lib/words';
 
-/** A contact's roles (§4.3 contact_roles), as stored. */
+/** A contact's roles (§4.3 contact_roles), as words. */
 export function RoleBadges({ roles }: { roles: string[] }) {
   return (
     <span className="flex flex-wrap gap-1">
       {roles.map((role) => (
         <Badge key={role} variant="secondary">
-          {role}
+          {words(role)}
         </Badge>
       ))}
     </span>

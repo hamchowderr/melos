@@ -17,10 +17,17 @@ test('melos-rpr.6: Jordan opens People: both tabs, then Theo Grant, a music supe
 
   const table = page.getByRole('tabpanel').getByRole('table');
   const rows = table.locator('tbody').getByRole('row');
-  await page.getByRole('tab', { name: 'Organizations' }).click();
+  // A click before hydration switches nothing, so each click retries until a name only that
+  // tab lists is its first row.
+  const openTab = (name: string, firstName: string) =>
+    expect(async () => {
+      await page.getByRole('tab', { name }).click();
+      const first = rows.first().getByRole('cell').first();
+      await expect(first).toHaveText(firstName, { timeout: 1_000 });
+    }).toPass(AUTH_REDIRECT);
+  await openTab('Organizations', 'Blue Lantern Studios');
   await expect(rows).toHaveCount(7);
-  await expect(rows.first().getByRole('cell').first()).toHaveText('Blue Lantern Studios');
-  await page.getByRole('tab', { name: 'People' }).click();
+  await openTab('People', 'Alex Ramirez');
   await expect(table.getByRole('columnheader')).toHaveText([
     ...['Name', 'Primary email', 'Company', 'Contact roles'],
   ]);
@@ -30,14 +37,14 @@ test('melos-rpr.6: Jordan opens People: both tabs, then Theo Grant, a music supe
     'Theo Grant',
     'theo@bluelantern.example',
     'Blue Lantern Studios',
-    'music_supervisor',
+    'Music supervisor',
   ];
   await expect(theo.getByRole('cell')).toHaveText(cells);
 
   await theo.getByRole('link', { name: 'Theo Grant' }).click();
   await expect(page).toHaveURL(THEO_GRANT, AUTH_REDIRECT);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Theo Grant');
-  await expect(page.getByText('music_supervisor')).toBeVisible();
+  await expect(page.getByText('Music supervisor')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Blue Lantern Studios' })).toBeVisible();
 
   const missing = await page.goto('/people/pty_UNKNOWN', AUTH_REDIRECT);
