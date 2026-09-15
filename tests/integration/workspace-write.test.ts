@@ -97,6 +97,23 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     expect(await db.all(sql`PRAGMA foreign_key_check`)).toEqual([]);
   });
 
+  it('commits two overlapping writes: the one a lock refuses runs again (ADR-033)', async () => {
+    const db = await open(member);
+    const earlier = await db.select().from(auditLog);
+    const begin = vi.spyOn(db.$client, 'transaction');
+    const pair = [song('Twin Flame'), song('Twin Peaks')];
+    const writes = pair.map((each) => write.runWorkspaceWrite(member, CREATE, create(each)));
+    expect(await Promise.all(writes)).toEqual(pair.map(({ id }) => success(id)));
+    // Probe: one BEGIN IMMEDIATE met the other write's lock.
+    const busy = { type: 'rejected', value: expect.objectContaining({ code: 'SQLITE_BUSY' }) };
+    expect(begin.mock.settledResults).toContainEqual(busy);
+    begin.mockRestore();
+    const audited = (await db.select().from(auditLog)).slice(earlier.length);
+    const ids = pair.map(({ id }) => id).sort();
+    expect(audited.map(({ entityId }) => entityId).sort()).toEqual(ids);
+    expect(await db.all(sql`PRAGMA foreign_key_check`)).toEqual([]);
+  });
+
   it('leaves neither the row nor its audit row when the write throws or refuses after inserting', async () => {
     const db = await open(member);
     const earlier = await db.select().from(auditLog);
@@ -143,7 +160,7 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     expect(await db.all(sql`PRAGMA foreign_key_check`)).toEqual([]);
   });
 
-  it('throws a libSQL error as WorkspaceConnectionError with its name and code, never its SQL or message (§7.2)', async () => {
+  it('throws a libSQL error once as WorkspaceConnectionError with its name and code, never its SQL or message (§7.2)', async () => {
     const db = await open(member);
     const paper = song('Paper Planes');
     await db.insert(compositions).values(paper);
@@ -156,12 +173,13 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
         (error: Error) => error,
       );
     expect(`${raw} ${raw?.cause}`).toMatch(/UNIQUE constraint failed: compositions\.id/);
-    const duplicate = write.runWorkspaceWrite(member, CREATE, create(paper));
+    const core = vi.fn(create(paper));
+    const duplicate = write.runWorkspaceWrite(member, CREATE, core);
     const error = (await duplicate.catch((thrown) => thrown)) as WorkspaceConnectionError;
     expect(error).toBeInstanceOf(services.connections.WorkspaceConnectionError);
     expect(error.code).toMatch(/^\w+ SQLITE_CONSTRAINT\w*$/);
     const text = `Workspace ${member.workspaceId} database is unavailable: ${error.code}`;
-    expect([error.message, error.cause]).toEqual([text, undefined]);
+    expect([error.message, error.cause, core.mock.calls.length]).toEqual([text, undefined, 1]);
   });
 
   it('writes only the tenant database: a composition id from another workspace is NOT_FOUND (TEN-001)', async () => {

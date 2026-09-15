@@ -68,11 +68,11 @@ function isLocked(error: unknown): boolean {
 }
 
 /**
- * Runs a melos-control write again, after a jittered wait, while a lock refuses it: libSQL file
+ * Runs a libSQL write again, after a jittered wait, while a lock refuses it: libSQL file
  * connections fail at once instead of waiting (ADR-033). A refused transaction has rolled back, so a
  * retry repeats all of it. Throws the lock error once the retries run out.
  */
-async function retryLocked<T>(write: () => Promise<T>): Promise<T> {
+export async function retryLocked<T>(write: () => Promise<T>): Promise<T> {
   for (const wait of LOCK_RETRY_MS) {
     try {
       return await write();

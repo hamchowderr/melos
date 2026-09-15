@@ -1,4 +1,5 @@
 import type { WorkspacePermissions } from '../../lib/auth/permissions';
+import { retryLocked } from '../db/migration-runner';
 import { type Actor, type AuditWriter, createAuditWriter } from './audit-writer';
 import { IntegrityError } from './integrity-guard';
 import { requirePermission } from './permissions';
@@ -28,8 +29,11 @@ class Refusal extends Error {
  * transaction (drizzle's libSQL default, `BEGIN IMMEDIATE`) on the tenant's own database, which
  * commits only when `core` succeeds. Anything else rolls it all back, audit rows included: a refusal
  * `core` returns comes back as it is, an IntegrityError as its code and counts, and any other error
- * throws WorkspaceConnectionError with its name and code, never its message (§7.2). `origin` names
- * an agent run or import acting for the tenant's user.
+ * throws WorkspaceConnectionError with its name and code, never its message (§7.2). `core` refuses
+ * by returning `failure(...)`, never with `tx.rollback()`, which throws. A transaction a lock
+ * refuses (SQLITE_BUSY, SQLITE_LOCKED) has rolled back and runs again after a jittered wait, as
+ * MigrationRunner's writes do (ADR-033), so `core` may run more than once and must touch only `tx`
+ * and `audit`. `origin` names an agent run or import acting for the tenant's user.
  */
 export async function runWorkspaceWrite<T>(
   tenant: TenantContext,
@@ -41,12 +45,14 @@ export async function runWorkspaceWrite<T>(
   const actor = { ...origin, userId: tenant.userId };
   return sanitized(tenant.workspaceId, async () => {
     const database = await getWorkspaceDatabase(tenant.workspaceId);
-    try {
-      return await database.transaction(async (tx) => {
+    const attempt = () =>
+      database.transaction(async (tx) => {
         const result = await core(tx, createAuditWriter(tx, actor, tenant.requestId));
         if (!result.ok) throw new Refusal(result.error);
         return result;
       });
+    try {
+      return await retryLocked(attempt);
     } catch (error) {
       if (error instanceof Refusal) return failure(error.error);
       if (error instanceof IntegrityError)
