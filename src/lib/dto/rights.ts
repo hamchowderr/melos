@@ -50,3 +50,35 @@ export type RecordingReadiness = {
   issues: ReadinessIssue[];
   licensingContacts: LicensingContactDTO[];
 };
+
+/** A publishing or master row in RightsSummaryDTO; `isSelf` compares with its side's self party. */
+export type RightsHolderDTO = {
+  interestId: string;
+  partyId: string;
+  displayName: string;
+  shareBp: number;
+  isSelf: boolean;
+  representationAttested: boolean;
+  agreementId: string | null;
+};
+
+/** One song's shares with the §4.3 view totals, its licensing contacts and its issues (§3.4). */
+export type RightsSummaryDTO = {
+  /** Null for a recording without a composition, which has no writer or publishing side. */
+  compositionId: string | null;
+  writers: {
+    contributorId: string;
+    partyId: string;
+    displayName: string;
+    roles: string[];
+    shareBp: number | null;
+  }[];
+  writerTotalBp: number;
+  /** One entry per territory. */
+  publishing: { territory: string; totalBp: number; holders: RightsHolderDTO[] }[];
+  /** One entry per live recording. */
+  masters: { recordingId: string; totalBp: number; holders: RightsHolderDTO[] }[];
+  licensingContacts: LicensingContactDTO[];
+  /** Every live recording's issues, recording by recording. */
+  issues: ReadinessIssue[];
+};
