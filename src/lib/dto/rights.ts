@@ -82,3 +82,12 @@ export type RightsSummaryDTO = {
   /** Every live recording's issues, recording by recording. */
   issues: ReadinessIssue[];
 };
+
+/** Recordings with both readiness flags and their issues (§3.4). */
+export type ReadinessReportDTO = {
+  generatedAt: string;
+  recordings: ({ recordingId: string; compositionId: string | null; title: string } & Omit<
+    RecordingReadiness,
+    'licensingContacts'
+  >)[];
+};
