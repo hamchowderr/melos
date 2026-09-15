@@ -370,7 +370,7 @@ Maps `docs/source/GIZMO_Demo_Fixture.json` fields to canonical storage. The rebu
 - Tools call services. Services own authorization, transactions, validation, integrity checks (§4.4), database access and audit. Tools hold no SQL and no authorization logic (ADR-010, BP §18).
 - Inputs take stable IDs. Name resolution is a separate read (`searchMusic`, `searchContacts`) that follows §3.5. Only genuinely distinct matches render `ConflictResolver` (BP §15.2, §17.2).
 - An entity ID that does not exist in the active workspace database returns `NOT_FOUND`. Because each workspace has its own database, an ID from another workspace can never resolve (TEN-001).
-- An input a service refuses before writing returns `VALIDATION`, where `field` names the input and `reason` is a stable snake_case code, such as `person_required` for an organization on the writer self-party side. Nothing is written and no `audit_log` row is added (PROPOSED P-45).
+- An input that breaks a service rule with no error code of its own returns `VALIDATION`, where `field` names the input and `reason` is a stable snake_case code, such as `person_required` for an organization on the writer self-party side. Nothing is written and no `audit_log` row is added (PROPOSED P-45). Identifier checks keep their own codes, `INVALID_ISRC`, `INVALID_ISWC` and `INVALID_UPC_EAN` (§4.4, D-1, D-2).
 - Tools return full DTOs to the UI and the compact, ID-bearing summary in §3.6 to the model through `toModelOutput` ([SRC-038](https://mastra.ai/reference/tools/create-tool)). Tool results never carry database credentials, provider keys or storage secrets (TEN-008). Contact email addresses, phone numbers, lyrics and report text are not sent to the model (BP §15.2).
 - A structured result renders its component. Text-only answers are allowed only for zero results and plain explanations (TS §12).
 
@@ -2322,7 +2322,7 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | P-42 | `ReadinessIssue.severity` keeps two values; sync-only codes are blocking and are told apart by the exported §6.5 code lists | §3.4, §6.5 |
 | P-43 | Canonical JSON as `canonicalJson` writes it: keys sorted by UTF-16 code unit at every depth, array order kept, no whitespace, `toJSON` applied, undefined left out of objects and written as null in arrays; NaN, Infinity, bigints, boxed primitives and cycles refused | §7.4, §7.6 |
 | P-44 | Local asset URLs: HMAC-SHA256 over method, storage key, content type and `expires`, with expiries from 1 s to 7 days; the signing key is HMAC-SHA256 of the label `melos local asset url` keyed with `BETTER_AUTH_SECRET`, so local storage needs no secret of its own | §7.5 |
-| P-45 | A service input refusal is `VALIDATION` with `field`, naming the input, and `reason`, a stable snake_case code; nothing is written and no `audit_log` row is added | §3.1 |
+| P-45 | An input that breaks a service rule with no error code of its own is `VALIDATION` with `field`, naming the input, and `reason`, a stable snake_case code; identifier checks keep their `INVALID_*` codes (§4.4); nothing is written and no `audit_log` row is added | §3.1 |
 
 ### 10.2 UNVERIFIED
 
