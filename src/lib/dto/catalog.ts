@@ -40,6 +40,14 @@ export type CompositionDTO = {
   hasLyrics: boolean;
 };
 
+/** A live composition findCompositionDuplicates matched, and what matched (§3.3, §6.15). */
+export type CompositionDuplicate = {
+  compositionId: string;
+  title: string;
+  iswc: string | null;
+  matchedOn: ('title' | 'iswc')[];
+};
+
 export type RecordingLinkDTO = {
   id: string;
   linkType: string;
