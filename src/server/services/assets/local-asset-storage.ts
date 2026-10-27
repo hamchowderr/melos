@@ -1,12 +1,15 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve, sep } from 'node:path';
-import { AssetKeyError, type AssetStorage, requireWorkspaceKey } from './asset-storage';
+import {
+  AssetKeyError,
+  type AssetStorage,
+  requireExpiry,
+  requireWorkspaceKey,
+} from './asset-storage';
 
 /** Serves local URLs: src/app/api/assets/local/[...key]/route.ts. */
 export const LOCAL_ASSET_ROUTE = '/api/assets/local';
-/** R2 accepts presigned expiries from 1 second to 7 days (§7.5); local URLs keep that range. */
-const MAX_EXPIRY_SECONDS = 604_800;
 
 type Method = 'GET' | 'PUT';
 type KeyInput = { workspaceId: string; storageKey: string };
@@ -26,6 +29,18 @@ export type LocalAssetStorage = AssetStorage & {
     signature: string | null;
   }): SignedUrlCheck;
 };
+
+/** Writes `data` to a hidden temporary file beside `file`, then renames it over `file`. */
+async function replace(file: string, data: string | Uint8Array) {
+  const temporary = join(dirname(file), `.${basename(file)}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(temporary, data);
+    await rename(temporary, file);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
+  }
+}
 
 /**
  * Development and tests (§7.5): objects under `rootDir` at their key, each with a hidden
@@ -54,9 +69,7 @@ export function createLocalAssetStorage(options: {
 
   function signedUrl(method: Method, input: KeyInput, contentType: string, seconds: number) {
     filesOf(input);
-    if (!Number.isInteger(seconds) || seconds < 1 || seconds > MAX_EXPIRY_SECONDS) {
-      throw new RangeError(`expiresInSeconds must be an integer from 1 to ${MAX_EXPIRY_SECONDS}`);
-    }
+    requireExpiry(seconds);
     const expires = String(Math.floor(Date.now() / 1000) + seconds);
     const signature = sign(method, input.storageKey, contentType, expires);
     const query = new URLSearchParams({ expires, signature });
@@ -74,12 +87,24 @@ export function createLocalAssetStorage(options: {
     async put({ contentType, body, ...input }) {
       const { file, typeFile } = filesOf(input);
       await mkdir(dirname(file), { recursive: true });
-      await writeFile(file, body);
-      await writeFile(typeFile, contentType);
+      // Each file is written beside its target and renamed over it, so a read never sees half a
+      // file; the type goes first, so a new object's body never appears without it (melos-rpr.12).
+      await replace(typeFile, contentType);
+      await replace(file, body);
     },
     async delete(input) {
       const { file, typeFile } = filesOf(input);
       await Promise.all([rm(file, { force: true }), rm(typeFile, { force: true })]);
+    },
+    async head(input) {
+      const { file, typeFile } = filesOf(input);
+      try {
+        const [{ size }, type] = await Promise.all([stat(file), readFile(typeFile, 'utf8')]);
+        return { contentType: type || 'application/octet-stream', size };
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw error;
+      }
     },
     async read(input) {
       const { file, typeFile } = filesOf(input);
