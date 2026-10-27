@@ -135,7 +135,11 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     const inside = new Promise<void>((done) => {
       entered = done;
     });
-    const [first, second, later] = [song('Held Lock'), song('Refused At Begin'), song('Afterwards')];
+    const [first, second, later] = [
+      song('Held Lock'),
+      song('Refused At Begin'),
+      song('Afterwards'),
+    ];
     const held = write.runWorkspaceWrite(member, CREATE, async (tx, audit) => {
       const result = await create(first)(tx, audit);
       entered();
