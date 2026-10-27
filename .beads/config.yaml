@@ -75,4 +75,4 @@ validation.on-create: "warn"
 export:
     auto: true
 sync:
-    remote: "git+https://github.com/hamchowderr/melos.git"
+    remote: chowderr/melos
