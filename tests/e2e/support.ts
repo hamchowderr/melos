@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { createClient } from '@libsql/client';
 import { expect, type Page } from '@playwright/test';
+import Database from 'libsql';
 import { DEMO_JORDAN } from './demo-seed';
 
 // The first auth request after `next start` hashes a password on a cold server; 5s is too tight.
@@ -104,6 +105,24 @@ export async function activeWorkspaceId(organizationId: string): Promise<string>
 export async function setWorkspaceStatus(organizationId: string, status: string): Promise<void> {
   const sql = 'UPDATE workspace_registry SET status = ? WHERE organization_id = ?';
   await controlQuery(sql, [status, organizationId]);
+}
+
+/**
+ * Holds an exclusive lock on an organization's workspace database file, so the server's reads of
+ * it fail with SQLITE_BUSY, as they would while the database is unreachable. Returns the release.
+ */
+export async function lockWorkspaceDatabase(organizationId: string): Promise<() => void> {
+  const where = "organization_id = ? AND status = 'active'";
+  const rows = await controlQuery(`SELECT database_url FROM workspace_registry WHERE ${where}`, [
+    organizationId,
+  ]);
+  expect(rows).toHaveLength(1);
+  const database = new Database(String(rows[0].database_url).replace(/^file:/, ''));
+  database.exec('BEGIN EXCLUSIVE');
+  return () => {
+    database.exec('ROLLBACK');
+    database.close();
+  };
 }
 
 /** Sets the role of every member of an organization, as a configuration error would (P-30). */
