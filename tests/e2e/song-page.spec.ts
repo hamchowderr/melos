@@ -97,3 +97,35 @@ test('melos-rpr.16: Midnight Drive is One Stop Ready with Silverline Songs as im
     rights.getByRole('table', { name: 'Writers' }).getByTestId('share-total'),
   ).toHaveText('100.00%');
 });
+
+test('melos-rpr.16: /rights lists Ocean Blue and Neon Static as not ready', async ({ page }) => {
+  await signInAsJordan(page);
+  await page
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('link', { name: 'Rights' })
+    .click();
+  await expect(page).toHaveURL(/\/rights$/, AUTH_REDIRECT);
+  const recordings = page.getByRole('list', { name: 'Recordings' });
+  // EXPECTED.md §6 DEMO-003, by title.
+  await expect(recordings.getByRole('heading', { level: 2 })).toHaveText([
+    'Neon Static',
+    'Ocean Blue',
+  ]);
+  const ocean = recordings.getByRole('list', { name: 'Ocean Blue issues' }).getByRole('listitem');
+  await expect(ocean).toHaveText([
+    /^PUBLISHING_TOTAL_INCOMPLETE/,
+    /^PUBLISHING_NOT_CONTROLLED/,
+    /^NO_LICENSING_CONTACT/,
+    /^MISSING_ISRC/,
+  ]);
+
+  const filter = page.getByRole('switch', { name: 'Only not ready' });
+  await expect(filter).toHaveAttribute('aria-checked', 'true');
+  await filter.click();
+  await expect(page).toHaveURL(/\/rights\?all=1$/);
+  await expect(recordings.getByRole('heading', { level: 2 })).toHaveCount(5);
+  await expect(page.getByRole('switch', { name: 'Only not ready' })).toHaveAttribute(
+    'aria-checked',
+    'false',
+  );
+});
