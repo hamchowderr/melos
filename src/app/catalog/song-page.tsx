@@ -1,13 +1,14 @@
 import { notFound, redirect } from 'next/navigation';
 import { resolveWorkspacePage } from '@/app/workspace-page';
 import { CompositionSection } from '@/components/catalog/composition-section';
-import { RecordingSection } from '@/components/catalog/recording-section';
+import { RecordingSection, recordingTitle } from '@/components/catalog/recording-section';
 import { ReleaseSection } from '@/components/catalog/release-section';
+import { RightsPanel } from '@/components/rights/rights-panel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
 import type { CatalogFocus } from '@/lib/dto/catalog';
-import { getSongCatalog } from '@/server/services/catalog/read';
+import { getMusicWorkspace } from '@/server/services/catalog/music-workspace';
 
 /**
  * A song's page (§2.3 MusicWorkspaceCard, D-12) for the composition or recording id in its route.
@@ -18,10 +19,12 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
   if (workspace.status === 'not-ready') {
     return <WorkspaceNotReady status={workspace.workspaceStatus} />;
   }
-  // CatalogService checks catalog:read (§6.2) and looks the id up in this workspace's database only.
-  const song = await getSongCatalog(workspace.tenant, focus);
+  // getMusicWorkspace checks catalog, rights and pitch read (§6.2) and looks the id up in this
+  // workspace's database only.
+  const song = await getMusicWorkspace(workspace.tenant, focus);
   if (!song.ok && song.error.code === 'NOT_FOUND') notFound();
   const composition = song.ok ? song.value.composition : null;
+  const readiness = new Map(song.ok ? song.value.readiness.map((r) => [r.recordingId, r]) : []);
   if (focus.entityType === 'recording' && composition) {
     redirect(`/catalog/compositions/${composition.id}`);
   }
@@ -37,12 +40,20 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
             </h1>
             {composition ? <CompositionSection composition={composition} /> : null}
             {song.value.recordings.map((recording) => (
-              <RecordingSection key={recording.id} recording={recording} />
+              <RecordingSection
+                key={recording.id}
+                recording={recording}
+                readiness={readiness.get(recording.id)}
+              />
             ))}
+            <RightsPanel
+              rights={song.value.rights}
+              recordingTitles={new Map(song.value.recordings.map((r) => [r.id, recordingTitle(r)]))}
+            />
             <ReleaseSection releases={song.value.releases} recordings={song.value.recordings} />
           </>
         ) : (
-          // The other refusal is FORBIDDEN: this request's role lacks catalog:read (§6.2).
+          // The other refusal is FORBIDDEN: this request's role lacks a read it needs (§6.2).
           <Alert>
             <AlertTitle>You do not have access to this catalog</AlertTitle>
             <AlertDescription>Ask the workspace owner for access.</AlertDescription>
