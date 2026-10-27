@@ -1,10 +1,11 @@
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import type { WorkspacePermissions } from '../../../lib/auth/permissions';
 import {
   RELEASE_TYPES,
   type ReleaseDTO,
   type ReleaseInput,
+  type ReleasePatch,
   type ReleaseTrackDTO,
   type ReleaseType,
 } from '../../../lib/dto/catalog';
@@ -19,6 +20,7 @@ import { getWorkspaceDatabase, sanitized } from '../workspace-connections';
 import { runWorkspaceWrite, type WorkspaceTransaction } from '../workspace-write';
 
 const CREATE: WorkspacePermissions = { catalog: ['create'] };
+const UPDATE: WorkspacePermissions = { catalog: ['update'] };
 
 const refuse = (field: string, reason: string) => failure({ code: 'VALIDATION', field, reason });
 const positive = (n: unknown) => Number.isInteger(n) && (n as number) >= 1;
@@ -34,8 +36,9 @@ const track = ({ recordingId, discNumber = 1, trackNumber = null }: TrackInput) 
  * VALIDATION for the first broken field, before the database opens: a title that is not blank, the
  * §4.2 CHECKs on type and positions, a calendar date, and each recording and numbered position once.
  */
-function invalid(fields: ReleaseInput): ServiceResult<never> | null {
-  if (!fields.title?.trim()) return refuse('title', 'required');
+function invalid(fields: ReleasePatch, create = true): ServiceResult<never> | null {
+  if ((create || fields.title !== undefined) && !fields.title?.trim())
+    return refuse('title', 'required');
   if (fields.releaseType != null && !RELEASE_TYPES.includes(fields.releaseType))
     return refuse('releaseType', 'not_allowed');
   if (fields.releaseDate != null && !isCalendarDate(fields.releaseDate))
@@ -53,7 +56,7 @@ function invalid(fields: ReleaseInput): ServiceResult<never> | null {
 }
 
 /** The release columns an input sets, besides upc_ean. */
-const columns = (fields: ReleaseInput) => ({
+const columns = (fields: ReleasePatch) => ({
   ...{ title: fields.title?.trim(), releaseType: fields.releaseType },
   ...{ labelPartyId: fields.labelPartyId, distributorPartyId: fields.distributorPartyId },
   releaseDate: fields.releaseDate,
@@ -62,11 +65,13 @@ const columns = (fields: ReleaseInput) => ({
 /**
  * The upc_ean to store (D-1): the normalized input, null for none, or INVALID_UPC_EAN. PROPOSED
  * (melos-rpr.14): a live release with the same GTIN-13, reading a 12-digit UPC-A with a leading
- * zero, is CONFLICT; the value is still stored as normalized.
+ * zero, is CONFLICT; the value is still stored as normalized. On an update, `self` is the release
+ * being edited, which never conflicts with itself.
  */
 async function upcEanOf(
   tx: WorkspaceTransaction,
   input: string | null | undefined,
+  self?: string,
 ): Promise<ServiceResult<string | null>> {
   if (input == null) return success(null);
   const normalized = normalizeUpcEan(input);
@@ -74,7 +79,7 @@ async function upcEanOf(
   const upc = releases.upcEan;
   const gtin = sql`CASE length(${upc}) WHEN 12 THEN '0' || ${upc} ELSE ${upc} END`;
   const same = sql`${gtin} = ${normalized.value.padStart(13, '0')}`;
-  const live = and(same, isNull(releases.deletedAt));
+  const live = and(same, isNull(releases.deletedAt), self ? ne(releases.id, self) : undefined);
   const [taken] = await tx.select({ id: releases.id }).from(releases).where(live).limit(1);
   return taken ? failure({ code: 'CONFLICT', field: 'upcEan' }) : success(normalized.value);
 }
@@ -165,4 +170,59 @@ export async function getRelease(
   });
   const release = toDTO(read);
   return release ? success(release) : failure('NOT_FOUND');
+}
+
+/**
+ * Applies `patch` to a live release (CAT-007, §3.3) in one audited write transaction. catalog:update
+ * (§6.2) and VALIDATION come first, before the database opens; a release with no live row is
+ * NOT_FOUND. A UPC/EAN is checked only when it changes (D-1 grants no stored exemption, so a legacy
+ * value must not block unrelated edits); then INVALID_UPC_EAN or CONFLICT, and IntegrityGuard's
+ * NOT_FOUND for a label, distributor or recording with no live row. `tracks` replaces the set by
+ * recording; release_tracks has no columns besides the key and positions, so the rows are rewritten.
+ * A patch that changes nothing writes nothing and adds no audit row. Otherwise audits
+ * release.update with the release and its tracks before and after (§6.6).
+ */
+export async function updateRelease(
+  tenant: TenantContext,
+  releaseId: string,
+  patch: ReleasePatch,
+): Promise<ServiceResult<ReleaseDTO>> {
+  if (!requirePermission(tenant, UPDATE).ok) return failure('FORBIDDEN');
+  const refused = invalid(patch, false);
+  if (refused) return refused;
+  return runWorkspaceWrite(tenant, UPDATE, async (tx, audit) => {
+    const before = await load(tx, releaseId);
+    if (!before) return failure('NOT_FOUND');
+    const set: Partial<typeof releases.$inferInsert> = columns(patch);
+    if (patch.upcEan !== undefined && patch.upcEan !== before.upcEan) {
+      const upcEan = await upcEanOf(tx, patch.upcEan, releaseId);
+      if (!upcEan.ok) return upcEan;
+      set.upcEan = upcEan.value;
+    }
+    const keys = Object.keys(set) as (keyof typeof set & keyof ReleaseDTO)[];
+    const changed = keys.some((key) => set[key] !== undefined && set[key] !== before[key]);
+    const tracks = patch.tracks?.map(track);
+    const placement = (list: ReleaseTrackDTO[]) =>
+      JSON.stringify(list.map((t) => [t.recordingId, t.discNumber, t.trackNumber]).sort());
+    const moved = tracks !== undefined && placement(tracks) !== placement(before.tracks);
+    if (!changed && !moved) return success(before);
+    const stamp = { updatedAt: new Date().toISOString(), updatedBy: tenant.userId };
+    await guard.update(tx, releases, { ...set, ...stamp }, eq(releases.id, releaseId));
+    if (moved) {
+      await guard.delete(tx, releaseTracks, eq(releaseTracks.releaseId, releaseId));
+      if (tracks.length)
+        await guard.insert(
+          tx,
+          releaseTracks,
+          tracks.map((t) => ({ releaseId, ...t })),
+        );
+    }
+    const after = await load(tx, releaseId);
+    if (!after) throw new Error(`Release ${releaseId} was not stored`);
+    await audit.write({
+      ...{ action: 'release.update', entityType: 'release', entityId: releaseId },
+      ...{ before, after },
+    });
+    return success(after);
+  });
 }
