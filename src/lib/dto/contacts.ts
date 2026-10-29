@@ -97,3 +97,25 @@ export type PartyInput = {
 
 /** A party update: an absent field keeps its value; a new `partyKind` replaces the subtype row. */
 export type PartyPatch = Partial<PartyInput>;
+
+export const METHOD_TYPES = ['email', 'phone', 'url', 'social'] as const;
+
+/**
+ * One contact method in a party's whole set (§4.2). `id` keeps an existing row, so messages that
+ * name it keep their link; a row the set leaves out is deleted. At most one primary per type.
+ */
+export type ContactMethodInput = {
+  id?: string;
+  methodType: (typeof METHOD_TYPES)[number];
+  value: string;
+  label?: string | null;
+  isPrimary?: boolean;
+};
+
+/** A live party that shares a normalized name or an email with a candidate (§6.15). */
+export type PartyMatch = {
+  partyId: string;
+  partyKind: PartyKind;
+  displayName: string;
+  matchedOn: ('name' | 'email')[];
+};
