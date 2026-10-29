@@ -29,6 +29,29 @@ export type SongListItem = {
   }[];
 };
 
+/** How a search result matched (§3.4): its normalized title, an alternate title, or the text index. */
+export type MatchType = 'exact_title' | 'exact_alt_title' | 'text';
+
+/** MusicSearchResult (§3.4): one song (§3.5), with how it matched and its recording ids. */
+export type MusicSearchResult = SongListItem & { recordingIds: string[]; matchType: MatchType };
+
+/** The searchMusic `readiness` filter (§3.3): a song passes when one live recording does. */
+export const READINESS_FILTERS = [
+  'one_stop_ready',
+  'not_one_stop_ready',
+  'sync_ready',
+  'not_sync_ready',
+] as const;
+
+/** searchMusic input (§3.3); `termIds` keeps songs carrying every listed term. */
+export type MusicSearchInput = {
+  query: string;
+  limit?: number;
+  readiness?: (typeof READINESS_FILTERS)[number];
+  artistPartyId?: string;
+  termIds?: string[];
+};
+
 export type CompositionDTO = {
   id: string;
   title: string;
