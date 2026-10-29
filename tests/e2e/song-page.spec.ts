@@ -59,3 +59,41 @@ test('melos-rpr.5: an unknown composition is a 404; a recording opens its compos
   await expect(page).toHaveURL(MIDNIGHT_DRIVE);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Midnight Drive');
 });
+
+test('melos-rpr.16: Ocean Blue shows publishing WORLD at 85.00% with its readiness issues', async ({
+  page,
+}) => {
+  await openFromCatalog(page, 'Ocean Blue');
+  const rights = page.getByRole('region', { name: 'Rights' });
+  const world = rights.getByRole('table', { name: 'Publishing WORLD' });
+  await expect(world.getByTestId('share-total')).toHaveText('85.00%');
+  await expect(world.getByRole('row', { name: /Silverline Songs/ })).toContainText('Self');
+  // EXPECTED.md §2: three one-stop codes, then the sync-only code.
+  const issues = rights.getByRole('list', { name: 'Issues' }).getByRole('listitem');
+  await expect(issues).toHaveText([
+    /^PUBLISHING_TOTAL_INCOMPLETE/,
+    /^PUBLISHING_NOT_CONTROLLED/,
+    /^NO_LICENSING_CONTACT/,
+    /^MISSING_ISRC/,
+  ]);
+  await expect(
+    rights.getByRole('heading', { name: 'Licensing contacts' }).locator('..'),
+  ).toContainText('None');
+  const recording = page.getByRole('region', { name: 'Ocean Blue', exact: true });
+  await expect(recording.getByTestId('readiness')).toContainText('Not one-stop ready');
+});
+
+test('melos-rpr.16: Midnight Drive is One Stop Ready with Silverline Songs as implicit contact', async ({
+  page,
+}) => {
+  await openFromCatalog(page, 'Midnight Drive');
+  const recording = page.getByRole('region', { name: 'Midnight Drive', exact: true });
+  await expect(recording.getByTestId('readiness')).toContainText('One Stop Ready');
+  const rights = page.getByRole('region', { name: 'Rights' });
+  const contacts = rights.getByRole('list', { name: 'Licensing contacts' }).getByRole('listitem');
+  await expect(contacts).toHaveText([/^Silverline Songs\s*Implicit$/]);
+  await expect(rights.getByRole('list', { name: 'Issues' })).toHaveCount(0);
+  await expect(
+    rights.getByRole('table', { name: 'Writers' }).getByTestId('share-total'),
+  ).toHaveText('100.00%');
+});
