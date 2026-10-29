@@ -80,3 +80,29 @@ test('melos-rpr.43: an unreachable workspace database shows a recoverable error 
   await expect(page.getByText('No songs yet')).toBeVisible();
   await expect(page).toHaveURL(/\/catalog$/);
 });
+
+test('melos-rpr.22: Jordan searches the catalog and filters it by readiness', async ({ page }) => {
+  await signInAsJordan(page);
+  await page.goto('/catalog');
+  const search = page.getByRole('search', { name: 'Catalog' });
+  const songs = page.getByRole('region', { name: 'Songs' });
+  const rows = songs.locator('tbody').getByRole('row');
+  const titles = rows.locator('td:first-child a');
+
+  await search.getByLabel('Search songs').fill('Paper Planes');
+  await search.getByRole('button', { name: 'Search' }).click();
+  await expect(page).toHaveURL(/\/catalog\?q=Paper\+Planes/);
+  await expect(titles).toHaveText(['Paper Planes at 2AM']);
+
+  await search.getByLabel('Search songs').fill('zzzz no such song');
+  await search.getByRole('button', { name: 'Search' }).click();
+  await expect(songs.getByText('No matching songs')).toBeVisible();
+  await expect(rows).toHaveCount(0);
+
+  await search.getByLabel('Search songs').fill('');
+  await search.getByLabel('Readiness').selectOption('not_sync_ready');
+  await search.getByRole('button', { name: 'Search' }).click();
+  await expect(page).toHaveURL(/readiness=not_sync_ready/);
+  await expect(titles).toHaveText(['Neon Static', 'Ocean Blue']);
+  await expect(page.getByRole('region', { name: 'Releases' })).toBeVisible();
+});

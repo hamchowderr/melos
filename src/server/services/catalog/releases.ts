@@ -5,6 +5,7 @@ import {
   RELEASE_TYPES,
   type ReleaseDTO,
   type ReleaseInput,
+  type ReleaseListItem,
   type ReleasePatch,
   type ReleaseTrackDTO,
   type ReleaseType,
@@ -18,6 +19,7 @@ import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
 import { getWorkspaceDatabase, sanitized } from '../workspace-connections';
 import { runWorkspaceWrite, type WorkspaceTransaction } from '../workspace-write';
+import { normalizeTitle } from './read';
 
 const CREATE: WorkspacePermissions = { catalog: ['create'] };
 const UPDATE: WorkspacePermissions = { catalog: ['update'] };
@@ -225,4 +227,38 @@ export async function updateRelease(
     });
     return success(after);
   });
+}
+
+/**
+ * Every live release by normalized title, with its tracks' recording ids (CAT-007), for
+ * catalog:read (§6.2) in one batch. A refused role never opens the database.
+ */
+export async function listReleases(
+  tenant: TenantContext,
+): Promise<ServiceResult<ReleaseListItem[]>> {
+  if (!requirePermission(tenant, { catalog: ['read'] }).ok) return failure('FORBIDDEN');
+  const [rows, tracks] = await sanitized(tenant.workspaceId, async () => {
+    const database = await getWorkspaceDatabase(tenant.workspaceId);
+    const { id, title, releaseType, releaseDate, upcEan } = releases;
+    return database.batch([
+      database
+        .select({ id, title, releaseType, releaseDate, upcEan })
+        .from(releases)
+        .where(isNull(releases.deletedAt)),
+      database
+        .select({ releaseId: releaseTracks.releaseId, recordingId: releaseTracks.recordingId })
+        .from(releaseTracks)
+        .orderBy(asc(releaseTracks.discNumber), asc(releaseTracks.trackNumber)),
+    ]);
+  });
+  const sorted = rows.sort(
+    (a, b) =>
+      normalizeTitle(a.title).localeCompare(normalizeTitle(b.title)) || a.id.localeCompare(b.id),
+  );
+  return success(
+    sorted.map((row) => ({
+      ...row,
+      recordingIds: tracks.filter((t) => t.releaseId === row.id).map((t) => t.recordingId),
+    })),
+  );
 }

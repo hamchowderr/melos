@@ -300,3 +300,13 @@ export type RecordingArtistInput = {
   artistAliasId?: string | null;
   billingOrder?: number;
 };
+
+/** A live release in the /catalog Releases list (CAT-007), with the recordings its tracks hold. */
+export type ReleaseListItem = {
+  id: string;
+  title: string;
+  releaseType: string | null;
+  releaseDate: string | null;
+  upcEan: string | null;
+  recordingIds: string[];
+};
