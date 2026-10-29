@@ -94,6 +94,47 @@ export type SongReleaseDTO = {
   trackNumber: number | null;
 };
 
+/** The `releases.release_type` values the §4.2 CHECK allows. */
+export const RELEASE_TYPES = ['single', 'ep', 'album', 'compilation', 'other'] as const;
+
+export type ReleaseType = (typeof RELEASE_TYPES)[number];
+
+/** A `release_tracks` row (§4.2) without its release id. */
+export type ReleaseTrackDTO = {
+  recordingId: string;
+  discNumber: number;
+  trackNumber: number | null;
+};
+
+/**
+ * createRelease input (§3.3): an omitted field is stored as NULL, a track's disc as 1. Tracks are
+ * unique by recording and by numbered position on a disc (the release_tracks keys).
+ */
+export type ReleaseInput = {
+  title: string;
+  releaseType?: ReleaseType | null;
+  upcEan?: string | null;
+  labelPartyId?: string | null;
+  distributorPartyId?: string | null;
+  releaseDate?: string | null;
+  tracks?: { recordingId: string; discNumber?: number; trackNumber?: number | null }[];
+};
+
+/**
+ * A live `releases` row (§4.2; `deletedAt` null) with its tracks by disc and track number, unnumbered
+ * last. PROPOSED (melos-rpr.14): §3.4 has no release DTO; the phase 5 tool builds MusicWorkspaceDTO.
+ */
+export type ReleaseDTO = Required<Omit<ReleaseInput, 'tracks'>> & {
+  id: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+  deletedAt: string | null;
+  tracks: ReleaseTrackDTO[];
+};
+
 /** The catalog part of MusicWorkspaceDTO (§3.4), without rights, readiness and pitchSummary. */
 export type SongCatalogDTO = {
   focus: CatalogFocus;

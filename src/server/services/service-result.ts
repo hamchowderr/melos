@@ -16,7 +16,13 @@ export type ServiceError =
   | { code: 'FORBIDDEN' }
   | { code: 'NOT_FOUND'; counts?: RowCounts }
   | { code: 'REFERENCED' | 'SONG_LEVEL_CONFLICT'; counts: RowCounts }
-  | { code: 'VALIDATION'; field: string; reason: string };
+  | { code: 'VALIDATION'; field: string; reason: string }
+  | {
+      code: 'INVALID_ISRC' | 'INVALID_ISWC' | 'INVALID_UPC_EAN';
+      field: string;
+      reason: 'shape' | 'check_digit';
+    }
+  | { code: 'CONFLICT'; field: string };
 
 export type ServiceErrorCode = ServiceError['code'];
 
