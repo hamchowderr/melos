@@ -5,6 +5,15 @@ const INTO = sql.raw(
   'INSERT INTO catalog_search (entity_type, entity_id, title, alt_titles, artist_names, contributor_names, terms, lyrics)',
 );
 
+/** validate.mjs's recording rows, for the live recordings a caller's condition narrows. */
+const RECORDINGS = sql.raw(`
+    SELECT 'recording', r.id, trim(r.title || ' ' || COALESCE(r.version_title, '')), '',
+      COALESCE((SELECT group_concat(p.display_name, ' ') FROM recording_artists ra JOIN parties p ON p.id = ra.party_id WHERE ra.recording_id = r.id), ''),
+      COALESCE((SELECT group_concat(p.display_name, ' ') FROM recording_contributors rc JOIN parties p ON p.id = rc.party_id WHERE rc.recording_id = r.id), ''),
+      COALESCE((SELECT group_concat(t.label, ' ') FROM recording_terms rt JOIN metadata_terms t ON t.id = rt.term_id WHERE rt.recording_id = r.id), ''),
+      ''
+    FROM recordings r WHERE r.deleted_at IS NULL`);
+
 /**
  * Re-derives one song's catalog_search rows (CAT-001, §4.3) in the caller's write transaction. It
  * deletes the rows of the composition and of every recording that names it, live or deleted, then
@@ -31,11 +40,17 @@ export async function reindexSong(tx: Pick<WorkspaceTransaction, 'run'>, composi
       COALESCE((SELECT group_concat(t.label, ' ') FROM composition_terms ct JOIN metadata_terms t ON t.id = ct.term_id WHERE ct.composition_id = c.id), ''),
       COALESCE(c.lyrics, '')
     FROM compositions c WHERE c.deleted_at IS NULL AND c.id = ${compositionId}`);
-  await tx.run(sql`${INTO}
-    SELECT 'recording', r.id, trim(r.title || ' ' || COALESCE(r.version_title, '')), '',
-      COALESCE((SELECT group_concat(p.display_name, ' ') FROM recording_artists ra JOIN parties p ON p.id = ra.party_id WHERE ra.recording_id = r.id), ''),
-      COALESCE((SELECT group_concat(p.display_name, ' ') FROM recording_contributors rc JOIN parties p ON p.id = rc.party_id WHERE rc.recording_id = r.id), ''),
-      COALESCE((SELECT group_concat(t.label, ' ') FROM recording_terms rt JOIN metadata_terms t ON t.id = rt.term_id WHERE rt.recording_id = r.id), ''),
-      ''
-    FROM recordings r WHERE r.deleted_at IS NULL AND r.composition_id = ${compositionId}`);
+  await tx.run(sql`${INTO} ${RECORDINGS} AND r.composition_id = ${compositionId}`);
+}
+
+/**
+ * Re-derives a recording's own catalog_search row when it has no composition, which reindexSong
+ * does not cover; a recording with one is reindexed through its song.
+ */
+export async function reindexRecording(tx: Pick<WorkspaceTransaction, 'run'>, recordingId: string) {
+  await tx.run(
+    sql`DELETE FROM catalog_search WHERE entity_type = 'recording' AND entity_id = ${recordingId}`,
+  );
+  const own = sql`AND r.composition_id IS NULL AND r.id = ${recordingId}`;
+  await tx.run(sql`${INTO} ${RECORDINGS} ${own}`);
 }
