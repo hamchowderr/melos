@@ -161,3 +161,22 @@ export type LicensingContactsInput = {
   compositionId?: string;
   contacts: LicensingContactInput[];
 };
+
+export const WRITER_ROLES = ['songwriter', 'composer', 'lyricist', 'arranger'] as const;
+
+/** One writer in a composition's whole share set (§4.4 share replacement, RGT-001). */
+export type WriterShareInput = {
+  partyId: string;
+  roles: (typeof WRITER_ROLES)[number][];
+  shareBp: number | null;
+};
+
+/**
+ * A writer share-set replace. `expectedBeforeHash`, from an approval request (§7.4), refuses with
+ * STATE_CHANGED when the current set no longer hashes to it.
+ */
+export type WriterSharesInput = {
+  compositionId: string;
+  shares: WriterShareInput[];
+  expectedBeforeHash?: string;
+};
