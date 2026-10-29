@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AssetKeyError, assetStorageKey } from '../../src/server/services/assets/asset-storage';
 import { createLocalAssetStorage } from '../../src/server/services/assets/local-asset-storage';
@@ -28,8 +28,17 @@ describe('AST-INT-001: LocalAssetStorage keeps a key inside the workspace that g
     ]);
     const other = { workspaceId: ALPHA, storageKey: `${ALPHA}/ast_2/other.wav` };
     await storage.put({ ...other, contentType: 'audio/wav', body: bytes('other') });
+    expect(await storage.head(other)).toEqual({ contentType: 'audio/wav', size: 5 });
+    // A replaced object: the new bytes and type, and no temporary file left beside it.
+    await storage.put({ ...other, contentType: 'audio/x-wav', body: bytes('longer') });
+    expect(await storage.head(other)).toEqual({ contentType: 'audio/x-wav', size: 6 });
+    expect(readdirSync(dirname(join(ROOT, other.storageKey))).sort()).toEqual([
+      '.other.wav.type',
+      'other.wav',
+    ]);
     await storage.delete(other);
     expect(await storage.read(other)).toBeNull();
+    expect(await storage.head(other)).toBeNull();
   });
 
   it('refuses workspace A keys in workspace B from every method, touching no file', async () => {
@@ -40,6 +49,7 @@ describe('AST-INT-001: LocalAssetStorage keeps a key inside the workspace that g
       () => storage.put({ ...inBeta, contentType: 'text/html', body: bytes('beta') }),
       () => storage.delete(inBeta),
       () => storage.read(inBeta),
+      () => storage.head(inBeta),
     ];
     for (const method of methods) await expect(method()).rejects.toThrow(AssetKeyError);
 

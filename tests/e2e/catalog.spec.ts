@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   AUTH_REDIRECT,
   activeOrganizationId,
+  lockWorkspaceDatabase,
   setWorkspaceStatus,
   signInAsJordan,
   signUpWithWorkspace,
@@ -19,19 +20,22 @@ test('melos-rpr.2: Jordan opens Catalog: 5 songs with their primary artists', as
 
   const table = page.getByRole('table');
   const headers = table.getByRole('columnheader');
-  await expect(headers).toHaveText(['Title', 'Primary artists', 'Recordings']);
+  await expect(headers).toHaveText(['Title', 'Primary artists', 'Readiness', 'Recordings']);
   const rows = table.locator('tbody').getByRole('row');
-  const songs: [string | RegExp, string][] = [
-    ['Home Again', 'Jordan Taylor'],
-    ['Midnight Drive', 'Jordan Taylor'],
+  // Readiness follows EXPECTED.md §2: Neon Static and Ocean Blue are neither one-stop nor sync ready.
+  const ready = /^One Stop Ready\s*Sync ready$/;
+  const notReady = /^Not one-stop ready\s*Not sync ready$/;
+  const songs: [string | RegExp, string, RegExp][] = [
+    ['Home Again', 'Jordan Taylor', ready],
+    ['Midnight Drive', 'Jordan Taylor', ready],
     // Alex Ramirez is the primary artist; Jordan Taylor is featured.
-    ['Neon Static', 'Alex Ramirez'],
-    ['Ocean Blue', 'Jordan Taylor'],
-    [/^Paper Planes at 2AM\s*Also known as Paper Planes$/, 'Jordan Taylor'],
+    ['Neon Static', 'Alex Ramirez', notReady],
+    ['Ocean Blue', 'Jordan Taylor', notReady],
+    [/^Paper Planes at 2AM\s*Also known as Paper Planes$/, 'Jordan Taylor', ready],
   ];
   await expect(rows).toHaveCount(songs.length);
-  for (const [index, [title, artists]] of songs.entries()) {
-    await expect(rows.nth(index).getByRole('cell')).toHaveText([title, artists, '1']);
+  for (const [index, [title, artists, readiness]] of songs.entries()) {
+    await expect(rows.nth(index).getByRole('cell')).toHaveText([title, artists, readiness, '1']);
   }
 });
 
@@ -50,4 +54,29 @@ test('melos-rpr.2: a failed workspace shows the not-ready screen in Catalog', as
   await expect(page).toHaveURL(/\/catalog$/);
   await expect(page.getByTestId('workspace-not-ready')).toHaveAttribute('data-status', 'failed');
   await expect(page.getByRole('table')).toHaveCount(0);
+});
+
+test('melos-rpr.43: an unreachable workspace database shows a recoverable error in Catalog', async ({
+  page,
+}) => {
+  await signUpWithWorkspace(page, 'Outage');
+  const release = await lockWorkspaceDatabase(await activeOrganizationId(page));
+  try {
+    await page.goto('/catalog');
+    await expect(page.getByRole('heading', { name: 'This page could not load' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Switch workspace' })).toHaveAttribute(
+      'href',
+      '/workspaces',
+    );
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    // No database error text reaches the page (§7.2).
+    await expect(page.getByText(/SQLITE|WorkspaceConnectionError|unavailable:/)).toHaveCount(0);
+  } finally {
+    release();
+  }
+
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByText('No songs yet')).toBeVisible();
+  await expect(page).toHaveURL(/\/catalog$/);
 });
