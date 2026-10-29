@@ -91,6 +91,50 @@ export type CompositionDuplicate = {
   matchedOn: ('title' | 'iswc')[];
 };
 
+/** The `recording_links.link_type` values the §4.2 CHECK allows. */
+export const LINK_TYPES = [
+  'private_player',
+  'dsp',
+  'cloud_file',
+  'sync_link',
+  'video',
+  'other',
+] as const;
+
+/** A link in a createRecording or updateRecording `links` set; at most one is primary. */
+export type RecordingLinkInput = {
+  url: string;
+  linkType?: (typeof LINK_TYPES)[number];
+  label?: string | null;
+  isPrimary?: boolean;
+};
+
+/**
+ * createRecording input (§3.3). An omitted optional field is stored as NULL; `links` is the whole
+ * set. PROPOSED (melos-rpr.18): `copyrightDate` and the other §4.2 columns wait for MetadataPanel.
+ */
+export type RecordingInput = {
+  compositionId?: string | null;
+  title: string;
+  versionTitle?: string | null;
+  isrc?: string | null;
+  durationMs?: number | null;
+  bpm?: number | null;
+  musicalKey?: string | null;
+  previewStartMs?: number | null;
+  links?: RecordingLinkInput[];
+};
+
+/** A live recording findRecordingDuplicates matched, and what matched (§3.3, §6.15). */
+export type RecordingDuplicate = {
+  recordingId: string;
+  compositionId: string | null;
+  title: string;
+  versionTitle: string | null;
+  isrc: string | null;
+  matchedOn: ('isrc' | 'title')[];
+};
+
 export type RecordingLinkDTO = {
   id: string;
   linkType: string;
