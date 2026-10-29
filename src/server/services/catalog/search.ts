@@ -30,7 +30,11 @@ const keyOf = (song: SongListItem) => song.compositionId ?? song.recordings[0]?.
 
 const RANK: Record<MatchType, number> = { exact_title: 0, exact_alt_title: 1, text: 2 };
 
-const ready: Record<NonNullable<MusicSearchInput['readiness']>, (song: SongListItem) => boolean> = {
+/** Whether a song passes a readiness filter: some live recording is, or is not, ready (§6.5). */
+export const READINESS: Record<
+  NonNullable<MusicSearchInput['readiness']>,
+  (song: SongListItem) => boolean
+> = {
   one_stop_ready: (song) => song.recordings.some((r) => r.oneStopReady),
   not_one_stop_ready: (song) => song.recordings.some((r) => !r.oneStopReady),
   sync_ready: (song) => song.recordings.some((r) => r.syncReady),
@@ -116,7 +120,7 @@ export async function searchMusic(
     const matchType = matchOf(song);
     if (!matchType) return [];
     if (filters.some((keep) => keep && !keep.has(keyOf(song)))) return [];
-    if (input.readiness && !ready[input.readiness](song)) return [];
+    if (input.readiness && !READINESS[input.readiness](song)) return [];
     const recordingIds = song.recordings.map(({ recordingId }) => recordingId);
     return [{ ...song, recordingIds, matchType }];
   });
