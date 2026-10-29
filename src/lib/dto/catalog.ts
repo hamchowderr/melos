@@ -125,6 +125,12 @@ export type RecordingInput = {
   links?: RecordingLinkInput[];
 };
 
+/**
+ * updateRecording `patch` (§3.3): an omitted field is kept and null clears it; `links` replaces the
+ * set. A changed `compositionId` moves the recording to another song.
+ */
+export type RecordingPatch = Partial<Omit<RecordingInput, 'title'>> & { title?: string };
+
 /** A live recording findRecordingDuplicates matched, and what matched (§3.3, §6.15). */
 export type RecordingDuplicate = {
   recordingId: string;

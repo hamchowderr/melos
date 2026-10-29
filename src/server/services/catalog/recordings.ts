@@ -7,6 +7,7 @@ import {
   type RecordingDuplicate,
   type RecordingInput,
   type RecordingLinkInput,
+  type RecordingPatch,
 } from '../../../lib/dto/catalog';
 import { normalizeIsrc } from '../../../lib/identifiers';
 import { compositions, recordingLinks, recordings } from '../../db/schema/workspace.generated';
@@ -21,6 +22,7 @@ import { normalizeTitle } from './read';
 import { reindexRecording, reindexSong } from './search-index';
 
 const CREATE: WorkspacePermissions = { catalog: ['create'] };
+const UPDATE: WorkspacePermissions = { catalog: ['update'] };
 
 const refuse = (field: string, reason: string) => failure({ code: 'VALIDATION', field, reason });
 const whole = (value: number | null | undefined) =>
@@ -64,7 +66,7 @@ export async function findRecordingDuplicates(
 }
 
 /** VALIDATION for the first broken field, before the database opens. */
-function invalid(fields: Partial<RecordingInput>, create: boolean): ServiceResult<never> | null {
+function invalid(fields: RecordingPatch, create: boolean): ServiceResult<never> | null {
   if ((create || fields.title !== undefined) && !fields.title?.trim())
     return refuse('title', 'required');
   if (!whole(fields.durationMs)) return refuse('durationMs', 'not_a_whole_number');
@@ -81,7 +83,7 @@ function invalid(fields: Partial<RecordingInput>, create: boolean): ServiceResul
 }
 
 /** The recording columns a patch sets, besides isrc and compositionId; undefined keeps a column. */
-const columns = (fields: Partial<RecordingInput>) => ({
+const columns = (fields: RecordingPatch) => ({
   ...{
     title: fields.title?.trim(),
     versionTitle: fields.versionTitle,
@@ -200,6 +202,59 @@ export async function createRecording(
       ...{ before: null, after: created },
     });
     return success(id);
+  });
+  return written.ok ? songOf(tenant, written.value) : written;
+}
+
+/**
+ * Applies `patch` to a live recording (CAT-002, CAT-004, CAT-005, §3.3) in one audited write
+ * transaction and reindexes the songs it touched (§4.3). catalog:update (§6.2) and VALIDATION come
+ * first; a recording or target composition with no live row is NOT_FOUND; then INVALID_ISRC or
+ * CONFLICT for a changed ISRC. A move the song-level pitch rule forbids is SONG_LEVEL_CONFLICT
+ * (§4.4 rule 3). `links` replaces the set. A patch that changes nothing writes nothing and adds no
+ * audit row; otherwise audits recording.update before and after (§6.6).
+ */
+export async function updateRecording(
+  tenant: TenantContext,
+  recordingId: string,
+  patch: RecordingPatch,
+): Promise<ServiceResult<MusicWorkspaceDTO>> {
+  if (!requirePermission(tenant, UPDATE).ok) return failure('FORBIDDEN');
+  const refused = invalid(patch, false);
+  if (refused) return refused;
+  const written = await runWorkspaceWrite(tenant, UPDATE, async (tx, audit) => {
+    const before = await load(tx, recordingId);
+    if (!before) return failure('NOT_FOUND');
+    const set: Partial<typeof recordings.$inferInsert> = columns(patch);
+    if (patch.compositionId !== undefined) {
+      const target = patch.compositionId;
+      if (target && target !== before.compositionId && !(await liveComposition(tx, target)))
+        return failure('NOT_FOUND');
+      set.compositionId = target;
+    }
+    if (patch.isrc !== undefined) {
+      const isrc = await isrcOf(tx, patch.isrc, recordingId);
+      if (!isrc.ok) return isrc;
+      set.isrc = isrc.value;
+    }
+    const keys = Object.keys(set) as (keyof typeof set)[];
+    const changed = keys.filter((key) => set[key] !== undefined && set[key] !== before[key]);
+    const links = patch.links && linksOf(patch.links);
+    const relinked = links && JSON.stringify(links) !== JSON.stringify(before.links);
+    if (!changed.length && !relinked) return success(recordingId);
+    const stamp = { updatedAt: new Date().toISOString(), updatedBy: tenant.userId };
+    const fields = Object.fromEntries(changed.map((key) => [key, set[key]]));
+    await guard.update(tx, recordings, { ...fields, ...stamp }, eq(recordings.id, recordingId));
+    if (relinked) await replaceLinks(tx, tenant, recordingId, links);
+    const after = await load(tx, recordingId);
+    if (!after) throw new Error(`Recording ${recordingId} was not stored`);
+    // A move reindexes both songs: the old song's row still lists the moved recording's artists.
+    await reindex(tx, recordingId, [before.compositionId, after.compositionId]);
+    await audit.write({
+      ...{ action: 'recording.update', entityType: 'recording', entityId: recordingId },
+      ...{ before, after },
+    });
+    return success(recordingId);
   });
   return written.ok ? songOf(tenant, written.value) : written;
 }
