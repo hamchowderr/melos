@@ -63,6 +63,34 @@ export type CompositionDTO = {
   hasLyrics: boolean;
 };
 
+/**
+ * createComposition input (§3.3): an omitted field is stored as NULL. Alternate titles are stored as
+ * `alternate`, each once (`composition_alt_titles`, §4.2).
+ */
+export type CompositionInput = {
+  title: string;
+  description?: string | null;
+  lyrics?: string | null;
+  iswc?: string | null;
+  copyrightRegistrationNumber?: string | null;
+  copyrightDate?: string | null;
+  altTitles?: string[];
+};
+
+/**
+ * updateComposition `patch` (§3.3): an omitted field is kept and null clears it. `altTitles`
+ * replaces the set; a title it keeps keeps its `title_type`. PROPOSED (melos-rpr.13).
+ */
+export type CompositionPatch = Partial<Omit<CompositionInput, 'title'>> & { title?: string };
+
+/** A live composition findCompositionDuplicates matched, and what matched (§3.3, §6.15). */
+export type CompositionDuplicate = {
+  compositionId: string;
+  title: string;
+  iswc: string | null;
+  matchedOn: ('title' | 'iswc')[];
+};
+
 export type RecordingLinkDTO = {
   id: string;
   linkType: string;
