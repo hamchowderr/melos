@@ -172,6 +172,12 @@ export type ReleaseInput = {
 };
 
 /**
+ * updateRelease `patch` (§3.3): an omitted field is kept and null clears it; `tracks` replaces the
+ * set, matched by recording. PROPOSED (melos-rpr.14).
+ */
+export type ReleasePatch = Partial<Omit<ReleaseInput, 'title'>> & { title?: string };
+
+/**
  * A live `releases` row (§4.2; `deletedAt` null) with its tracks by disc and track number, unnumbered
  * last. PROPOSED (melos-rpr.14): §3.4 has no release DTO; the phase 5 tool builds MusicWorkspaceDTO.
  */

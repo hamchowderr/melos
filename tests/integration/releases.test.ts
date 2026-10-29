@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { ReleaseInput, ReleaseType } from '../../src/lib/dto/catalog';
+import type { ReleaseInput, ReleasePatch, ReleaseType } from '../../src/lib/dto/catalog';
 import * as tables from '../../src/server/db/schema/workspace.generated';
 import { canonicalJson } from '../../src/server/services/audit-writer';
 import type { ServiceResult } from '../../src/server/services/service-result';
@@ -28,6 +28,8 @@ let other: TenantContext;
 
 const create = (input: ReleaseInput, tenant = owner) => service.createRelease(tenant, input);
 const get = (id: string, tenant = owner) => service.getRelease(tenant, id);
+const update = (id: string, patch: ReleasePatch, tenant = owner) =>
+  service.updateRelease(tenant, id, patch);
 async function accepted<T>(pending: Promise<ServiceResult<T>>): Promise<T> {
   const result = await pending;
   if (!result.ok) throw new Error(`Refused with ${result.error.code}`);
@@ -170,5 +172,73 @@ describe('melos-rpr.14: releases with ordered tracks (CAT-007)', () => {
       expect(await create({ title: 'New', ...fields }), reason).toEqual(refusal);
     }
     expect(services.getWorkspaceDatabase.mock.calls).toEqual([]);
+  });
+
+  it('patches the fields given, replaces tracks by recording, and audits once before and after (AUD-INT-001)', async () => {
+    const created = await accepted(
+      create({ title: 'Edit Me', upcEan: '077777777770', tracks: [at(A, 1), at(B, 2)] }),
+    );
+    const [, earlier] = await stored();
+    const patched = await accepted(
+      update(created.id, {
+        ...{ title: ' Edited ', releaseType: 'album', labelPartyId: LABEL, upcEan: null },
+        tracks: [at(B, 1), at(C, 2)],
+      }),
+    );
+    expect(patched).toMatchObject({ title: 'Edited', releaseType: 'album', upcEan: null });
+    expect(patched.tracks).toEqual([at(B, 1), at(C, 2)]);
+    expect(patched.updatedAt >= created.updatedAt).toBe(true);
+    const [, audits] = await stored();
+    const entry = { entityType: 'release', entityId: created.id, actorUserId: owner.userId };
+    expect(audits.slice(earlier.length)).toMatchObject([
+      {
+        ...{ ...entry, action: 'release.update', requestId: owner.requestId },
+        ...{ beforeJson: canonicalJson(created), afterJson: canonicalJson(patched) },
+      },
+    ]);
+    // The same values again, tracks in another order, change nothing and add no audit row.
+    const same = { title: 'Edited', tracks: [at(C, 2), at(B, 1)] };
+    expect(await update(created.id, same)).toEqual(ok(patched));
+    expect((await stored())[1]).toHaveLength(audits.length);
+  });
+
+  it('checks a UPC/EAN only when it changes, refuses one another release holds, and keeps a legacy value', async () => {
+    const held = await accepted(create({ title: 'Held', upcEan: '0-12345-67891-2' }));
+    const mine = await accepted(create({ title: 'Mine', upcEan: '009876543215' }));
+    // A stored value that would fail today's check digit, as an import could leave it.
+    const legacy = await accepted(create({ title: 'Legacy' }));
+    const byId = eq(tables.releases.id, legacy.id);
+    await (await open(owner)).update(tables.releases).set({ upcEan: '036000291453' }).where(byId);
+    const earlier = await stored();
+    expect(await update(mine.id, { upcEan: held.upcEan })).toEqual(CONFLICT);
+    expect(await update(mine.id, { upcEan: '036000291453' })).toEqual(badUpc('check_digit'));
+    expect(await update(mine.id, { tracks: [at(DELETED, 1)] })).toEqual(missing('recordings'));
+    expect(await stored()).toEqual(earlier);
+    // Its own value, as EAN-13, is no conflict.
+    expect(await update(mine.id, { upcEan: '0009876543215' })).toMatchObject(
+      ok({ upcEan: '0009876543215' }),
+    );
+    expect(await update(legacy.id, { title: 'Legacy Edit' })).toMatchObject(
+      ok({ title: 'Legacy Edit', upcEan: '036000291453' }),
+    );
+  });
+
+  it('refuses a missing, deleted or foreign release with NOT_FOUND, a viewer with FORBIDDEN and bad fields with VALIDATION, before writing', async () => {
+    const kept = await accepted(create({ title: 'Kept for update' }));
+    services.getWorkspaceDatabase.mockClear();
+    expect(await update(kept.id, { title: 'X' }, withRole(owner, 'viewer'))).toEqual(FORBIDDEN);
+    expect(await update(kept.id, { title: ' ' })).toEqual(
+      refused({ code: 'VALIDATION', field: 'title', reason: 'required' }),
+    );
+    expect(await update(kept.id, { tracks: [at(A, 1), at(A, 2)] })).toEqual(
+      refused({ code: 'VALIDATION', field: 'tracks', reason: 'duplicate_recording' }),
+    );
+    expect(services.getWorkspaceDatabase.mock.calls).toEqual([]);
+    expect(await update(`rel_${ulid()}`, { title: 'X' })).toEqual(NOT_FOUND);
+    expect(await update(kept.id, { title: 'X' }, other)).toEqual(NOT_FOUND);
+    const byId = eq(tables.releases.id, kept.id);
+    await (await open(owner)).update(tables.releases).set({ deletedAt: AT }).where(byId);
+    expect(await update(kept.id, { title: 'X' })).toEqual(NOT_FOUND);
+    await stored();
   });
 });
