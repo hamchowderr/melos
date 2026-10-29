@@ -287,3 +287,16 @@ export type MusicWorkspaceDTO = SongCatalogDTO & {
   pitchSummary: SongPitchSummaryDTO;
   importedReportTemplateId: string | null;
 };
+
+export const ARTIST_ROLES = ['primary', 'featured'] as const;
+
+/**
+ * One credit in a recording's whole artist set (CAT-003), keyed by party and role. `artistAliasId`
+ * names the credited alias, one of that party's own; `billingOrder` defaults to the input position.
+ */
+export type RecordingArtistInput = {
+  partyId: string;
+  role: (typeof ARTIST_ROLES)[number];
+  artistAliasId?: string | null;
+  billingOrder?: number;
+};
