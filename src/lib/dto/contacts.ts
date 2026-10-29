@@ -78,3 +78,22 @@ export type PartyDetailDTO = Omit<PartyListItem, 'primaryEmail' | 'organizationT
   identifiers: PartyIdentifierDTO[];
   societyAffiliations: SocietyAffiliationDTO[];
 };
+
+/**
+ * A new party (§4.2, D-5): the party row and its subtype row. `legalName` defaults to the display
+ * name; only the subtype that matches `partyKind` is stored.
+ */
+export type PartyInput = {
+  partyKind: PartyKind;
+  displayName: string;
+  notes?: string | null;
+  person?: { givenName?: string | null; familyName?: string | null; legalName?: string };
+  organization?: {
+    legalName?: string;
+    organizationType?: string | null;
+    websiteUrl?: string | null;
+  };
+};
+
+/** A party update: an absent field keeps its value; a new `partyKind` replaces the subtype row. */
+export type PartyPatch = Partial<PartyInput>;
