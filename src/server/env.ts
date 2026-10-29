@@ -58,6 +58,10 @@ const rawEnvSchema = z.object({
       .default('outbox'),
   ),
   MELOS_SIGNUP_ALLOWED_EMAILS: optionalText,
+  R2_ACCOUNT_ID: optionalText,
+  R2_ACCESS_KEY_ID: optionalText,
+  R2_SECRET_ACCESS_KEY: optionalText,
+  R2_BUCKET: optionalText,
   MELOS_ASSET_STORAGE: z.preprocess(
     blankToUndefined,
     z.enum(['local', 'r2'], { error: 'must be one of: local, r2' }).optional(),
@@ -159,8 +163,22 @@ export type ChatModelSetting =
 /** A chat model whose variables are missing or invalid; `requireChatModel` throws its problems. */
 export type UnconfiguredChatModel = { provider: 'unconfigured'; problems: EnvProblem[] };
 
-/** Files under the workspace data folder off Vercel; R2 on Vercel, resolved on first use (D-7). */
-export type AssetStorageSetting = { kind: 'local'; rootDir: string } | { kind: 'r2' };
+/** The R2 API credentials and bucket (§7.5, U-27); the variable names are PROPOSED. */
+export type R2Config = {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+};
+
+/**
+ * Files under the workspace data folder off Vercel; R2 on Vercel, resolved on first use (D-7). R2
+ * with variables missing names them, so the asset call fails clearly while every page still serves.
+ */
+export type AssetStorageSetting =
+  | { kind: 'local'; rootDir: string }
+  | { kind: 'r2'; config: R2Config }
+  | { kind: 'r2'; missing: string[] };
 
 export type ServerEnv = {
   onVercel: boolean;
@@ -226,6 +244,30 @@ function parseSignUpAllowlist(env: RawEnv): string[] | null {
   return env.MELOS_SIGNUP_ALLOWED_EMAILS.split(',')
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
+}
+
+const R2_VARIABLES = [
+  'R2_ACCOUNT_ID',
+  'R2_ACCESS_KEY_ID',
+  'R2_SECRET_ACCESS_KEY',
+  'R2_BUCKET',
+] as const;
+
+/** R2's settings, or the names of its missing variables, never their values (ADR-031). */
+function resolveR2(env: RawEnv): AssetStorageSetting {
+  const missing = R2_VARIABLES.filter((name) => !env[name]);
+  if (missing.length) return { kind: 'r2', missing };
+  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET } = env as Record<
+    (typeof R2_VARIABLES)[number],
+    string
+  >;
+  return {
+    kind: 'r2',
+    config: {
+      ...{ accountId: R2_ACCOUNT_ID, accessKeyId: R2_ACCESS_KEY_ID },
+      ...{ secretAccessKey: R2_SECRET_ACCESS_KEY, bucket: R2_BUCKET },
+    },
+  };
 }
 
 /** Missing Turso variables fail provisioning, not startup, so a deploy without them still runs. */
@@ -303,7 +345,7 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
     // Only an off-Vercel host is local, and local assets on Vercel were refused above.
     assetStorage:
       env.MELOS_ASSET_STORAGE === 'r2' || workspaceHost.kind !== 'local'
-        ? { kind: 'r2' }
+        ? resolveR2(env)
         : { kind: 'local', rootDir: posix.join(workspaceHost.dataDir, 'assets') },
     auth: { secret: env.BETTER_AUTH_SECRET, ...resolveAuthUrls(env) },
     controlDatabase: {

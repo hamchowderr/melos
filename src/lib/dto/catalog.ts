@@ -29,6 +29,29 @@ export type SongListItem = {
   }[];
 };
 
+/** How a search result matched (§3.4): its normalized title, an alternate title, or the text index. */
+export type MatchType = 'exact_title' | 'exact_alt_title' | 'text';
+
+/** MusicSearchResult (§3.4): one song (§3.5), with how it matched and its recording ids. */
+export type MusicSearchResult = SongListItem & { recordingIds: string[]; matchType: MatchType };
+
+/** The searchMusic `readiness` filter (§3.3): a song passes when one live recording does. */
+export const READINESS_FILTERS = [
+  'one_stop_ready',
+  'not_one_stop_ready',
+  'sync_ready',
+  'not_sync_ready',
+] as const;
+
+/** searchMusic input (§3.3); `termIds` keeps songs carrying every listed term. */
+export type MusicSearchInput = {
+  query: string;
+  limit?: number;
+  readiness?: (typeof READINESS_FILTERS)[number];
+  artistPartyId?: string;
+  termIds?: string[];
+};
+
 export type CompositionDTO = {
   id: string;
   title: string;
@@ -92,6 +115,47 @@ export type SongReleaseDTO = {
   recordingId: string;
   discNumber: number;
   trackNumber: number | null;
+};
+
+/** The `releases.release_type` values the §4.2 CHECK allows. */
+export const RELEASE_TYPES = ['single', 'ep', 'album', 'compilation', 'other'] as const;
+
+export type ReleaseType = (typeof RELEASE_TYPES)[number];
+
+/** A `release_tracks` row (§4.2) without its release id. */
+export type ReleaseTrackDTO = {
+  recordingId: string;
+  discNumber: number;
+  trackNumber: number | null;
+};
+
+/**
+ * createRelease input (§3.3): an omitted field is stored as NULL, a track's disc as 1. Tracks are
+ * unique by recording and by numbered position on a disc (the release_tracks keys).
+ */
+export type ReleaseInput = {
+  title: string;
+  releaseType?: ReleaseType | null;
+  upcEan?: string | null;
+  labelPartyId?: string | null;
+  distributorPartyId?: string | null;
+  releaseDate?: string | null;
+  tracks?: { recordingId: string; discNumber?: number; trackNumber?: number | null }[];
+};
+
+/**
+ * A live `releases` row (§4.2; `deletedAt` null) with its tracks by disc and track number, unnumbered
+ * last. PROPOSED (melos-rpr.14): §3.4 has no release DTO; the phase 5 tool builds MusicWorkspaceDTO.
+ */
+export type ReleaseDTO = Required<Omit<ReleaseInput, 'tracks'>> & {
+  id: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+  deletedAt: string | null;
+  tracks: ReleaseTrackDTO[];
 };
 
 /** The catalog part of MusicWorkspaceDTO (§3.4), without rights, readiness and pitchSummary. */

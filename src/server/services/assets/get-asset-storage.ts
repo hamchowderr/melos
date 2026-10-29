@@ -1,18 +1,23 @@
 import { getServerEnv } from '../../env';
 import type { AssetStorage } from './asset-storage';
 import { createLocalAssetStorage, type LocalAssetStorage } from './local-asset-storage';
+import { createR2AssetStorage } from './r2-asset-storage';
 
-/** Thrown by the asset call itself, never at startup, while MELOS_ASSET_STORAGE selects r2. */
+/**
+ * Thrown by the asset call itself, never at startup, while R2 is selected and its variables are
+ * missing. It names the variables, never their values (ADR-031).
+ */
 export class AssetStorageUnavailableError extends Error {
-  readonly code = 'R2_NOT_AVAILABLE';
+  readonly code = 'R2_NOT_CONFIGURED';
 
-  constructor() {
-    super('Asset storage is unavailable: MELOS_ASSET_STORAGE selects r2, which is not built yet');
+  constructor(readonly missing: string[]) {
+    super(`Asset storage is unavailable: set ${missing.join(', ')} to use R2`);
     this.name = 'AssetStorageUnavailableError';
   }
 }
 
 let local: LocalAssetStorage | undefined;
+let r2: AssetStorage | undefined;
 
 /** LocalAssetStorage when MELOS_ASSET_STORAGE selects local, built on first use; otherwise null. */
 export function getLocalAssetStorage(): LocalAssetStorage | null {
@@ -27,7 +32,12 @@ export function getLocalAssetStorage(): LocalAssetStorage | null {
  * asset variables still serves every page (D-7).
  */
 export function getAssetStorage(): AssetStorage {
-  const storage = getLocalAssetStorage();
-  if (!storage) throw new AssetStorageUnavailableError();
-  return storage;
+  const files = getLocalAssetStorage();
+  if (files) return files;
+  const { assetStorage } = getServerEnv();
+  if (assetStorage.kind === 'r2' && 'config' in assetStorage) {
+    r2 ??= createR2AssetStorage(assetStorage.config);
+    return r2;
+  }
+  throw new AssetStorageUnavailableError('missing' in assetStorage ? assetStorage.missing : []);
 }

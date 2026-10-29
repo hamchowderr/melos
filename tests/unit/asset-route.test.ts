@@ -3,11 +3,14 @@ import { expect, it, vi } from 'vitest';
 const resolve = vi.hoisted(() => vi.fn());
 vi.mock('../../src/server/services/tenant-context', () => ({ tenantContextResolver: { resolve } }));
 
-it('builds asset storage on the first asset call, which fails clearly while r2 is selected (D-7)', async () => {
+it('builds asset storage on the first asset call, which names the missing R2 variables (D-7)', async () => {
   vi.stubEnv('MELOS_ASSET_STORAGE', 'r2');
   const selection = await import('../../src/server/services/assets/get-asset-storage');
   expect(selection.getLocalAssetStorage()).toBeNull();
   expect(() => selection.getAssetStorage()).toThrow(selection.AssetStorageUnavailableError);
+  expect(() => selection.getAssetStorage()).toThrow(
+    'set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET to use R2',
+  );
 
   // The local route answers 404 before any session lookup where local storage is not selected.
   const route = await import('../../src/app/api/assets/local/[...key]/route');

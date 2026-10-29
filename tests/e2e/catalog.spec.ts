@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   AUTH_REDIRECT,
   activeOrganizationId,
+  lockWorkspaceDatabase,
   setWorkspaceStatus,
   signInAsJordan,
   signUpWithWorkspace,
@@ -53,4 +54,29 @@ test('melos-rpr.2: a failed workspace shows the not-ready screen in Catalog', as
   await expect(page).toHaveURL(/\/catalog$/);
   await expect(page.getByTestId('workspace-not-ready')).toHaveAttribute('data-status', 'failed');
   await expect(page.getByRole('table')).toHaveCount(0);
+});
+
+test('melos-rpr.43: an unreachable workspace database shows a recoverable error in Catalog', async ({
+  page,
+}) => {
+  await signUpWithWorkspace(page, 'Outage');
+  const release = await lockWorkspaceDatabase(await activeOrganizationId(page));
+  try {
+    await page.goto('/catalog');
+    await expect(page.getByRole('heading', { name: 'This page could not load' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Switch workspace' })).toHaveAttribute(
+      'href',
+      '/workspaces',
+    );
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    // No database error text reaches the page (§7.2).
+    await expect(page.getByText(/SQLITE|WorkspaceConnectionError|unavailable:/)).toHaveCount(0);
+  } finally {
+    release();
+  }
+
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByText('No songs yet')).toBeVisible();
+  await expect(page).toHaveURL(/\/catalog$/);
 });

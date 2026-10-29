@@ -139,3 +139,25 @@ export type ReadinessReportDTO = {
     'licensingContacts'
   >)[];
 };
+
+/** attestRepresentation input (§3.3): `attested` true sets the attestation, false clears it. */
+export type RepresentationInput = {
+  interestType: 'publishing' | 'master';
+  interestId: string;
+  agreementId?: string | null;
+  attested: boolean;
+};
+
+/** One licensing contact in updateLicensingContacts input (§3.3). */
+export type LicensingContactInput = {
+  partyId: string;
+  agreementId?: string | null;
+  notes?: string | null;
+};
+
+/** updateLicensingContacts input (§3.3): exactly one target, and the contact set that replaces it. */
+export type LicensingContactsInput = {
+  recordingId?: string;
+  compositionId?: string;
+  contacts: LicensingContactInput[];
+};
