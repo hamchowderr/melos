@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ReadinessBadges } from '@/components/rights/readiness-badges';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import {
   Table,
@@ -15,6 +16,12 @@ const songHref = ({ compositionId, recordings }: SongListItem) =>
   compositionId
     ? `/catalog/compositions/${compositionId}`
     : `/catalog/recordings/${recordings[0].recordingId}`;
+
+/** A song is ready when every one of its live recordings is (§6.5). */
+const songReadiness = ({ recordings }: SongListItem) => ({
+  oneStopReady: recordings.every(({ oneStopReady }) => oneStopReady),
+  syncReady: recordings.every(({ syncReady }) => syncReady),
+});
 
 /** The catalog's songs (§2.3, CAT-009), in the order CatalogService lists them. */
 export function SongGrid({ songs }: { songs: SongListItem[] }) {
@@ -35,6 +42,7 @@ export function SongGrid({ songs }: { songs: SongListItem[] }) {
         <TableRow>
           <TableHead>Title</TableHead>
           <TableHead>Primary artists</TableHead>
+          <TableHead>Readiness</TableHead>
           <TableHead className="text-right">Recordings</TableHead>
         </TableRow>
       </TableHeader>
@@ -56,6 +64,9 @@ export function SongGrid({ songs }: { songs: SongListItem[] }) {
             </TableCell>
             <TableCell className="whitespace-normal">
               {song.primaryArtistNames.join(', ')}
+            </TableCell>
+            <TableCell>
+              <ReadinessBadges {...songReadiness(song)} />
             </TableCell>
             <TableCell className="text-right tabular-nums">{song.recordings.length}</TableCell>
           </TableRow>

@@ -124,6 +124,44 @@ describe('melos-rpr.3: runWorkspaceWrite authorizes, guards and audits one trans
     expect(await db.all(sql`PRAGMA foreign_key_check`)).toEqual([]);
   });
 
+  it('recovers when a read runs on the pooled connection while one write holds the lock and another is refused (melos-rpr.44)', async () => {
+    const db = await open(member);
+    const earlier = await db.select().from(auditLog);
+    let release = () => {};
+    const gate = new Promise<void>((done) => {
+      release = done;
+    });
+    let entered = () => {};
+    const inside = new Promise<void>((done) => {
+      entered = done;
+    });
+    const [first, second, later] = [
+      song('Held Lock'),
+      song('Refused At Begin'),
+      song('Afterwards'),
+    ];
+    const held = write.runWorkspaceWrite(member, CREATE, async (tx, audit) => {
+      const result = await create(first)(tx, audit);
+      entered();
+      await gate;
+      return result;
+    });
+    await inside;
+    const refused = write.runWorkspaceWrite(member, CREATE, create(second));
+    // A read on the pooled connection while the first write holds the lock.
+    const read = db.select().from(compositions);
+    await new Promise((done) => setTimeout(done, 30));
+    release();
+    expect(await held).toEqual(success(first.id));
+    expect(await refused).toEqual(success(second.id));
+    await read;
+    expect(await write.runWorkspaceWrite(member, CREATE, create(later))).toEqual(success(later.id));
+    const audited = (await db.select().from(auditLog)).slice(earlier.length);
+    const ids = [first, second, later].map(({ id }) => id).sort();
+    expect(audited.map(({ entityId }) => entityId).sort()).toEqual(ids);
+    expect(await db.all(sql`PRAGMA foreign_key_check`)).toEqual([]);
+  });
+
   it('runs core again when a lock refuses the transaction after core ran, keeping one audit row', async () => {
     const db = await open(member);
     const earlier = await db.select().from(auditLog);

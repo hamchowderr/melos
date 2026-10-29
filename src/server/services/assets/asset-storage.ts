@@ -1,4 +1,7 @@
-/** Storage adapters for asset binaries, copied from docs/CONTRACT.md §7.5. */
+/**
+ * Storage adapters for asset binaries, copied from docs/CONTRACT.md §7.5, plus `head` (G-15), which
+ * AssetService uses to confirm an upload landed.
+ */
 export interface AssetStorage {
   readonly provider: 'local' | 'r2';
   createUploadUrl(input: {
@@ -19,6 +22,30 @@ export interface AssetStorage {
     body: Uint8Array;
   }): Promise<void>;
   delete(input: { workspaceId: string; storageKey: string }): Promise<void>;
+  /** The stored object's content type and size in bytes, or null when no object has the key. */
+  head(input: {
+    workspaceId: string;
+    storageKey: string;
+  }): Promise<{ contentType: string; size: number } | null>;
+}
+
+/** Presigned URL lifetimes (P-35): uploads 900 s, audio downloads 3600 s, other downloads 300 s. */
+export const ASSET_URL_SECONDS = { upload: 900, audio: 3600, other: 300 } as const;
+
+/** How long a download URL for `contentType` stays valid (P-35). */
+export const downloadSeconds = (contentType: string) =>
+  contentType.toLowerCase().startsWith('audio/')
+    ? ASSET_URL_SECONDS.audio
+    : ASSET_URL_SECONDS.other;
+
+/** R2 accepts presigned expiries from 1 second to 7 days (§7.5); every adapter keeps that range. */
+export const MAX_EXPIRY_SECONDS = 604_800;
+
+/** Throws unless `seconds` is a whole number of seconds R2 accepts. */
+export function requireExpiry(seconds: number): void {
+  if (!Number.isInteger(seconds) || seconds < 1 || seconds > MAX_EXPIRY_SECONDS) {
+    throw new RangeError(`expiresInSeconds must be an integer from 1 to ${MAX_EXPIRY_SECONDS}`);
+  }
 }
 
 /** A storage key outside the tenant workspace's prefix or not in the generated shape (AST-001). */

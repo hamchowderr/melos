@@ -278,7 +278,25 @@ describe('parseServerEnv', () => {
     const local = parseServerEnv({ ...TEST_MODEL, MELOS_WORKSPACE_DATA_DIR: 'data/ws' });
     expect(local.assetStorage).toEqual({ kind: 'local', rootDir: 'data/ws/assets' });
     const r2 = parseServerEnv({ ...TEST_MODEL, MELOS_ASSET_STORAGE: 'r2' });
-    expect(r2.assetStorage).toEqual({ kind: 'r2' });
+    expect(r2.assetStorage).toEqual({
+      kind: 'r2',
+      missing: ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET'],
+    });
+    const r2Variables = {
+      ...{ R2_ACCOUNT_ID: 'account', R2_ACCESS_KEY_ID: 'key-id', R2_SECRET_ACCESS_KEY: 'secret' },
+      R2_BUCKET: 'melos-preview',
+    };
+    expect(
+      parseServerEnv({ ...TEST_MODEL, MELOS_ASSET_STORAGE: 'r2', ...r2Variables }).assetStorage,
+    ).toEqual({
+      kind: 'r2',
+      config: {
+        accountId: 'account',
+        accessKeyId: 'key-id',
+        secretAccessKey: 'secret',
+        bucket: 'melos-preview',
+      },
+    });
     expect(problemsOf({ ...TEST_MODEL, MELOS_ASSET_STORAGE: 's3' }).problems).toEqual([
       { name: 'MELOS_ASSET_STORAGE', reason: 'must be one of: local, r2' },
     ]);
@@ -293,7 +311,10 @@ describe('parseServerEnv', () => {
       MELOS_AGENT_DATABASE_URL: 'libsql://agent-example.turso.io',
       MELOS_AGENT_DATABASE_AUTH_TOKEN: 'agent-token-for-test',
     };
-    expect(parseServerEnv(production).assetStorage).toEqual({ kind: 'r2' });
+    expect(parseServerEnv(production).assetStorage).toEqual({
+      kind: 'r2',
+      missing: ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET'],
+    });
     expect(problemsOf({ ...production, MELOS_ASSET_STORAGE: 'local' }).problems).toEqual([
       {
         name: 'MELOS_ASSET_STORAGE',
