@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { RepresentationControls } from '@/components/rights/representation-controls';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -22,6 +23,9 @@ type Props = {
   /** The publishing editor, and each recording's master editor by id, for rights:update. */
   publishingEditor?: ReactNode;
   masterEditors?: Map<string, ReactNode>;
+  /** Attest controls on other holders' shares, and the licensing contacts editor (RGT-005). */
+  representable?: boolean;
+  contactsEditor?: ReactNode;
 };
 
 /** A share table with its §4.3 view total in the footer. */
@@ -74,11 +78,22 @@ const holderBadges = ({ isSelf, representationAttested }: RightsHolderDTO) => (
   </span>
 );
 
-const holderRows = (holders: RightsHolderDTO[]) =>
+const holderRows = (
+  holders: RightsHolderDTO[],
+  interestType: 'publishing' | 'master',
+  representable?: boolean,
+) =>
   holders.map((holder) => ({
     key: holder.interestId,
     name: holder.displayName,
-    detail: holderBadges(holder),
+    detail: (
+      <span className="inline-flex flex-wrap items-center gap-2">
+        {holderBadges(holder)}
+        {representable ? (
+          <RepresentationControls interestType={interestType} holder={holder} />
+        ) : null}
+      </span>
+    ),
     shareBp: holder.shareBp,
   }));
 
@@ -88,6 +103,7 @@ const holderRows = (holders: RightsHolderDTO[]) =>
  */
 export function RightsPanel(props: Props) {
   const { rights, recordingTitles, writerEditor, publishingEditor, masterEditors } = props;
+  const { representable, contactsEditor } = props;
   const writers = rights.writers.map((writer) => ({
     key: writer.contributorId,
     name: writer.displayName,
@@ -117,7 +133,7 @@ export function RightsPanel(props: Props) {
                   <h3 className="font-medium">{`Publishing ${territory}`}</h3>
                   <ShareTable
                     label={`Publishing ${territory}`}
-                    rows={holderRows(holders)}
+                    rows={holderRows(holders, 'publishing', representable)}
                     totalBp={totalBp}
                   />
                 </div>
@@ -130,7 +146,11 @@ export function RightsPanel(props: Props) {
             return (
               <div key={recordingId} className="flex flex-col gap-2">
                 <h3 className="font-medium">{label}</h3>
-                <ShareTable label={label} rows={holderRows(holders)} totalBp={totalBp} />
+                <ShareTable
+                  label={label}
+                  rows={holderRows(holders, 'master', representable)}
+                  totalBp={totalBp}
+                />
                 {masterEditors?.get(recordingId)}
               </div>
             );
@@ -150,6 +170,7 @@ export function RightsPanel(props: Props) {
                 ))}
               </ul>
             )}
+            {contactsEditor}
           </div>
           {rights.issues.length > 0 ? (
             <div className="flex flex-col gap-2">
