@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { resolveWorkspacePage } from '@/app/workspace-page';
 import { ContactMethodsEditor } from '@/components/people/contact-methods-editor';
 import { DeleteParty } from '@/components/people/delete-party';
+import { IdentityEditors } from '@/components/people/identity-editors';
 import { PartyDetails } from '@/components/people/party-details';
 import { PartyForm } from '@/components/people/party-form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -39,6 +40,7 @@ export default async function PartyPage({ params }: Props) {
                 <>
                   <PartyForm kind={party.value.partyKind} party={party.value} label="Edit" />
                   <ContactMethodsEditor party={party.value} />
+                  <IdentityEditors party={party.value} />
                 </>
               ) : null}
               {can('delete') ? (
