@@ -8,6 +8,7 @@ import { RecordingPanel } from '@/components/catalog/recording-panel';
 import { RecordingSection, recordingTitle } from '@/components/catalog/recording-section';
 import { ReleaseForm } from '@/components/catalog/release-form';
 import { ReleaseSection } from '@/components/catalog/release-section';
+import { FillOwnership } from '@/components/rights/fill-ownership';
 import { HolderSplitEditor } from '@/components/rights/holder-split-editor';
 import { LicensingContactsEditor } from '@/components/rights/licensing-contacts-editor';
 import { PublishingEditor } from '@/components/rights/publishing-editor';
@@ -21,6 +22,7 @@ import { getMusicWorkspace } from '@/server/services/catalog/music-workspace';
 import { listParties } from '@/server/services/contacts/read';
 import { requirePermission } from '@/server/services/permissions';
 import { listAgreements } from '@/server/services/rights/agreements';
+import { proposeDefaultOwnership } from '@/server/services/rights/default-ownership';
 import { getHolderSharesHashes } from '@/server/services/rights/holder-shares';
 import { getWriterSharesHash } from '@/server/services/rights/shares';
 
@@ -49,12 +51,13 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
   const { tenant } = workspace;
   const editable = song.ok && requirePermission(tenant, { rights: ['update'] }).ok;
   const recordingIds = song.ok ? song.value.recordings.map(({ id }) => id) : [];
-  const [hash, hashes, everyone, agreements] = editable
+  const [hash, hashes, everyone, agreements, proposal] = editable
     ? await Promise.all([
         composition ? getWriterSharesHash(tenant, composition.id) : null,
         getHolderSharesHashes(tenant, { compositionId: composition?.id ?? null, recordingIds }),
         listParties(tenant),
         listAgreements(tenant),
+        proposeDefaultOwnership(tenant, focus),
       ])
     : [];
   const option = ({ partyId, displayName }: { partyId: string; displayName: string }) => ({
@@ -116,6 +119,19 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
       />
     ) : null;
 
+  const fillOwnership =
+    song.ok && proposal?.ok && hashes?.ok && (hash?.ok || !composition) ? (
+      <FillOwnership
+        compositionId={composition?.id ?? null}
+        proposal={proposal.value}
+        writerHash={hash?.ok ? hash.value : ''}
+        emptyHash={hashes.value.empty}
+        recordingTitles={Object.fromEntries(
+          song.value.recordings.map((r) => [r.id, recordingTitle(r)]),
+        )}
+      />
+    ) : null;
+
   const target = composition
     ? { compositionId: composition.id }
     : { recordingId: recordingIds[0] ?? '' };
@@ -172,6 +188,7 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
             {composition && can('create') ? (
               <RecordingPanel compositionId={composition.id} songTitle={composition.title} />
             ) : null}
+            {fillOwnership}
             <RightsPanel
               rights={song.value.rights}
               recordingTitles={new Map(song.value.recordings.map((r) => [r.id, recordingTitle(r)]))}

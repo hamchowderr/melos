@@ -2,6 +2,7 @@
  * Rights readiness DTOs (docs/CONTRACT.md §3.4, §6.5; D-12). Types and the §6.5 code lists, with no
  * server import, so client components can import them.
  */
+import type { SelfPartiesDTO, SelfPartySide } from './self-parties';
 
 /** Codes that block `oneStopReady`, in the order of the §6.5 table. */
 export const ONE_STOP_CODES = [
@@ -200,4 +201,20 @@ export type MasterSharesInput = {
   recordingId: string;
   shares: HolderShareInput[];
   expectedBeforeHash?: string;
+};
+
+/** Why a side of a DefaultOwnershipProposal is null (RGT-008, PROPOSED). */
+export const OWNERSHIP_BLOCKS = ['has_rows', 'no_self_party', 'no_composition'] as const;
+
+/**
+ * Default ownership for a song's empty share sets (§3.4, RGT-008): each side's self party at 100%,
+ * or null with a blocked reason when the side already has rows or has nothing to fill. Writers
+ * default to songwriter and publishing to WORLD (PROPOSED). Applying it uses the share tools.
+ */
+export type DefaultOwnershipProposal = {
+  selfParties: SelfPartiesDTO;
+  writerShares: WriterShareInput[] | null;
+  publishingShares: { territory: 'WORLD'; shares: HolderShareInput[] } | null;
+  masterShares: { recordingId: string; shares: HolderShareInput[] }[] | null;
+  blockedReasons: { side: SelfPartySide; code: (typeof OWNERSHIP_BLOCKS)[number] }[];
 };
