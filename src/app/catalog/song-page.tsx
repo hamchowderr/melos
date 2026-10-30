@@ -3,6 +3,7 @@ import { resolveWorkspacePage } from '@/app/workspace-page';
 import { CompositionSection } from '@/components/catalog/composition-section';
 import { DeleteSong } from '@/components/catalog/delete-song';
 import { MetadataPanel } from '@/components/catalog/metadata-panel';
+import { RecordingPanel } from '@/components/catalog/recording-panel';
 import { RecordingSection, recordingTitle } from '@/components/catalog/recording-section';
 import { ReleaseSection } from '@/components/catalog/release-section';
 import { HolderSplitEditor } from '@/components/rights/holder-split-editor';
@@ -39,8 +40,8 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
   if (focus.entityType === 'recording' && composition) {
     redirect(`/catalog/compositions/${composition.id}`);
   }
-  // Edit and Delete show only for catalog:update and catalog:delete (§6.2).
-  const can = (action: 'update' | 'delete') =>
+  // Add, Edit and Delete show only for catalog:create, update and delete (§6.2).
+  const can = (action: 'create' | 'update' | 'delete') =>
     requirePermission(workspace.tenant, { catalog: [action] }).ok;
   // The editors show only for rights:update (§6.2); hashes, parties and agreements load only then.
   const { tenant } = workspace;
@@ -137,8 +138,21 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
                 key={recording.id}
                 recording={recording}
                 readiness={readiness.get(recording.id)}
+                editor={
+                  can('update') ? (
+                    <RecordingPanel
+                      key={JSON.stringify(recording)}
+                      compositionId={composition?.id ?? ''}
+                      songTitle={recording.title}
+                      recording={recording}
+                    />
+                  ) : null
+                }
               />
             ))}
+            {composition && can('create') ? (
+              <RecordingPanel compositionId={composition.id} songTitle={composition.title} />
+            ) : null}
             <RightsPanel
               rights={song.value.rights}
               recordingTitles={new Map(song.value.recordings.map((r) => [r.id, recordingTitle(r)]))}
