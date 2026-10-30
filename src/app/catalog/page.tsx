@@ -62,7 +62,7 @@ export default async function CatalogPage({ searchParams }: Props) {
         {/* New song shows only for catalog:create (§6.2). */}
         {requirePermission(workspace.tenant, { catalog: ['create'] }).ok ? <MetadataPanel /> : null}
       </PageHeader>
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4 px-4 pt-3 pb-6 md:px-6">
         {songs.ok && releases.ok ? (
           <SearchResults
             query={query}
