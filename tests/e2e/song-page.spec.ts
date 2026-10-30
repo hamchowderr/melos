@@ -109,13 +109,19 @@ test('melos-rpr.16: /rights lists Ocean Blue and Neon Static as not ready', asyn
   const titles = recordings.locator('tbody tr td:first-child');
   // EXPECTED.md §6 DEMO-003, by title.
   await expect(titles).toHaveText(['Neon Static', 'Ocean Blue']);
-  const ocean = recordings.getByRole('list', { name: 'Ocean Blue issues' }).getByRole('listitem');
+  // Issues live in a side panel, not in the grid.
+  await expect(recordings.getByRole('list')).toHaveCount(0);
+  await recordings.getByRole('row', { name: 'Ocean Blue readiness' }).press('Enter');
+  const panel = page.getByRole('dialog', { name: 'Ocean Blue' });
+  const ocean = panel.getByRole('list', { name: 'Ocean Blue issues' }).getByRole('listitem');
   await expect(ocean).toHaveText([
-    /^PUBLISHING_TOTAL_INCOMPLETE/,
-    /^PUBLISHING_NOT_CONTROLLED/,
-    /^NO_LICENSING_CONTACT/,
-    /^MISSING_ISRC/,
+    /PUBLISHING_TOTAL_INCOMPLETE/,
+    /PUBLISHING_NOT_CONTROLLED/,
+    /NO_LICENSING_CONTACT/,
+    /MISSING_ISRC/,
   ]);
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await expect(panel).toHaveCount(0);
 
   const filter = page.getByRole('switch', { name: 'Only not ready' });
   await expect(filter).toHaveAttribute('aria-checked', 'true');
