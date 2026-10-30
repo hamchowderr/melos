@@ -9,6 +9,7 @@ import type {
 } from '../../../lib/dto/catalog';
 import { normalizeIswc } from '../../../lib/identifiers';
 import { compositionAltTitles, compositions } from '../../db/schema/workspace.generated';
+import type { AuditWriter } from '../audit-writer';
 import { workspaceIntegrityGuard as guard } from '../integrity-guard';
 import { requirePermission } from '../permissions';
 import { isCalendarDate } from '../rights/agreements';
@@ -119,6 +120,46 @@ async function load(tx: WorkspaceTransaction, id: string) {
 const songOf = (tenant: TenantContext, entityId: string) =>
   getMusicWorkspace(tenant, { entityType: 'composition', entityId });
 
+/** VALIDATION for a new composition's first broken field, before the database opens. */
+export const invalidComposition = (input: CompositionInput) => invalid(input, true);
+
+/**
+ * The write half of createComposition, for a caller's own transaction (createSong, D-10): the
+ * composition, its alternate titles, its catalog_search row and its composition.create audit row.
+ * Returns its id, or INVALID_ISWC or CONFLICT before any write.
+ */
+export async function insertComposition(
+  tx: WorkspaceTransaction,
+  audit: AuditWriter,
+  tenant: TenantContext,
+  input: CompositionInput,
+): Promise<ServiceResult<string>> {
+  const iswc = await iswcOf(tx, input.iswc ?? null);
+  if (!iswc.ok) return iswc;
+  const [id, at] = [`cmp_${ulid()}`, new Date().toISOString()];
+  await guard.insert(tx, compositions, [
+    {
+      ...{ id, ...columns(input), title: input.title.trim(), iswc: iswc.value },
+      ...{ createdAt: at, updatedAt: at, createdBy: tenant.userId, updatedBy: tenant.userId },
+    },
+  ]);
+  const titles = (input.altTitles ?? []).map((title) => title.trim());
+  if (titles.length)
+    await guard.insert(
+      tx,
+      compositionAltTitles,
+      titles.map((title) => ({ id: ulid(), compositionId: id, title })),
+    );
+  await reindexSong(tx, id);
+  const created = await load(tx, id);
+  if (!created) throw new Error(`Composition ${id} was not stored`);
+  await audit.write({
+    ...{ action: 'composition.create', entityType: 'composition', entityId: id },
+    ...{ before: null, after: created },
+  });
+  return success(id);
+}
+
 /**
  * Creates a composition with its alternate titles (CAT-001, §3.3) in one audited write transaction
  * and reindexes its catalog_search row (§4.3). catalog:create (§6.2) and VALIDATION come first,
@@ -134,32 +175,9 @@ export async function createComposition(
   if (!requirePermission(tenant, CREATE).ok) return failure('FORBIDDEN');
   const refused = invalid(input, true);
   if (refused) return refused;
-  const written = await runWorkspaceWrite(tenant, CREATE, async (tx, audit) => {
-    const iswc = await iswcOf(tx, input.iswc ?? null);
-    if (!iswc.ok) return iswc;
-    const [id, at] = [`cmp_${ulid()}`, new Date().toISOString()];
-    await guard.insert(tx, compositions, [
-      {
-        ...{ id, ...columns(input), title: input.title.trim(), iswc: iswc.value },
-        ...{ createdAt: at, updatedAt: at, createdBy: tenant.userId, updatedBy: tenant.userId },
-      },
-    ]);
-    const titles = (input.altTitles ?? []).map((title) => title.trim());
-    if (titles.length)
-      await guard.insert(
-        tx,
-        compositionAltTitles,
-        titles.map((title) => ({ id: ulid(), compositionId: id, title })),
-      );
-    await reindexSong(tx, id);
-    const created = await load(tx, id);
-    if (!created) throw new Error(`Composition ${id} was not stored`);
-    await audit.write({
-      ...{ action: 'composition.create', entityType: 'composition', entityId: id },
-      ...{ before: null, after: created },
-    });
-    return success(id);
-  });
+  const written = await runWorkspaceWrite(tenant, CREATE, (tx, audit) =>
+    insertComposition(tx, audit, tenant, input),
+  );
   return written.ok ? songOf(tenant, written.value) : written;
 }
 

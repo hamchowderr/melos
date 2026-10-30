@@ -16,6 +16,7 @@ import {
   recordings,
   recordingTerms,
 } from '../../db/schema/workspace.generated';
+import type { AuditWriter } from '../audit-writer';
 import { workspaceIntegrityGuard as guard } from '../integrity-guard';
 import { requirePermission } from '../permissions';
 import { failure, type ServiceResult, success } from '../service-result';
@@ -178,6 +179,42 @@ async function reindex(tx: WorkspaceTransaction, id: string, songs: (string | nu
 const songOf = (tenant: TenantContext, entityId: string) =>
   getMusicWorkspace(tenant, { entityType: 'recording', entityId });
 
+/** VALIDATION for a new recording's first broken field, before the database opens. */
+export const invalidRecording = (input: RecordingInput) => invalid(input, true);
+
+/**
+ * The write half of createRecording, for a caller's own transaction (createSong, D-10): the
+ * recording, its links, the reindex and its recording.create audit row. Returns its id, or
+ * NOT_FOUND, INVALID_ISRC or CONFLICT before it writes the recording.
+ */
+export async function insertRecording(
+  tx: WorkspaceTransaction,
+  audit: AuditWriter,
+  tenant: TenantContext,
+  input: RecordingInput,
+): Promise<ServiceResult<string>> {
+  const compositionId = input.compositionId ?? null;
+  if (compositionId && !(await liveComposition(tx, compositionId))) return failure('NOT_FOUND');
+  const isrc = await isrcOf(tx, input.isrc ?? null);
+  if (!isrc.ok) return isrc;
+  const [id, at] = [`rec_${ulid()}`, new Date().toISOString()];
+  await guard.insert(tx, recordings, [
+    {
+      ...{ id, compositionId, ...columns(input), title: input.title.trim(), isrc: isrc.value },
+      ...{ createdAt: at, updatedAt: at, createdBy: tenant.userId, updatedBy: tenant.userId },
+    },
+  ]);
+  await replaceLinks(tx, tenant, id, linksOf(input.links ?? []));
+  await reindex(tx, id, [compositionId]);
+  const created = await load(tx, id);
+  if (!created) throw new Error(`Recording ${id} was not stored`);
+  await audit.write({
+    ...{ action: 'recording.create', entityType: 'recording', entityId: id },
+    ...{ before: null, after: created },
+  });
+  return success(id);
+}
+
 /**
  * Creates a recording with its links (CAT-002, CAT-005, §3.3) in one audited write transaction and
  * reindexes its song (§4.3). catalog:create (§6.2) and VALIDATION come first, before the database
@@ -191,28 +228,9 @@ export async function createRecording(
   if (!requirePermission(tenant, CREATE).ok) return failure('FORBIDDEN');
   const refused = invalid(input, true);
   if (refused) return refused;
-  const written = await runWorkspaceWrite(tenant, CREATE, async (tx, audit) => {
-    const compositionId = input.compositionId ?? null;
-    if (compositionId && !(await liveComposition(tx, compositionId))) return failure('NOT_FOUND');
-    const isrc = await isrcOf(tx, input.isrc ?? null);
-    if (!isrc.ok) return isrc;
-    const [id, at] = [`rec_${ulid()}`, new Date().toISOString()];
-    await guard.insert(tx, recordings, [
-      {
-        ...{ id, compositionId, ...columns(input), title: input.title.trim(), isrc: isrc.value },
-        ...{ createdAt: at, updatedAt: at, createdBy: tenant.userId, updatedBy: tenant.userId },
-      },
-    ]);
-    await replaceLinks(tx, tenant, id, linksOf(input.links ?? []));
-    await reindex(tx, id, [compositionId]);
-    const created = await load(tx, id);
-    if (!created) throw new Error(`Recording ${id} was not stored`);
-    await audit.write({
-      ...{ action: 'recording.create', entityType: 'recording', entityId: id },
-      ...{ before: null, after: created },
-    });
-    return success(id);
-  });
+  const written = await runWorkspaceWrite(tenant, CREATE, (tx, audit) =>
+    insertRecording(tx, audit, tenant, input),
+  );
   return written.ok ? songOf(tenant, written.value) : written;
 }
 
