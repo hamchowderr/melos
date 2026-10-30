@@ -20,10 +20,14 @@ import { workspaceIntegrityGuard as guard } from '../integrity-guard';
 import { requirePermission } from '../permissions';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
+import { getWorkspaceDatabase, sanitized } from '../workspace-connections';
 import { runWorkspaceWrite, type WorkspaceTransaction } from '../workspace-write';
 import { getRightsSummary } from './read';
 
 const UPDATE: WorkspacePermissions = { rights: ['update'] };
+
+/** A transaction or the database itself: writerSetOf only reads. */
+type Reader = Pick<WorkspaceTransaction, 'select'>;
 const MAX_BP = 10_000;
 
 const refuse = (reason: string) => failure({ code: 'VALIDATION', field: 'shares', reason });
@@ -64,7 +68,7 @@ function invalid(shares: WriterShareInput[]): ServiceResult<never> | null {
 }
 
 /** A composition's writer set, canonical: by party id, each writer's roles sorted. */
-async function writerSetOf(tx: WorkspaceTransaction, compositionId: string) {
+async function writerSetOf(tx: Reader, compositionId: string) {
   const rows = await tx
     .select({ id: writers.id, partyId: writers.partyId, shareBp: writers.writerShareBp })
     .from(writers)
@@ -89,9 +93,24 @@ async function writerSetOf(tx: WorkspaceTransaction, compositionId: string) {
 }
 
 /** SHA-256 of the canonical current writer set: the share tools' `beforeHash` (§7.4). */
-export async function writerSharesHash(tx: WorkspaceTransaction, compositionId: string) {
+export async function writerSharesHash(tx: Reader, compositionId: string) {
   const set = (await writerSetOf(tx, compositionId)).map(({ id: _, ...share }) => share);
   return createHash('sha256').update(canonicalJson(set)).digest('hex');
+}
+
+/**
+ * The writer set's `beforeHash` as the editor loads it (RGT-001), for its Save to send back as
+ * `expectedBeforeHash`. rights:read; a refused role never opens the database.
+ */
+export async function getWriterSharesHash(
+  tenant: TenantContext,
+  compositionId: string,
+): Promise<ServiceResult<string>> {
+  if (!requirePermission(tenant, { rights: ['read'] }).ok) return failure('FORBIDDEN');
+  const hash = await sanitized(tenant.workspaceId, async () =>
+    writerSharesHash(await getWorkspaceDatabase(tenant.workspaceId), compositionId),
+  );
+  return success(hash);
 }
 
 /**
