@@ -184,10 +184,15 @@ export function PartyTable({ parties, noun }: Props) {
             {parties.map((party) => (
               <TableRow
                 key={party.partyId}
-                className="cursor-pointer"
-                // A click anywhere but a link opens the side panel.
+                className="cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none"
+                // A click anywhere but a link, or Enter on the focused row, opens the side panel.
+                tabIndex={0}
+                aria-label={`${party.displayName} details`}
                 onClick={(event) => {
                   if (!(event.target as HTMLElement).closest('a,button')) setOpen(party);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && event.target === event.currentTarget) setOpen(party);
                 }}
               >
                 {[name, ...details].map(({ heading, cell, wrap }) => (
