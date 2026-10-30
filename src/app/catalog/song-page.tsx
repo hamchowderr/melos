@@ -10,6 +10,7 @@ import { RecordingSection, recordingTitle } from '@/components/catalog/recording
 import { RecordingTermsEditor } from '@/components/catalog/recording-terms-editor';
 import { ReleaseForm } from '@/components/catalog/release-form';
 import { ReleaseSection } from '@/components/catalog/release-section';
+import { AgreementForm } from '@/components/rights/agreement-form';
 import { FillOwnership } from '@/components/rights/fill-ownership';
 import { HolderSplitEditor } from '@/components/rights/holder-split-editor';
 import { LicensingContactsEditor } from '@/components/rights/licensing-contacts-editor';
@@ -221,6 +222,8 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
               masterEditors={masterEditors}
               representable={Boolean(editable)}
               contactsEditor={contactsEditor}
+              agreements={options.agreements}
+              agreementForm={editable && everyone?.ok ? <AgreementForm parties={parties} /> : null}
             />
             <ReleaseSection releases={song.value.releases} recordings={song.value.recordings} />
             {releaseForm}
