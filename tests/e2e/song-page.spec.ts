@@ -109,7 +109,10 @@ test('melos-rpr.16: /rights lists Ocean Blue and Neon Static as not ready', asyn
   const titles = recordings.locator('tbody tr td:first-child');
   // EXPECTED.md §6 DEMO-003, by title.
   await expect(titles).toHaveText(['Neon Static', 'Ocean Blue']);
-  // Issues live in a side panel, not in the grid.
+  // Each row shows its issue counts; the issues themselves live in a side panel.
+  await expect(
+    recordings.getByRole('row', { name: 'Ocean Blue readiness' }).getByText('4 blocking'),
+  ).toBeVisible();
   await expect(recordings.getByRole('list')).toHaveCount(0);
   await recordings.getByRole('row', { name: 'Ocean Blue readiness' }).press('Enter');
   const panel = page.getByRole('dialog', { name: 'Ocean Blue' });
