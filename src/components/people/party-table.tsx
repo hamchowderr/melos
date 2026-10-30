@@ -1,7 +1,19 @@
+'use client';
+
 import Link from 'next/link';
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, type ReactNode, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { GridFrame } from '@/components/ui/grid-frame';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   Table,
   TableBody,
@@ -82,8 +94,50 @@ const filled = (content: ReactNode) =>
     ? '—'
     : content;
 
+/** One party's columns in the side panel, with the way to its full page. */
+function PartyPanel({
+  party,
+  details,
+  onClose,
+}: {
+  party: PartyListItem | null;
+  details: Column[];
+  onClose: () => void;
+}) {
+  return (
+    <Sheet open={party !== null} onOpenChange={(open) => (open ? null : onClose())}>
+      <SheetContent>
+        {party ? (
+          <>
+            <SheetHeader className="border-b">
+              <SheetTitle>{party.displayName}</SheetTitle>
+              <SheetDescription>
+                {party.partyKind === 'person' ? 'Person' : 'Organization'}
+              </SheetDescription>
+            </SheetHeader>
+            <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 px-4">
+              {details.map(({ heading, cell }) => (
+                <Fragment key={heading}>
+                  <dt className="text-muted-foreground">{heading}</dt>
+                  <dd className="break-words">{filled(cell(party))}</dd>
+                </Fragment>
+              ))}
+            </dl>
+            <SheetFooter className="border-t">
+              <Link href={`/people/${party.partyId}`} className={buttonVariants()}>
+                Open {party.partyKind === 'person' ? 'person' : 'organization'}
+              </Link>
+            </SheetFooter>
+          </>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 /** People or organizations at /people (§2.3), in the order ContactService lists them. */
 export function PartyTable({ parties, noun }: Props) {
+  const [open, setOpen] = useState<PartyListItem | null>(null);
   if (parties.length === 0) {
     return (
       <Empty className="border">
@@ -117,26 +171,41 @@ export function PartyTable({ parties, noun }: Props) {
           </li>
         ))}
       </ul>
-      <Table className="hidden sm:table">
-        <TableHeader>
-          <TableRow>
-            {[name, ...details].map(({ heading }) => (
-              <TableHead key={heading}>{heading}</TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {parties.map((party) => (
-            <TableRow key={party.partyId}>
-              {[name, ...details].map(({ heading, cell, wrap }) => (
-                <TableCell key={heading} className={wrap ? 'whitespace-normal' : undefined}>
-                  {cell(party)}
-                </TableCell>
+      <GridFrame className="hidden sm:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {[name, ...details].map(({ heading }) => (
+                <TableHead key={heading}>{heading}</TableHead>
               ))}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {parties.map((party) => (
+              <TableRow
+                key={party.partyId}
+                className="cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none"
+                // A click anywhere but a link, or Enter on the focused row, opens the side panel.
+                tabIndex={0}
+                aria-label={`${party.displayName} details`}
+                onClick={(event) => {
+                  if (!(event.target as HTMLElement).closest('a,button')) setOpen(party);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && event.target === event.currentTarget) setOpen(party);
+                }}
+              >
+                {[name, ...details].map(({ heading, cell, wrap }) => (
+                  <TableCell key={heading} className={wrap ? 'whitespace-normal' : undefined}>
+                    {cell(party)}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </GridFrame>
+      <PartyPanel party={open} details={details} onClose={() => setOpen(null)} />
     </>
   );
 }

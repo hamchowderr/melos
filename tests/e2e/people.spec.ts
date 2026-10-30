@@ -95,3 +95,26 @@ test('melos-rpr.48: at phone width /people lists each party as a card with no si
   );
   expect(overflow).toBe(0);
 });
+
+test('melos-vcr: a People row opens its side panel, which opens the person', async ({ page }) => {
+  await signInAsJordan(page);
+  await page.goto('/people', AUTH_REDIRECT);
+  const row = page.getByRole('tabpanel').getByRole('row').filter({ hasText: 'Theo Grant' });
+  await row.getByRole('cell').nth(1).click();
+  const panel = page.getByRole('dialog', { name: 'Theo Grant' });
+  await expect(panel).toContainText('theo@bluelantern.example');
+  await expect(panel).toContainText('Music supervisor');
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await expect(panel).toBeHidden();
+
+  // Keyboard: Enter on a focused row opens the same panel.
+  await page.getByRole('row', { name: 'Maya Chen details' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Maya Chen' })).toContainText(
+    'Northlight Pictures',
+  );
+  await page.keyboard.press('Escape');
+  await row.getByRole('cell').nth(1).click();
+  await panel.getByRole('link', { name: 'Open person' }).click();
+  await expect(page).toHaveURL(THEO_GRANT, AUTH_REDIRECT);
+});
