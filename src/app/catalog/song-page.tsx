@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import { resolveWorkspacePage } from '@/app/workspace-page';
 import { CompositionSection } from '@/components/catalog/composition-section';
+import { DeleteSong } from '@/components/catalog/delete-song';
+import { MetadataPanel } from '@/components/catalog/metadata-panel';
 import { RecordingSection, recordingTitle } from '@/components/catalog/recording-section';
 import { ReleaseSection } from '@/components/catalog/release-section';
 import { RightsPanel } from '@/components/rights/rights-panel';
@@ -34,6 +36,9 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
   }
   // Edit shows only for rights:update (§6.2); the hash and people load only then.
   const { tenant } = workspace;
+  // Edit and Delete show only for catalog:update and catalog:delete (§6.2).
+  const can = (action: 'update' | 'delete') =>
+    requirePermission(workspace.tenant, { catalog: [action] }).ok;
   const editable = song.ok && composition && requirePermission(tenant, { rights: ['update'] }).ok;
   const [hash, people] = editable
     ? await Promise.all([
@@ -60,9 +65,17 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6">
         {song.ok ? (
           <>
-            <h1 className="text-lg font-semibold">
-              {composition?.title ?? song.value.recordings[0].title}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="mr-auto text-lg font-semibold">
+                {composition?.title ?? song.value.recordings[0].title}
+              </h1>
+              {composition && can('update') ? (
+                <MetadataPanel key={JSON.stringify(composition)} composition={composition} />
+              ) : null}
+              {composition && can('delete') ? (
+                <DeleteSong compositionId={composition.id} title={composition.title} />
+              ) : null}
+            </div>
             {composition ? <CompositionSection composition={composition} /> : null}
             {song.value.recordings.map((recording) => (
               <RecordingSection
