@@ -1,10 +1,12 @@
 import { resolveWorkspacePage } from '@/app/workspace-page';
+import { PartyForm } from '@/components/people/party-form';
 import { PartyTable } from '@/components/people/party-table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
 import { listParties } from '@/server/services/contacts/read';
+import { requirePermission } from '@/server/services/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +17,7 @@ export default async function PeoplePage() {
   }
   // ContactService checks contact:read for the role resolved for this request (§6.2, D-5).
   const parties = await listParties(workspace.tenant);
+  const creates = requirePermission(workspace.tenant, { contact: ['create'] }).ok;
   const ofKind = (kind: string) =>
     parties.ok ? parties.value.filter(({ partyKind }) => partyKind === kind) : [];
 
@@ -22,7 +25,15 @@ export default async function PeoplePage() {
     <main>
       <WorkspaceHeader workspaceName={workspace.workspaceName} current="people" />
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6">
-        <h1 className="text-lg font-semibold">People and organizations</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="mr-auto text-lg font-semibold">People and organizations</h1>
+          {creates ? (
+            <>
+              <PartyForm kind="person" label="New person" />
+              <PartyForm kind="organization" label="New organization" />
+            </>
+          ) : null}
+        </div>
         {parties.ok ? (
           <Tabs defaultValue="person">
             <TabsList>
