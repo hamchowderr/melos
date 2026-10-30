@@ -770,7 +770,9 @@ CREATE TABLE recordings (
   updated_at                     TEXT NOT NULL,
   created_by                     TEXT,
   updated_by                     TEXT,
-  deleted_at                     TEXT
+  deleted_at                     TEXT,
+  contains_samples               INTEGER NOT NULL DEFAULT 0 CHECK (contains_samples IN (0,1)),   -- CAT-011, migration 0005
+  samples_cleared                INTEGER NOT NULL DEFAULT 0 CHECK (samples_cleared IN (0,1))
 );
 
 CREATE TABLE recording_links (
@@ -916,7 +918,9 @@ CREATE TABLE agreements (
   created_at             TEXT NOT NULL,
   updated_at             TEXT NOT NULL,
   created_by             TEXT,
-  updated_by             TEXT
+  updated_by             TEXT,
+  is_exclusive           INTEGER NOT NULL DEFAULT 0 CHECK (is_exclusive IN (0,1)),   -- RGT-009, migration 0005
+  exclusivity_scope      TEXT                    -- free text, such as "sync, worldwide"
 );
 
 -- One row per writer party per composition, so a share counts once however many roles the writer holds.

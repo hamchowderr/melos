@@ -82,6 +82,8 @@ const RECORDING = {
     bpm: recordings.bpm,
     musicalKey: recordings.musicalKey,
     previewStartMs: recordings.previewStartMs,
+    containsSamples: sql`${recordings.containsSamples} = 1`.mapWith(Boolean),
+    samplesCleared: sql`${recordings.samplesCleared} = 1`.mapWith(Boolean),
   },
 };
 

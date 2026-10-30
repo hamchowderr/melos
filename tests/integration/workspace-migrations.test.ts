@@ -204,7 +204,7 @@ describe('melos-75e.18: runtime code applies the migrations embedded from the SQ
 
   it.each([
     ['added', addPitchOwner],
-    ['removed', (folder: string) => rmSync(join(folder, '0004_registrations.sql'))],
+    ['removed', (folder: string) => rmSync(join(folder, '0005_samples_exclusivity.sql'))],
     ['edited', replaceIn('0001_parties_catalog.sql', "DEFAULT 'stage_name'", "DEFAULT 'aka'")],
   ])('fails, naming the npm script, when a migration is %s in the folder', async (_, change) => {
     const refused = async (folder: string) => {

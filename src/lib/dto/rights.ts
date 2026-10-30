@@ -107,6 +107,9 @@ export type AgreementDTO = {
   counterpartyName: string | null;
   effectiveOn: string | null;
   expiresOn: string | null;
+  /** RGT-009: an exclusive agreement and its scope in free text, such as "sync, worldwide". */
+  isExclusive: boolean;
+  exclusivityScope: string | null;
   assetId: string | null;
   notes: string | null;
   createdAt: string;
@@ -122,6 +125,9 @@ export type AgreementInput = {
   counterpartyPartyId?: string | null;
   effectiveOn?: string | null;
   expiresOn?: string | null;
+  /** RGT-009; defaults to false. */
+  isExclusive?: boolean;
+  exclusivityScope?: string | null;
   assetId?: string | null;
   notes?: string | null;
 };

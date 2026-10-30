@@ -57,7 +57,18 @@ const columns = (fields: AgreementPatch) => ({
   ...{ agreementType: fields.agreementType, title: fields.title?.trim() },
   ...{ counterpartyPartyId: fields.counterpartyPartyId, assetId: fields.assetId },
   ...{ effectiveOn: fields.effectiveOn, expiresOn: fields.expiresOn, notes: fields.notes },
+  ...{
+    isExclusive: flag(fields.isExclusive),
+    exclusivityScope: blankToNull(fields.exclusivityScope),
+  },
 });
+
+/** Trimmed text, null for blank; undefined keeps the column. */
+const blankToNull = (value?: string | null) =>
+  value === undefined ? undefined : value?.trim() || null;
+
+/** A boolean input as its 0/1 column; undefined keeps the column. */
+const flag = (value?: boolean) => (value === undefined ? undefined : value ? 1 : 0);
 
 /** Agreement rows with their counterparty's display name, in a transaction or on the database. */
 const withCounterparty = (db: Pick<WorkspaceTransaction, 'select'>) =>
@@ -71,6 +82,7 @@ type Loaded = Awaited<ReturnType<typeof withCounterparty>>[number];
 const toDTO = ({ agreement, counterpartyName }: Loaded): AgreementDTO => ({
   ...agreement,
   agreementType: agreement.agreementType as AgreementType,
+  isExclusive: agreement.isExclusive === 1,
   counterpartyName,
 });
 

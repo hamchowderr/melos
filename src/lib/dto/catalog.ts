@@ -126,6 +126,9 @@ export type RecordingInput = {
   bpm?: number | null;
   musicalKey?: string | null;
   previewStartMs?: number | null;
+  /** CAT-011; both default to false. */
+  containsSamples?: boolean;
+  samplesCleared?: boolean;
   links?: RecordingLinkInput[];
 };
 
@@ -190,6 +193,9 @@ export type RecordingDTO = {
   bpm: number | null;
   musicalKey: string | null;
   previewStartMs: number | null;
+  /** CAT-011: the recording contains samples or interpolations, and whether they are cleared. */
+  containsSamples: boolean;
+  samplesCleared: boolean;
   primaryLink: RecordingLinkDTO | null;
   links: RecordingLinkDTO[];
   artists: RecordingArtistDTO[];

@@ -738,7 +738,9 @@
         "updated_at": "2026-08-04T17:00:01.000Z",
         "created_by": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
         "updated_by": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
-        "deleted_at": null
+        "deleted_at": null,
+        "contains_samples": 0,
+        "samples_cleared": 0
       },
       {
         "id": "rec_01KZ6VHC68RREPHJ2S3VWDYZVD",
@@ -759,7 +761,9 @@
         "updated_at": "2026-08-04T17:01:01.000Z",
         "created_by": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
         "updated_by": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
-        "deleted_at": null
+        "deleted_at": null,
+        "contains_samples": 0,
+        "samples_cleared": 0
       },
       {
         "id": "rec_01KZ6VK6S88M3CYGWCS1QMNJ8Z",
@@ -780,7 +784,9 @@
         "updated_at": "2026-08-04T17:02:01.000Z",
         "created_by": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
         "updated_by": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
-        "deleted_at": null
+        "deleted_at": null,
+        "contains_samples": 0,
+        "samples_cleared": 0
       },
       {
         "id": "rec_01KZ6VN1C8BKFTK9CR7GMFC2M9",
@@ -801,7 +807,9 @@
         "updated_at": "2026-08-04T17:03:01.000Z",
         "created_by": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
         "updated_by": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
-        "deleted_at": null
+        "deleted_at": null,
+        "contains_samples": 0,
+        "samples_cleared": 0
       },
       {
         "id": "rec_01KZ6VPVZ86BEXAHQFVEWA8DZ3",
@@ -822,7 +830,9 @@
         "updated_at": "2026-08-04T17:04:01.000Z",
         "created_by": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
         "updated_by": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
-        "deleted_at": null
+        "deleted_at": null,
+        "contains_samples": 0,
+        "samples_cleared": 0
       }
     ],
     "recording_links": [
