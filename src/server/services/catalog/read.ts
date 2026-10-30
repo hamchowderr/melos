@@ -1,14 +1,22 @@
 import { and, asc, type Column, desc, eq, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
-import type { CatalogFocus, SongCatalogDTO, SongListItem } from '../../../lib/dto/catalog';
+import type {
+  CatalogFocus,
+  CompositionRegistrationDTO,
+  RecordingRegistrationDTO,
+  SongCatalogDTO,
+  SongListItem,
+} from '../../../lib/dto/catalog';
 import {
   artistAliases,
   compositionAltTitles,
+  compositionRegistrations,
   compositions,
   metadataTerms,
   parties,
   recordingArtists,
   recordingContributors,
   recordingLinks,
+  recordingRegistrations,
   recordings,
   recordingTerms,
   releases,
@@ -101,6 +109,31 @@ const TERM = {
   id: metadataTerms.id,
   termType: metadataTerms.termType,
   label: metadataTerms.label,
+};
+
+/** A composition's registrations (CAT-010); the CHECK constraints hold the kind and status. */
+export const COMPOSITION_REGISTRATION = {
+  id: compositionRegistrations.id,
+  registryKind: sql<
+    CompositionRegistrationDTO['registryKind']
+  >`${compositionRegistrations.registryKind}`,
+  societyCode: compositionRegistrations.societyCode,
+  status: sql<CompositionRegistrationDTO['status']>`${compositionRegistrations.status}`,
+  workCode: compositionRegistrations.workCode,
+  registeredOn: compositionRegistrations.registeredOn,
+  notes: compositionRegistrations.notes,
+};
+
+export const RECORDING_REGISTRATION = {
+  recordingId: recordingRegistrations.recordingId,
+  id: recordingRegistrations.id,
+  registryKind: sql<
+    RecordingRegistrationDTO['registryKind']
+  >`${recordingRegistrations.registryKind}`,
+  status: sql<RecordingRegistrationDTO['status']>`${recordingRegistrations.status}`,
+  registrationCode: recordingRegistrations.registrationCode,
+  registeredOn: recordingRegistrations.registeredOn,
+  notes: recordingRegistrations.notes,
 };
 
 const RELEASE = {
@@ -277,11 +310,25 @@ export async function getSongCatalog(
           asc(releases.id),
           asc(releaseTracks.recordingId),
         ),
+      database
+        .select(COMPOSITION_REGISTRATION)
+        .from(compositionRegistrations)
+        .where(inSong(compositionRegistrations.compositionId))
+        .orderBy(
+          asc(compositionRegistrations.registryKind),
+          asc(compositionRegistrations.societyCode),
+        ),
+      database
+        .select(RECORDING_REGISTRATION)
+        .from(recordingRegistrations)
+        .where(ofSong(recordingRegistrations.recordingId))
+        .orderBy(asc(recordingRegistrations.registryKind)),
     ]);
   });
   // Only the database work is sanitized, so a bug in the mapping throws as itself.
   return reads.then(
-    ([found, altTitles, songRecordings, links, artists, contributors, terms, songReleases]) => {
+    ([found, altTitles, songRecordings, links, artists, contributors, terms, ...more]) => {
+      const [songReleases, compositionRegs, recordingRegs] = more;
       const [composition] = found;
       const focused = songRecordings.find(({ recording }) => recording.id === entityId);
       // A recording id names no song when it, or the composition it belongs to, is not live.
@@ -291,6 +338,7 @@ export async function getSongCatalog(
       const artistsOf = byRecording(artists);
       const contributorsOf = byRecording(contributors);
       const termsOf = byRecording(terms);
+      const registrationsOf = byRecording(recordingRegs);
       const recordingDtos = songRecordings.map(({ recording }) => ({
         ...recording,
         primaryLink: linksOf.get(recording.id)?.find((link) => link.isPrimary) ?? null,
@@ -298,11 +346,16 @@ export async function getSongCatalog(
         artists: artistsOf.get(recording.id) ?? [],
         contributors: contributorsOf.get(recording.id) ?? [],
         terms: termsOf.get(recording.id) ?? [],
+        registrations: registrationsOf.get(recording.id) ?? [],
       }));
       return success({
         focus: { entityType, entityId },
         composition: composition
-          ? { ...composition, altTitles: altTitles.map((alt) => alt.title) }
+          ? {
+              ...composition,
+              altTitles: altTitles.map((alt) => alt.title),
+              registrations: compositionRegs,
+            }
           : null,
         primaryRecordingId: primaryRecording(composition?.title ?? '', recordingDtos)?.id ?? null,
         recordings: recordingDtos,

@@ -61,6 +61,7 @@ export type CompositionDTO = {
   copyrightDate: string | null;
   description: string | null;
   hasLyrics: boolean;
+  registrations: CompositionRegistrationDTO[];
 };
 
 /**
@@ -194,7 +195,39 @@ export type RecordingDTO = {
   artists: RecordingArtistDTO[];
   contributors: RecordingContributorDTO[];
   terms: MetadataTermDTO[];
+  registrations: RecordingRegistrationDTO[];
 };
+
+export const COMPOSITION_REGISTRIES = ['pro', 'mlc', 'hfa', 'other'] as const;
+export const RECORDING_REGISTRIES = ['soundexchange', 'other'] as const;
+export const REGISTRATION_STATUSES = ['pending', 'registered'] as const;
+
+/** Fields every registration carries (CAT-010). `status` defaults to `registered`. */
+type RegistrationFields = {
+  status?: (typeof REGISTRATION_STATUSES)[number];
+  registeredOn?: string | null;
+  notes?: string | null;
+};
+
+/**
+ * One row of a composition's whole registration set (CAT-010), keyed by registry and society.
+ * `societyCode` names the PRO and is required for `pro` only; `workCode` is the PRO work ID, MLC
+ * song code or HFA song code.
+ */
+export type CompositionRegistrationInput = RegistrationFields & {
+  registryKind: (typeof COMPOSITION_REGISTRIES)[number];
+  societyCode?: string | null;
+  workCode?: string | null;
+};
+
+/** One row of a recording's whole registration set (CAT-010), keyed by registry. */
+export type RecordingRegistrationInput = RegistrationFields & {
+  registryKind: (typeof RECORDING_REGISTRIES)[number];
+  registrationCode?: string | null;
+};
+
+export type CompositionRegistrationDTO = Required<CompositionRegistrationInput> & { id: string };
+export type RecordingRegistrationDTO = Required<RecordingRegistrationInput> & { id: string };
 
 /** A track of a live release that holds one of the song's recordings. */
 export type SongReleaseDTO = {

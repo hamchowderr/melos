@@ -26,9 +26,9 @@ export const replaceIn = (file: string, from: string | RegExp, to: string) => (f
   writeFileSync(path, text.replace(from, to));
 };
 
-/** Workspace migration 0004 for the drift tests: a new pitches column with a foreign key. */
+/** Workspace migration 0005 for the drift tests: a new pitches column with a foreign key. */
 export const addPitchOwner = (folder: string) =>
   writeFileSync(
-    join(folder, '0004_pitch_owner.sql'),
+    join(folder, '0005_pitch_owner.sql'),
     'ALTER TABLE pitches ADD COLUMN owner_party_id TEXT REFERENCES parties(id) ON DELETE SET NULL',
   );

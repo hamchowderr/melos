@@ -184,6 +184,8 @@ Tool IDs are the Mastra `createTool` ids. Frontend tools are CopilotKit frontend
 | `publishing_interests` | ws | same name: BP §3.3, §5 · `publishing_splits`: TS §8 RGT-002 · `Publishing`: legacy | |
 | `master_interests` | ws | same name: BP §3.3, §5 · `master_owner_splits`: TS §8 RGT-003 · `MasterOwner`: legacy | |
 | `agreements` | ws | `assets + agreements`: BP App A.2 PDF Agreements · `agreements + assets`: BP App A.6 Signed Agreement · `agreement_asset_id` column: BP §5 | NEW table. |
+| `composition_registrations` | ws | — | NEW table (owner decision 2026-10-30, CAT-010). Where a composition is registered (PRO, The MLC, HFA) and the work code returned. |
+| `recording_registrations` | ws | — | NEW table (owner decision 2026-10-30, CAT-010). Where a recording is registered (SoundExchange) and the code returned. |
 | `licensing_contacts` | ws | `licensing_contacts / party relationships`: BP App A.2 · "composition/recording licensing contacts": BP App A.1 SONGSJnctContact | NEW table. |
 | Representation attestation columns on `publishing_interests` and `master_interests` | ws | "rights attestations": BP §3.3 · "explicit representation/authorization attestation": BP §6 | Records authorization for the workspace's own party to represent a holder (§6.5). |
 | `workspace_self_parties` | ws | "the workspace's own party": owner decision 2026-09-12 (RGT-008) | NEW table. The parties that are "me" for this workspace, per rights side. |
@@ -991,6 +993,40 @@ CREATE TABLE licensing_contacts (
   CHECK ((recording_id IS NULL) != (composition_id IS NULL))
 );
 
+-- ---------- Registrations (CAT-010, owner decision 2026-10-30) ----------
+-- Where a song is registered and the code the registry returned. Copyright office numbers stay on
+-- compositions and recordings. society_code names the PRO (ASCAP, BMI, SESAC, GMR, ...; not constrained,
+-- like party_society_affiliations) and is set for registry_kind 'pro' only (P-48).
+CREATE TABLE composition_registrations (
+  id              TEXT PRIMARY KEY,                           -- creg_<ulid>
+  composition_id  TEXT NOT NULL REFERENCES compositions(id) ON DELETE CASCADE,
+  registry_kind   TEXT NOT NULL CHECK (registry_kind IN ('pro','mlc','hfa','other')),
+  society_code    TEXT,
+  status          TEXT NOT NULL DEFAULT 'registered' CHECK (status IN ('pending','registered')),
+  work_code       TEXT,      -- PRO work ID, MLC song code or HFA song code
+  registered_on   TEXT,
+  notes           TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  created_by      TEXT,
+  updated_by      TEXT,
+  CHECK ((registry_kind = 'pro') = (society_code IS NOT NULL))
+);
+
+CREATE TABLE recording_registrations (
+  id                 TEXT PRIMARY KEY,                        -- rreg_<ulid>
+  recording_id       TEXT NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+  registry_kind      TEXT NOT NULL CHECK (registry_kind IN ('soundexchange','other')),
+  status             TEXT NOT NULL DEFAULT 'registered' CHECK (status IN ('pending','registered')),
+  registration_code  TEXT,
+  registered_on      TEXT,
+  notes              TEXT,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL,
+  created_by         TEXT,
+  updated_by         TEXT
+);
+
 -- ---------- Derived totals (never stored; live rows only) ----------
 CREATE VIEW composition_writer_totals AS
   SELECT c.id AS composition_id,
@@ -1343,6 +1379,8 @@ CREATE INDEX idx_messages_pitch_time      ON messages(pitch_id, created_at DESC)
 CREATE UNIQUE INDEX uq_messages_provider_id ON messages(provider, provider_message_id) WHERE provider_message_id IS NOT NULL;
 CREATE INDEX idx_report_items_recording   ON generated_report_items(recording_id);
 CREATE INDEX idx_report_items_composition ON generated_report_items(composition_id);
+CREATE UNIQUE INDEX uq_composition_registrations ON composition_registrations(composition_id, registry_kind, ifnull(society_code, ''));
+CREATE UNIQUE INDEX uq_recording_registrations   ON recording_registrations(recording_id, registry_kind);
 CREATE INDEX idx_audit_entity_time        ON audit_log(entity_type, entity_id, occurred_at DESC);
 CREATE INDEX idx_audit_time               ON audit_log(occurred_at DESC);
 CREATE INDEX idx_external_refs_entity     ON external_references(entity_type, entity_id);

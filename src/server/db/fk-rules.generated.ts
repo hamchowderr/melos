@@ -176,6 +176,14 @@ export const FOREIGN_KEY_RULES: ForeignKeyRules = {
       onUpdate: 'NO ACTION',
     },
     {
+      table: 'composition_registrations',
+      columns: ['composition_id'],
+      parentTable: 'compositions',
+      parentColumns: ['id'],
+      onDelete: 'CASCADE',
+      onUpdate: 'NO ACTION',
+    },
+    {
       table: 'composition_terms',
       columns: ['composition_id'],
       parentTable: 'compositions',
@@ -577,6 +585,14 @@ export const FOREIGN_KEY_RULES: ForeignKeyRules = {
     },
     {
       table: 'recording_links',
+      columns: ['recording_id'],
+      parentTable: 'recordings',
+      parentColumns: ['id'],
+      onDelete: 'CASCADE',
+      onUpdate: 'NO ACTION',
+    },
+    {
+      table: 'recording_registrations',
       columns: ['recording_id'],
       parentTable: 'recordings',
       parentColumns: ['id'],

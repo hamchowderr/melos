@@ -92,7 +92,7 @@ describe('TEN-004: workspace migrations create exactly the CONTRACT.md §4.2 and
     const fromContract = memoryDatabase();
     await fromContract.executeMultiple(contractSql(/^### [\d.]+ Workspace database\b/).join('\n'));
     contract = await describeSchema(fromContract);
-    expect(await applyWorkspaceMigrations(migrated)).toEqual({ applied: [1, 2, 3], version: 3 });
+    expect(await applyWorkspaceMigrations(migrated)).toEqual({ applied: [1, 2, 3, 4], version: 4 });
   });
 
   it('holds every §4.2 and §4.3 object and no other', async () => {
@@ -102,7 +102,7 @@ describe('TEN-004: workspace migrations create exactly the CONTRACT.md §4.2 and
         .map((key) => key.slice(type.length + 1))
         .sort();
     expect(names('table').join(' ')).toBe(
-      'agreements artist_aliases asset_credits assets audit_log catalog_search catalog_search_config catalog_search_content catalog_search_data catalog_search_docsize catalog_search_idx composition_alt_titles composition_assets composition_contributor_roles composition_contributors composition_terms compositions contact_methods contact_roles contacts external_references generated_report_items generated_reports import_issues import_runs licensing_contacts master_interests message_recipients messages metadata_terms organizations parties party_identifiers party_society_affiliations people pitch_events pitch_items pitches publishing_interests recording_artists recording_assets recording_contributors recording_links recording_terms recordings release_assets release_tracks releases report_templates schema_migrations workspace_self_parties workspace_settings',
+      'agreements artist_aliases asset_credits assets audit_log catalog_search catalog_search_config catalog_search_content catalog_search_data catalog_search_docsize catalog_search_idx composition_alt_titles composition_assets composition_contributor_roles composition_contributors composition_registrations composition_terms compositions contact_methods contact_roles contacts external_references generated_report_items generated_reports import_issues import_runs licensing_contacts master_interests message_recipients messages metadata_terms organizations parties party_identifiers party_society_affiliations people pitch_events pitch_items pitches publishing_interests recording_artists recording_assets recording_contributors recording_links recording_registrations recording_terms recordings release_assets release_tracks releases report_templates schema_migrations workspace_self_parties workspace_settings',
     );
     expect(names('view')).toEqual([
       'composition_publishing_totals',
@@ -123,8 +123,8 @@ describe('TEN-004: workspace migrations create exactly the CONTRACT.md §4.2 and
       'pitch_items_target_immutable',
       'recordings_composition_change_pitch_level',
     ]);
-    // 17 on §4.2 tables (version 1), 12 on version 2 tables, 13 on version 3 tables.
-    expect(names('index')).toHaveLength(42);
+    // 17 on §4.2 tables (version 1), 12 on version 2 tables, 13 on version 3 tables, 2 on version 4.
+    expect(names('index')).toHaveLength(44);
     // Both ways, by name first: an object the migrations miss and an object the contract does not
     // declare each fail here. Then every object's SQL and pragma rows must match.
     const schema = await describeSchema(migrated);
@@ -141,14 +141,15 @@ describe('TEN-004: workspace migrations create exactly the CONTRACT.md §4.2 and
     expect(await rows(migrated, 'PRAGMA foreign_key_check')).toEqual([]);
   });
 
-  it('records versions 1 to 3, and readSchemaVersion reads 3', async () => {
+  it('records versions 1 to 4, and readSchemaVersion reads 4', async () => {
     const recorded = await rows(migrated, 'SELECT version, name FROM schema_migrations');
     expect(recorded).toEqual([
       { version: 1, name: 'parties_catalog' },
       { version: 2, name: 'assets_rights_audit_import_search' },
       { version: 3, name: 'crm_pitches_messages_reports' },
+      { version: 4, name: 'registrations' },
     ]);
-    expect(await readSchemaVersion(migrated)).toBe(3);
+    expect(await readSchemaVersion(migrated)).toBe(4);
   });
 
   it.each<[string, string | RegExp, string]>([
@@ -434,7 +435,7 @@ describe('U-08: catalog_search works in a local libSQL file', () => {
     ensureLocalDatabaseDir(`file:./${file}`);
     const local = createClient({ url: `file:./${file}` });
     clients.push(local);
-    expect(await applyWorkspaceMigrations(local)).toEqual({ applied: [1, 2, 3], version: 3 });
+    expect(await applyWorkspaceMigrations(local)).toEqual({ applied: [1, 2, 3, 4], version: 4 });
     const row = ['composition', 'cmp_1', 'Ocean Blue', '', 'Northstar', 'Jordan Taylor', 'pop', ''];
     await local.execute({
       sql: 'INSERT INTO catalog_search (entity_type, entity_id, title, alt_titles, artist_names, contributor_names, terms, lyrics) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
