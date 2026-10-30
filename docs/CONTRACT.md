@@ -1883,8 +1883,20 @@ Let `R` be a recording, `C` its composition, `SP` the workspace self party for s
 |---|---|
 | `MISSING_ISRC` | `R.isrc IS NULL` |
 | `NO_LISTEN_LINK` | no `recording_links` row for `R` has `is_primary = 1` |
+| `SAMPLES_NOT_CLEARED` | `R.contains_samples = 1` and `R.samples_cleared = 0` (RGT-010) |
 
-Warning only (never blocks): `MISSING_ISWC` when `C.iswc IS NULL`.
+Warning only (never blocks):
+
+| Code | Warns when |
+|---|---|
+| `MISSING_ISWC` | `C.iswc IS NULL` |
+| `NOT_REGISTERED_PRO` | `C` has no `composition_registrations` row with `registry_kind = 'pro'` and `status = 'registered'` (RGT-010) |
+| `NOT_REGISTERED_MLC` | `C` has no registered `mlc` row (RGT-010) |
+| `NOT_REGISTERED_SOUNDEXCHANGE` | `R` has no registered `soundexchange` row in `recording_registrations` (RGT-010) |
+| `NO_INSTRUMENTAL` | `R` has no `recording_assets` row with `relationship = 'instrumental'` (RGT-010) |
+| `EXCLUSIVE_AGREEMENT` | an agreement with `is_exclusive = 1` that has not expired (`expires_on` is NULL or not before today's UTC date) backs a publishing or master row or a licensing contact of `R` or `C`, and its counterparty is not a self party (RGT-010) |
+
+The rebuilt demo fixture seeds no registrations and no instrumental assets, so every fixture song carries the three `NOT_REGISTERED_*` warnings and `NO_INSTRUMENTAL`; the expected blocking codes below do not change.
 
 **Implicit licensing contact (P-28).** When `C` exists, `SM` is set, no `PUBLISHING_TOTAL_*` or `MASTER_TOTAL_*` code applies and neither `PUBLISHING_NOT_CONTROLLED` nor `MASTER_NOT_CONTROLLED` applies, the workspace controls 100% of both sides, which is the legacy "can you just deal with me" case ([SRC-003]). The master self party `SM` is then the licensing contact, `NO_LICENSING_CONTACT` does not apply, and `RightsSummaryDTO.licensingContacts` lists `SM` with `implicit: true`. An explicit `licensing_contacts` row always takes precedence. In every other case an explicit contact is required.
 

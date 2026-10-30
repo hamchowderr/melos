@@ -39,3 +39,12 @@ export async function catalogSearchOf(database: Pick<WorkspaceTransaction, 'valu
   const indexed = await database.values(sql`SELECT * FROM catalog_search`);
   return { indexed: sorted(indexed), derived: sorted(derived) };
 }
+
+/** The §6.5 warnings every Northstar song carries: no registrations or instrumental (RGT-010). */
+export const northstarWarnings = (recordingId: string, compositionId: string) =>
+  [
+    ['NOT_REGISTERED_PRO', 'The composition is not registered with a PRO.'],
+    ['NOT_REGISTERED_MLC', 'The composition is not registered with The MLC.'],
+    ['NOT_REGISTERED_SOUNDEXCHANGE', 'Not registered with SoundExchange.'],
+    ['NO_INSTRUMENTAL', 'The recording has no instrumental.'],
+  ].map(([code, detail]) => ({ code, severity: 'warning', recordingId, compositionId, detail }));

@@ -56,6 +56,27 @@ const holderOf = (interest: typeof publishingInterests | typeof masterInterests,
   agreementId: interest.agreementId,
 });
 
+/** A registered row of `kind` for the outer composition or recording (RGT-010). */
+const registered = (owner: 'composition' | 'recording', kind: string) =>
+  sql.raw(
+    `exists (select 1 from ${owner}_registrations g where g.${owner}_id = "${owner}s"."id" and g.registry_kind = '${kind}' and g.status = 'registered')`,
+  );
+
+/**
+ * EXCLUSIVE_AGREEMENT (§6.5): an exclusive agreement, not expired on `today`, whose counterparty is
+ * not a self party, backs a share or licensing contact of the outer recording or its composition.
+ */
+const exclusiveAgreement = (today: string) => sql`exists (
+  select 1 from agreements a
+  where a.is_exclusive = 1 and (a.expires_on is null or a.expires_on >= ${today})
+    and (a.counterparty_party_id is null
+      or a.counterparty_party_id not in (select party_id from workspace_self_parties))
+    and a.id in (
+      select agreement_id from master_interests where recording_id = "recordings"."id"
+      union select agreement_id from publishing_interests where composition_id = "recordings"."composition_id"
+      union select agreement_id from licensing_contacts
+        where recording_id = "recordings"."id" or composition_id = "recordings"."composition_id"))`;
+
 /**
  * Reads a scope's live rights rows in one libSQL batch (§1.4): writer shares with roles, publishing
  * per territory and masters per recording with holders and attestation, totals from the §4.3 views,
@@ -80,6 +101,8 @@ export async function loadRightsFacts<const E extends readonly BatchItem<'sqlite
       database
         .select({
           ...{ id: compositions.id, iswc: compositions.iswc },
+          registeredPro: registered('composition', 'pro'),
+          registeredMlc: registered('composition', 'mlc'),
           writerTotalBp: sql<number>`(select t.writer_total_bp from composition_writer_totals t where t.composition_id = "compositions"."id")`,
         })
         .from(compositions)
@@ -94,6 +117,13 @@ export async function loadRightsFacts<const E extends readonly BatchItem<'sqlite
           isrc: recordings.isrc,
           masterTotalBp: sql<number>`(select t.master_total_bp from recording_master_totals t where t.recording_id = "recordings"."id")`,
           hasPrimaryLink: sql`exists (select 1 from recording_links l where l.recording_id = "recordings"."id" and l.is_primary = 1)`,
+          ...{
+            containsSamples: recordings.containsSamples,
+            samplesCleared: recordings.samplesCleared,
+          },
+          registeredSoundExchange: registered('recording', 'soundexchange'),
+          hasInstrumental: sql`exists (select 1 from recording_assets a where a.recording_id = "recordings"."id" and a.relationship = 'instrumental')`,
+          exclusiveAgreement: exclusiveAgreement(new Date().toISOString().slice(0, 10)),
         })
         .from(recordings)
         .where(liveTakes)
@@ -173,10 +203,11 @@ export async function loadRightsFacts<const E extends readonly BatchItem<'sqlite
   const mastersOf = Map.groupBy(masters, (row) => row.recordingId);
   const takeContactsOf = Map.groupBy(contacts, (row) => row.recordingId);
   const songContactsOf = Map.groupBy(contacts, (row) => row.compositionId);
-  const songRights = songs.map(({ id, iswc, writerTotalBp }) => {
+  const songRights = songs.map(({ id, iswc, writerTotalBp, registeredPro, registeredMlc }) => {
     const sets = Map.groupBy(publishingOf.get(id) ?? [], (row) => row.territory);
     const song = {
       ...{ id, iswc, writerTotalBp },
+      ...{ registeredPro: Boolean(registeredPro), registeredMlc: Boolean(registeredMlc) },
       writers: (writersOf.get(id) ?? []).map(({ writer }) => ({
         ...writer,
         roles: (JSON.parse(writer.roles) as string[]).sort(),
@@ -194,6 +225,10 @@ export async function loadRightsFacts<const E extends readonly BatchItem<'sqlite
     const holders = (mastersOf.get(take.id) ?? []).map(({ holder }) => holder);
     const facts = {
       ...{ recordingId: take.id, isrc: take.isrc, hasPrimaryLink: Boolean(take.hasPrimaryLink) },
+      ...{ containsSamples: take.containsSamples === 1, samplesCleared: take.samplesCleared === 1 },
+      registeredSoundExchange: Boolean(take.registeredSoundExchange),
+      ...{ hasInstrumental: Boolean(take.hasInstrumental) },
+      exclusiveAgreement: Boolean(take.exclusiveAgreement),
       ...{ selfParties, composition, masters: holders },
       licensingContacts: [
         ...(takeContactsOf.get(take.id) ?? []),

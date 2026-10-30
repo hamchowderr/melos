@@ -134,7 +134,7 @@ const DUE_STATUSES = ['sent', 'awaiting_reply', 'responded', 'interested', 'requ
 
 // §6.5, in the order of its code tables.
 const READINESS_CTE = `
-WITH rec AS (SELECT id AS rid, composition_id AS cid, isrc FROM recordings WHERE deleted_at IS NULL),
+WITH rec AS (SELECT id AS rid, composition_id AS cid, isrc, contains_samples, samples_cleared FROM recordings WHERE deleted_at IS NULL),
 sp AS (SELECT party_id FROM workspace_self_parties WHERE side = 'publishing'),
 sm AS (SELECT party_id FROM workspace_self_parties WHERE side = 'master'),
 pub AS (SELECT t.composition_id AS cid, t.territory, t.publishing_total_bp AS total,
@@ -203,9 +203,44 @@ const READINESS_CODES = [
     'SELECT rid FROM rec WHERE NOT EXISTS (SELECT 1 FROM recording_links l WHERE l.recording_id = rec.rid AND l.is_primary = 1)',
   ],
   [
+    'sync',
+    'SAMPLES_NOT_CLEARED',
+    'SELECT rid FROM rec WHERE contains_samples = 1 AND samples_cleared = 0',
+  ],
+  [
     'warning',
     'MISSING_ISWC',
     'SELECT rec.rid FROM rec JOIN compositions c ON c.id = rec.cid WHERE c.iswc IS NULL',
+  ],
+  [
+    'warning',
+    'NOT_REGISTERED_PRO',
+    "SELECT rid FROM rec WHERE cid IS NOT NULL AND NOT EXISTS (SELECT 1 FROM composition_registrations g WHERE g.composition_id = rec.cid AND g.registry_kind = 'pro' AND g.status = 'registered')",
+  ],
+  [
+    'warning',
+    'NOT_REGISTERED_MLC',
+    "SELECT rid FROM rec WHERE cid IS NOT NULL AND NOT EXISTS (SELECT 1 FROM composition_registrations g WHERE g.composition_id = rec.cid AND g.registry_kind = 'mlc' AND g.status = 'registered')",
+  ],
+  [
+    'warning',
+    'NOT_REGISTERED_SOUNDEXCHANGE',
+    "SELECT rid FROM rec WHERE NOT EXISTS (SELECT 1 FROM recording_registrations g WHERE g.recording_id = rec.rid AND g.registry_kind = 'soundexchange' AND g.status = 'registered')",
+  ],
+  [
+    'warning',
+    'NO_INSTRUMENTAL',
+    "SELECT rid FROM rec WHERE NOT EXISTS (SELECT 1 FROM recording_assets a WHERE a.recording_id = rec.rid AND a.relationship = 'instrumental')",
+  ],
+  [
+    'warning',
+    'EXCLUSIVE_AGREEMENT',
+    `SELECT rid FROM rec WHERE EXISTS (SELECT 1 FROM agreements a
+      WHERE a.is_exclusive = 1 AND (a.expires_on IS NULL OR a.expires_on >= date('now'))
+        AND (a.counterparty_party_id IS NULL OR a.counterparty_party_id NOT IN (SELECT party_id FROM workspace_self_parties))
+        AND a.id IN (SELECT agreement_id FROM master_interests WHERE recording_id = rec.rid
+          UNION SELECT agreement_id FROM publishing_interests WHERE composition_id = rec.cid
+          UNION SELECT agreement_id FROM licensing_contacts WHERE recording_id = rec.rid OR composition_id = rec.cid))`,
   ],
 ];
 

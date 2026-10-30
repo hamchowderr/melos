@@ -96,6 +96,8 @@ describe('melos-rpr.7: RightsService summarizes every song shape (RGT-001 to RGT
     const masters = [{ recordingId: ID.LONE, totalBp: 10000 }];
     expect(lone).toMatchObject({ ...empty, masters, licensingContacts: [] });
     const codes = ['NO_COMPOSITION', 'NO_LICENSING_CONTACT', 'MISSING_ISRC', 'NO_LISTEN_LINK'];
+    // Without a composition, only the recording's own warnings apply (RGT-010).
+    codes.push('NOT_REGISTERED_SOUNDEXCHANGE', 'NO_INSTRUMENTAL');
     expect(lone.issues.map(({ code }) => code)).toEqual(codes);
   });
 

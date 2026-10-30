@@ -64,11 +64,11 @@ Codes are listed in the order of the CONTRACT §6.5 code tables. Sync-only codes
 <!-- check:readiness -->
 | Song | Recording | One-stop codes | Sync-only codes | Warnings | oneStopReady | syncReady | Licensing contact |
 |---|---|---|---|---|---|---|---|
-| Midnight Drive | `rec_MIDNIGHT` | none | none | none | true | true | `pty_SILVERLINE` (implicit) |
-| Ocean Blue | `rec_OCEAN` | PUBLISHING_TOTAL_INCOMPLETE, PUBLISHING_NOT_CONTROLLED, NO_LICENSING_CONTACT | MISSING_ISRC | none | false | false | none |
-| Neon Static | `rec_NEON` | MASTER_TOTAL_INCOMPLETE, PUBLISHING_NOT_CONTROLLED, MASTER_NOT_CONTROLLED, NO_LICENSING_CONTACT | none | none | false | false | none |
-| Home Again | `rec_HOME` | none | none | none | true | true | `pty_SILVERLINE` (implicit) |
-| Paper Planes at 2AM | `rec_PAPER` | none | none | none | true | true | `pty_SILVERLINE` (implicit) |
+| Midnight Drive | `rec_MIDNIGHT` | none | none | NOT_REGISTERED_PRO, NOT_REGISTERED_MLC, NOT_REGISTERED_SOUNDEXCHANGE, NO_INSTRUMENTAL | true | true | `pty_SILVERLINE` (implicit) |
+| Ocean Blue | `rec_OCEAN` | PUBLISHING_TOTAL_INCOMPLETE, PUBLISHING_NOT_CONTROLLED, NO_LICENSING_CONTACT | MISSING_ISRC | NOT_REGISTERED_PRO, NOT_REGISTERED_MLC, NOT_REGISTERED_SOUNDEXCHANGE, NO_INSTRUMENTAL | false | false | none |
+| Neon Static | `rec_NEON` | MASTER_TOTAL_INCOMPLETE, PUBLISHING_NOT_CONTROLLED, MASTER_NOT_CONTROLLED, NO_LICENSING_CONTACT | none | NOT_REGISTERED_PRO, NOT_REGISTERED_MLC, NOT_REGISTERED_SOUNDEXCHANGE, NO_INSTRUMENTAL | false | false | none |
+| Home Again | `rec_HOME` | none | none | NOT_REGISTERED_PRO, NOT_REGISTERED_MLC, NOT_REGISTERED_SOUNDEXCHANGE, NO_INSTRUMENTAL | true | true | `pty_SILVERLINE` (implicit) |
+| Paper Planes at 2AM | `rec_PAPER` | none | none | NOT_REGISTERED_PRO, NOT_REGISTERED_MLC, NOT_REGISTERED_SOUNDEXCHANGE, NO_INSTRUMENTAL | true | true | `pty_SILVERLINE` (implicit) |
 
 `validate.mjs` also compares these rows with the expected readiness table in CONTRACT §6.5 and with FX `oneStopReady`.
 
