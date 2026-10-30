@@ -1,3 +1,4 @@
+import { ALLOWED_CONTENT_TYPES, MAX_ASSET_BYTES } from '@/lib/dto/assets';
 import { isWorkspaceKey } from '@/server/services/assets/asset-storage';
 import { getLocalAssetStorage } from '@/server/services/assets/get-asset-storage';
 import { requirePermission } from '@/server/services/permissions';
@@ -13,7 +14,8 @@ const refuse = (status: number, error: string) => Response.json({ error }, { sta
  * LocalAssetStorage URLs in development and tests (§7.5). 404 unless local storage is selected;
  * then the session's active workspace (§7.1), a key under that workspace's prefix (AST-001),
  * catalog:read to download or catalog:update to upload (D-5), and a valid, unexpired signature.
- * Every refusal comes before any file is read or written.
+ * A PUT must carry an allowed content type (so a stored type is always a safe header) and at most
+ * MAX_ASSET_BYTES. Every refusal comes before any file is read or written.
  */
 async function handle(method: 'GET' | 'PUT', request: Request, { params }: Context) {
   const storage = getLocalAssetStorage();
@@ -41,7 +43,12 @@ async function handle(method: 'GET' | 'PUT', request: Request, { params }: Conte
   if (check !== 'valid') return refuse(403, check);
 
   if (method === 'PUT') {
+    if (!ALLOWED_CONTENT_TYPES.has(contentType)) return refuse(415, 'content-type-not-allowed');
+    if (Number(request.headers.get('content-length') ?? 0) > MAX_ASSET_BYTES) {
+      return refuse(413, 'too-large');
+    }
     const body = new Uint8Array(await request.arrayBuffer());
+    if (body.byteLength > MAX_ASSET_BYTES) return refuse(413, 'too-large');
     await storage.put({ workspaceId, storageKey, contentType, body });
     return new Response(null, { status: 204 });
   }
