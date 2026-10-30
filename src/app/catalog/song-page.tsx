@@ -6,6 +6,7 @@ import { MetadataPanel } from '@/components/catalog/metadata-panel';
 import { RecordingSection, recordingTitle } from '@/components/catalog/recording-section';
 import { ReleaseSection } from '@/components/catalog/release-section';
 import { HolderSplitEditor } from '@/components/rights/holder-split-editor';
+import { LicensingContactsEditor } from '@/components/rights/licensing-contacts-editor';
 import { PublishingEditor } from '@/components/rights/publishing-editor';
 import { RightsPanel } from '@/components/rights/rights-panel';
 import { RightsSplitEditor } from '@/components/rights/rights-split-editor';
@@ -101,6 +102,18 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
       : [],
   );
 
+  const target = composition
+    ? { compositionId: composition.id }
+    : { recordingId: recordingIds[0] ?? '' };
+  const contactsEditor =
+    song.ok && everyone?.ok ? (
+      <LicensingContactsEditor
+        target={target}
+        contacts={song.value.rights.licensingContacts}
+        parties={parties}
+      />
+    ) : undefined;
+
   return (
     <main>
       <WorkspaceHeader workspaceName={workspace.workspaceName} current="catalog" />
@@ -132,6 +145,8 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
               writerEditor={writerEditor}
               publishingEditor={publishingEditor}
               masterEditors={masterEditors}
+              representable={Boolean(editable)}
+              contactsEditor={contactsEditor}
             />
             <ReleaseSection releases={song.value.releases} recordings={song.value.recordings} />
           </>
