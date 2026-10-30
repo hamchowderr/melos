@@ -235,19 +235,22 @@ test('melos-g4u: a sign-out that fails on the network shows its error and can be
   await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
 });
 
-test('melos-g4u: on a phone, the workspace header fits, with or without a sign-out error', async ({
+test('melos-g4u: on a phone, the workspace menu fits, with or without a sign-out error', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 667 });
-  await signUpWithWorkspace(page, 'Phone');
+  const workspaceName = await signUpWithWorkspace(page, 'Phone');
   await page.route('**/api/auth/sign-out', (route) => route.abort());
-  const signOut = page.getByRole('button', { name: 'Sign out' });
+  // Below md the sidebar is a drawer behind the top bar's menu button.
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  const menu = page.getByRole('dialog', { name: workspaceName });
+  const signOut = menu.getByRole('button', { name: 'Sign out' });
 
   for (const failed of [false, true]) {
     if (failed) await signOut.click();
     if (failed) await expect(signOutError(page)).toBeInViewport({ ratio: 1 });
-    await expect(page.getByTestId('active-workspace-name')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Switch workspace' })).toBeInViewport({ ratio: 1 });
+    await expect(menu.getByRole('navigation', { name: 'Workspace' })).toBeInViewport();
+    await expect(menu.getByRole('link', { name: 'Switch workspace' })).toBeInViewport({ ratio: 1 });
     await expect(signOut).toBeInViewport({ ratio: 1 });
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

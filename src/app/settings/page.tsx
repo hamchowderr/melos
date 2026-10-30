@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { resolveWorkspacePage } from '@/app/workspace-page';
 import { MembersPanel } from '@/components/workspace/members-panel';
-import { WorkspaceHeader } from '@/components/workspace/workspace-header';
+import { WorkspaceShell } from '@/components/workspace/workspace-shell';
 import type { WorkspacePermissions } from '@/lib/auth/permissions';
 import { auth } from '@/server/auth/auth';
 import { getServerEnv } from '@/server/env';
@@ -50,8 +50,7 @@ export default async function SettingsPage() {
     }));
 
   return (
-    <main>
-      <WorkspaceHeader workspaceName={workspace.workspaceName} current="settings" />
+    <WorkspaceShell workspaceName={workspace.workspaceName} current="settings">
       <div className="flex flex-col items-center gap-4 px-4 py-6">
         <SettingsNav current="members" />
         <MembersPanel
@@ -64,6 +63,6 @@ export default async function SettingsPage() {
           canRemove={can({ member: ['delete'] })}
         />
       </div>
-    </main>
+    </WorkspaceShell>
   );
 }

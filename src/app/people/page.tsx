@@ -3,8 +3,8 @@ import { PartyForm } from '@/components/people/party-form';
 import { PartyTable } from '@/components/people/party-table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
+import { WorkspaceShell } from '@/components/workspace/workspace-shell';
 import { listParties } from '@/server/services/contacts/read';
 import { requirePermission } from '@/server/services/permissions';
 
@@ -22,8 +22,7 @@ export default async function PeoplePage() {
     parties.ok ? parties.value.filter(({ partyKind }) => partyKind === kind) : [];
 
   return (
-    <main>
-      <WorkspaceHeader workspaceName={workspace.workspaceName} current="people" />
+    <WorkspaceShell workspaceName={workspace.workspaceName} current="people">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="mr-auto text-lg font-semibold">People and organizations</h1>
@@ -55,6 +54,6 @@ export default async function PeoplePage() {
           </Alert>
         )}
       </div>
-    </main>
+    </WorkspaceShell>
   );
 }
