@@ -3,11 +3,14 @@ import { resolveWorkspacePage } from '@/app/workspace-page';
 import { ReadinessChecklist } from '@/components/rights/readiness-checklist';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { buttonVariants } from '@/components/ui/button';
+import { PageHeader } from '@/components/workspace/page-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
 import { WorkspaceShell } from '@/components/workspace/workspace-shell';
 import { getReadinessIssues } from '@/server/services/rights/read';
 
 export const dynamic = 'force-dynamic';
+
+const recordingCount = (count: number) => (count === 1 ? '1 recording' : `${count} recordings`);
 
 type Props = { searchParams: Promise<{ all?: string }> };
 
@@ -23,19 +26,21 @@ export default async function RightsPage({ searchParams }: Props) {
 
   return (
     <WorkspaceShell workspaceName={workspace.workspaceName} current="rights">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-lg font-semibold">Rights readiness</h1>
-          {/* A link, so the filter is in the URL and works without client JavaScript. */}
-          <Link
-            href={onlyNotReady ? '/rights?all=1' : '/rights'}
-            role="switch"
-            aria-checked={onlyNotReady}
-            className={buttonVariants({ variant: onlyNotReady ? 'secondary' : 'outline' })}
-          >
-            Only not ready
-          </Link>
-        </div>
+      <PageHeader
+        title="Rights readiness"
+        count={report.ok ? recordingCount(report.value.recordings.length) : undefined}
+      >
+        {/* A link, so the filter is in the URL and works without client JavaScript. */}
+        <Link
+          href={onlyNotReady ? '/rights?all=1' : '/rights'}
+          role="switch"
+          aria-checked={onlyNotReady}
+          className={buttonVariants({ variant: onlyNotReady ? 'secondary' : 'outline' })}
+        >
+          Only not ready
+        </Link>
+      </PageHeader>
+      <div className="flex flex-col gap-4 p-4">
         {report.ok ? (
           <ReadinessChecklist recordings={report.value.recordings} onlyNotReady={onlyNotReady} />
         ) : (
