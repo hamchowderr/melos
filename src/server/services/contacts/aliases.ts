@@ -9,6 +9,7 @@ import {
   type PartyIdentifierInput,
   type SocietyAffiliationInput,
 } from '../../../lib/dto/contacts';
+import { normalizeIpi } from '../../../lib/identifiers';
 import {
   partySocietyAffiliations as affiliations,
   artistAliases as aliases,
@@ -128,8 +129,14 @@ export const setArtistAliases = (
     }),
   });
 
-/** An identifier as stored and compared: its value trimmed and upper-cased. */
-const storedValue = (row: PartyIdentifierInput) => row.identifierValue.trim().toUpperCase();
+const isIpi = (type: string): type is 'IPI' | 'IPI_BASE' => type === 'IPI' || type === 'IPI_BASE';
+
+/** An IPI as normalizeIpi stores it (§4.4), else the value trimmed and upper-cased. */
+function storedValue(row: PartyIdentifierInput) {
+  const value = row.identifierValue.trim().toUpperCase();
+  const ipi = isIpi(row.identifierType) ? normalizeIpi(value, row.identifierType) : undefined;
+  return ipi?.ok ? ipi.value : value;
+}
 
 /** VALIDATION for an identifier set: a value, a known type, no repeats, one primary per type. */
 function invalidIdentifiers(rows: PartyIdentifierInput[]): Refusal {
@@ -145,8 +152,9 @@ function invalidIdentifiers(rows: PartyIdentifierInput[]): Refusal {
 }
 
 /**
- * Replaces a party's identifiers. An alias must be one of the party's own (VALIDATION); a type and
- * value another party already holds is CONFLICT, before uq on (type, value) refuses the write.
+ * Replaces a party's identifiers. An alias must be one of the party's own (VALIDATION); a new or
+ * changed IPI that normalizeIpi refuses is INVALID_IPI (P-46); a type and value another party
+ * already holds is CONFLICT, before uq on (type, value) refuses the write.
  */
 export const setPartyIdentifiers = (
   tenant: TenantContext,
@@ -169,6 +177,23 @@ export const setPartyIdentifiers = (
             .where(and(inArray(aliases.id, named), eq(aliases.partyId, partyId)))
         : [];
       if (own.length < new Set(named).size) return refuse('identifiers', 'alias_of_other_party');
+      // Like ISWC, an IPI the party already holds passes unchecked; a new or changed one must parse.
+      const held = await tx
+        .select({ type: identifiers.identifierType, value: identifiers.identifierValue })
+        .from(identifiers)
+        .where(eq(identifiers.partyId, partyId));
+      for (const row of rows) {
+        if (!isIpi(row.identifierType)) continue;
+        const value = storedValue(row);
+        const parsed = normalizeIpi(value, row.identifierType);
+        const kept = held.some((h) => h.type === row.identifierType && h.value === value);
+        if (!parsed.ok && !kept)
+          return failure({
+            code: 'INVALID_IPI',
+            field: 'identifiers',
+            reason: parsed.error.reason,
+          });
+      }
       for (const row of rows) {
         const taken = and(
           eq(identifiers.identifierType, row.identifierType),

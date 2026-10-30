@@ -24,7 +24,7 @@ export function formatPlaybackTime(ms: number): string {
 
 /** Why an input is refused: its shape, or a check digit that does not match (§4.4). */
 export type IdentifierError = {
-  code: 'INVALID_ISRC' | 'INVALID_ISWC' | 'INVALID_UPC_EAN';
+  code: 'INVALID_ISRC' | 'INVALID_ISWC' | 'INVALID_UPC_EAN' | 'INVALID_IPI';
   reason: 'shape' | 'check_digit';
 };
 
@@ -76,6 +76,23 @@ export function normalizeUpcEan(input: string): IdentifierResult {
     return refuse('INVALID_UPC_EAN', 'check_digit');
   }
   return { ok: true, value };
+}
+
+/**
+ * An IPI as `party_identifiers.identifier_value` stores it (§4.4, P-47). A name number (`IPI`) loses
+ * spaces, dots and hyphens, has 9 to 11 digits and is left-padded to 11, since societies print it
+ * with and without leading zeros. A base number (`IPI_BASE`) is `I`, nine digits and a check digit,
+ * stored as `I-NNNNNNNNN-N`. Neither check digit is verified until §9 has a primary source.
+ */
+export function normalizeIpi(input: string, type: 'IPI' | 'IPI_BASE'): IdentifierResult {
+  if (type === 'IPI') {
+    const digits = input.replace(/[\s.-]/g, '');
+    if (!/^[0-9]{9,11}$/.test(digits)) return refuse('INVALID_IPI', 'shape');
+    return { ok: true, value: digits.padStart(11, '0') };
+  }
+  const base = /^[Ii]-?([0-9]{9})-?([0-9])$/.exec(input.replace(/\s/g, ''));
+  if (!base) return refuse('INVALID_IPI', 'shape');
+  return { ok: true, value: `I-${base[1]}-${base[2]}` };
 }
 
 /**

@@ -121,7 +121,7 @@ export type PartyMatch = {
 };
 
 export const ALIAS_TYPES = ['stage_name', 'band_name', 'pseudonym', 'aka'] as const;
-export const IDENTIFIER_TYPES = ['IPI', 'ISNI', 'SOCIETY_MEMBER_ID', 'OTHER'] as const;
+export const IDENTIFIER_TYPES = ['IPI', 'IPI_BASE', 'ISNI', 'SOCIETY_MEMBER_ID', 'OTHER'] as const;
 
 /** One alias in a party's whole alias set (CAT-008); `id` keeps an existing alias. */
 export type ArtistAliasInput = {

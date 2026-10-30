@@ -143,4 +143,52 @@ describe('melos-rpr.26: aliases, identifiers and society affiliations (CAT-008)'
     const other = await services.provision('owner');
     expect(await service.setArtistAliases(other, ALEX, [])).toEqual(refused({ code: 'NOT_FOUND' }));
   });
+
+  it('CAT-INT-012: normalizes IPIs and checks only a new or changed one', async () => {
+    const audits = (await auditsOf(ALEX)).length;
+    const name = { identifierType: 'IPI', identifierValue: '12345678' } as const;
+    const base = { identifierType: 'IPI_BASE', identifierValue: 'I-12345678-9' } as const;
+    for (const row of [name, base])
+      expect(await service.setPartyIdentifiers(owner, ALEX, [row])).toEqual(
+        refused({ code: 'INVALID_IPI', field: 'identifiers', reason: 'shape' }),
+      );
+    expect(await auditsOf(ALEX)).toHaveLength(audits);
+    const set = await accepted(
+      service.setPartyIdentifiers(owner, ALEX, [
+        { ...name, identifierValue: '987.654.321' },
+        { ...base, identifierValue: 'i0000002297' },
+      ]),
+    );
+    expect(set.identifiers.map((row) => row.identifierValue).sort()).toEqual([
+      '00987654321',
+      'I-000000229-7',
+    ]);
+    const padded = { ...name, identifierValue: '00987654321' };
+    expect(
+      await service.setPartyIdentifiers(owner, ALEX, [
+        padded,
+        { ...name, identifierValue: '987654321' },
+      ]),
+    ).toEqual(invalid('identifiers', 'duplicate_identifier'));
+    // A legacy value stored before the check passes while it is unchanged.
+    const database = await open(owner);
+    await database
+      .update(partyIdentifiers)
+      .set({ identifierValue: 'LEGACY-1' })
+      .where(eq(partyIdentifiers.identifierValue, '00987654321'));
+    const [legacy] = await database
+      .select()
+      .from(partyIdentifiers)
+      .where(eq(partyIdentifiers.identifierValue, 'LEGACY-1'));
+    await accepted(
+      service.setPartyIdentifiers(owner, ALEX, [
+        { ...name, id: legacy.id, identifierValue: 'legacy-1' },
+      ]),
+    );
+    expect(
+      await service.setPartyIdentifiers(owner, ALEX, [
+        { ...name, id: legacy.id, identifierValue: 'LEGACY-2' },
+      ]),
+    ).toEqual(refused({ code: 'INVALID_IPI', field: 'identifiers', reason: 'shape' }));
+  });
 });
