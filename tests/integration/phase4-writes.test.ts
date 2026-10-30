@@ -14,6 +14,7 @@ const MODULES = {
   compositions: () => import('../../src/server/services/catalog/compositions'),
   deletes: () => import('../../src/server/services/catalog/deletes'),
   recordings: () => import('../../src/server/services/catalog/recordings'),
+  registrations: () => import('../../src/server/services/catalog/registrations'),
   releases: () => import('../../src/server/services/catalog/releases'),
   songs: () => import('../../src/server/services/catalog/songs'),
   terms: () => import('../../src/server/services/catalog/terms'),
@@ -31,7 +32,7 @@ const MODULES = {
 type Modules = { [K in keyof typeof MODULES]: Awaited<ReturnType<(typeof MODULES)[K]>> };
 
 /** A write's exported name. insert* and reindex* run inside a caller's transaction. */
-const WRITE = /^(create|update|delete|set|ensure|attest|complete|add)[A-Z]/;
+const WRITE = /^(create|update|delete|set|ensure|attest|complete|add|replace)[A-Z]/;
 
 type Result = ServiceResult<unknown>;
 type Case = {
@@ -201,6 +202,28 @@ const cases = (): Record<string, Case> => ({
     refuse: () =>
       s.artists.updateRecordingArtists(owner, ids.recording, [
         { partyId: MISSING, role: 'primary' },
+      ]),
+  },
+  replaceCompositionRegistrations: {
+    actions: ['composition_registrations.replace'],
+    run: () =>
+      s.registrations.replaceCompositionRegistrations(owner, ids.composition, [
+        { registryKind: 'pro', societyCode: 'BMI', workCode: '12345678' },
+      ]),
+    refuse: () =>
+      s.registrations.replaceCompositionRegistrations(owner, 'cmp_MISSING', [
+        { registryKind: 'mlc' },
+      ]),
+  },
+  replaceRecordingRegistrations: {
+    actions: ['recording_registrations.replace'],
+    run: () =>
+      s.registrations.replaceRecordingRegistrations(owner, ids.recording, [
+        { registryKind: 'soundexchange', status: 'pending' },
+      ]),
+    refuse: () =>
+      s.registrations.replaceRecordingRegistrations(owner, 'rec_MISSING', [
+        { registryKind: 'soundexchange' },
       ]),
   },
   ensureTerms: {
