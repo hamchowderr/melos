@@ -1,5 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
-import { AUTH_REDIRECT, activeOrganizationId, setMemberRole, signUpWithWorkspace } from './support';
+import {
+  AUTH_REDIRECT,
+  activeOrganizationId,
+  insertWorkspaceRows,
+  setMemberRole,
+  signUpWithWorkspace,
+} from './support';
 
 const dialog = (page: Page) => page.getByRole('dialog').or(page.getByRole('alertdialog'));
 const detail = (page: Page, term: string) =>
@@ -39,6 +45,16 @@ test('melos-rpr.30: an owner creates, renames and reaches people and organizatio
   await page.reload();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Riley Stone-Hart');
 
+  await open(page, 'Contact methods');
+  await dialog(page).getByRole('button', { name: 'Add method' }).click();
+  await dialog(page).getByLabel('Method 2 value').fill('+1 555 0100');
+  await dialog(page).getByRole('checkbox').nth(1).check();
+  await dialog(page).getByRole('button', { name: 'Save' }).click();
+  await expect(detail(page, 'Phone')).toHaveText('+1 555 0100');
+  await page.reload();
+  await expect(detail(page, 'Phone')).toHaveText('+1 555 0100');
+  await expect(detail(page, 'Email')).toHaveText('riley@example.test');
+
   await create(page, 'New organization', 'Harbor Lane Music');
   await expect(detail(page, 'Kind')).toHaveText('Organization');
 
@@ -54,12 +70,34 @@ test('melos-rpr.30: an owner creates, renames and reaches people and organizatio
   );
 });
 
-test('melos-rpr.30: create and edit controls follow the roles', async ({ page }) => {
-  await signUpWithWorkspace(page, 'Viewer');
-  await create(page, 'New person', 'Sam Park');
-  await setMemberRole(await activeOrganizationId(page), 'viewer');
+test('melos-rpr.30: deleting a writer shows the block, and controls follow the roles', async ({
+  page,
+}) => {
+  await signUpWithWorkspace(page, 'Writer');
+  const sam = await create(page, 'New person', 'Sam Park');
+  const at = new Date().toISOString();
+  await insertWorkspaceRows(page, {
+    compositions: [{ id: 'cmp_TIDE', title: 'Tide Song', created_at: at, updated_at: at }],
+    composition_contributors: [
+      { id: 'ctr_SAM', composition_id: 'cmp_TIDE', party_id: sam, created_at: at, updated_at: at },
+    ],
+  });
+  await page.reload();
+  await open(page, 'Delete');
+  await dialog(page).getByRole('button', { name: 'Delete' }).click();
+  await expect(dialog(page).getByText('Sam Park is still in use')).toBeVisible();
+  await expect(dialog(page).getByRole('listitem')).toHaveText(['Composition contributors: 1']);
+  await dialog(page).getByRole('button', { name: 'Cancel' }).click();
+
+  const organizationId = await activeOrganizationId(page);
+  await setMemberRole(organizationId, 'member');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Contact methods' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+  await setMemberRole(organizationId, 'viewer');
   await page.reload();
   await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Contact methods' })).toHaveCount(0);
   await page.goto('/people');
   await expect(page.getByRole('table')).toContainText('Sam Park');
   await expect(page.getByRole('button', { name: 'New person' })).toHaveCount(0);
