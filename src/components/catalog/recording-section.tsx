@@ -19,13 +19,15 @@ type Props = {
   readiness?: Pick<RecordingReadiness, 'oneStopReady' | 'syncReady'>;
   /** The recording's Edit control, for a role with catalog:update (§6.2). */
   editor?: ReactNode;
+  /** The uploaded audio's player and the upload control (CAT-005). */
+  media?: ReactNode;
 };
 
 /**
  * One of the song's recordings (§3.4): its readiness (§6.5), identifiers, musical details, links,
  * credits and terms.
  */
-export function RecordingSection({ recording, readiness, editor }: Props) {
+export function RecordingSection({ recording, readiness, editor, media }: Props) {
   const { primaryLink, previewStartMs, isrc, durationMs } = recording;
   const title = recordingTitle(recording);
   const start = previewStartMs === null ? '' : ` · starts ${formatPlaybackTime(previewStartMs)}`;
@@ -55,6 +57,7 @@ export function RecordingSection({ recording, readiness, editor }: Props) {
           {editor}
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          {media}
           {primaryLink ? (
             // D-8: the primary link opens its external player; AudioPlayer plays uploaded audio only.
             <a

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import type { WorkspacePermissions } from '../../../lib/auth/permissions';
 import {
@@ -11,6 +11,7 @@ import {
   type AssetTargetType,
   type AssetType,
   MAX_ASSET_BYTES,
+  type RecordingAudioDTO,
   type UploadInput,
   type UploadTicketDTO,
 } from '../../../lib/dto/assets';
@@ -189,4 +190,30 @@ export async function getDownloadUrl(
     ...{ workspaceId, storageKey: asset.storageKey, expiresInSeconds },
   });
   return success({ url, expiresInSeconds });
+}
+
+/**
+ * The audio assets attached to these recordings (CAT-005), newest first, for AudioPlayer.
+ * catalog:read; no ids, or a refused role, never opens the database.
+ */
+export async function listRecordingAudio(
+  tenant: TenantContext,
+  recordingIds: string[],
+): Promise<ServiceResult<RecordingAudioDTO[]>> {
+  if (!requirePermission(tenant, READ).ok) return failure('FORBIDDEN');
+  if (!recordingIds.length) return success([]);
+  const { workspaceId } = tenant;
+  const rows = await sanitized(workspaceId, async () => {
+    const database = await getWorkspaceDatabase(workspaceId);
+    return database
+      .select({
+        ...{ recordingId: recordingAssets.recordingId, assetId: assets.id },
+        ...{ fileName: assets.fileName, relationship: recordingAssets.relationship },
+      })
+      .from(recordingAssets)
+      .innerJoin(assets, eq(assets.id, recordingAssets.assetId))
+      .where(and(inArray(recordingAssets.recordingId, recordingIds), eq(assets.assetType, 'audio')))
+      .orderBy(desc(assets.createdAt), desc(assets.id));
+  });
+  return success(rows);
 }

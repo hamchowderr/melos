@@ -54,14 +54,27 @@ async function handle(method: 'GET' | 'PUT', request: Request, { params }: Conte
   }
   const object = await storage.read({ workspaceId, storageKey });
   if (!object) return refuse(404, 'not-found');
-  return new Response(object.body, {
-    headers: {
-      'content-type': object.contentType,
-      'cache-control': 'private, no-store',
-      // An uploaded file never runs as a page on the app's origin.
-      'content-security-policy': 'sandbox',
-      'x-content-type-options': 'nosniff',
-    },
+  const headers = {
+    'content-type': object.contentType,
+    'cache-control': 'private, no-store',
+    // An uploaded file never runs as a page on the app's origin.
+    'content-security-policy': 'sandbox',
+    'x-content-type-options': 'nosniff',
+    // AudioPlayer seeks to the preview start, which media elements do with range requests, as R2
+    // serves them.
+    'accept-ranges': 'bytes',
+  };
+  const size = object.body.byteLength;
+  const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get('range') ?? '');
+  if (!range || (!range[1] && !range[2])) return new Response(object.body, { headers });
+  const start = range[1] ? Number(range[1]) : Math.max(size - Number(range[2]), 0);
+  const end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+  if (start > end || start >= size) {
+    return new Response(null, { status: 416, headers: { 'content-range': `bytes */${size}` } });
+  }
+  return new Response(object.body.slice(start, end + 1), {
+    status: 206,
+    headers: { ...headers, 'content-range': `bytes ${start}-${end}/${size}` },
   });
 }
 
