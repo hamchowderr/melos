@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { ONE_STOP_CODES, SYNC_ONLY_CODES, WARNING_CODES } from '../../src/lib/dto/rights';
 import type { TenantContext } from '../../src/server/services/tenant-context';
+import { northstarWarnings } from './catalog-support';
 import * as rig from './rights-support';
 
 const { accepted, getWorkspaceDatabase, ID, K, keys, refused, table, withRole } = rig;
@@ -46,7 +47,8 @@ describe('melos-rpr.7: RightsService reports readiness issues (RGT-005, DEMO-003
     const midnight = { recordingId: keys.rec_MIDNIGHT };
     expect(accepted(await issues(env.northstar, midnight)).recordings).toEqual([]);
     const ready = accepted(await issues(env.northstar, { ...midnight, onlyNotReady: false }));
-    const flags = { oneStopReady: true, syncReady: true, issues: [] };
+    const warnings = northstarWarnings(keys.rec_MIDNIGHT, keys.cmp_MIDNIGHT);
+    const flags = { oneStopReady: true, syncReady: true, issues: warnings };
     expect(ready.recordings).toEqual([
       { ...midnight, compositionId: keys.cmp_MIDNIGHT, title: 'Midnight Drive', ...flags },
     ]);

@@ -31,12 +31,22 @@ export type RecordingReadinessFacts = {
   isrc: string | null;
   /** A `recording_links` row of the recording has `is_primary = 1`. */
   hasPrimaryLink: boolean;
+  /** RGT-010: `contains_samples` and `samples_cleared`, a registered SoundExchange row, an
+   * `instrumental` asset, and a live exclusive agreement with an outside counterparty. */
+  containsSamples: boolean;
+  samplesCleared: boolean;
+  registeredSoundExchange: boolean;
+  hasInstrumental: boolean;
+  exclusiveAgreement: boolean;
   /** `workspace_self_parties` for sides publishing and master; null when the side is not set. */
   selfParties: { publishing: PartyFact | null; master: PartyFact | null };
   /** Null for a recording without a composition. */
   composition: {
     id: string;
     iswc: string | null;
+    /** A registered `composition_registrations` row of kind `pro` / `mlc` (RGT-010). */
+    registeredPro: boolean;
+    registeredMlc: boolean;
     /** One entry per `composition_contributors` row; a NULL share counts as 0, as in the view. */
     writers: { shareBp: number | null }[];
     /** `publishing_interests`, one entry per territory. */
@@ -116,7 +126,18 @@ export function evaluateRecordingReadiness(facts: RecordingReadinessFacts): Reco
 
   flag('MISSING_ISRC', facts.isrc === null, 'The recording has no ISRC.');
   flag('NO_LISTEN_LINK', !facts.hasPrimaryLink, 'The recording has no primary listen link.');
+  const uncleared = facts.containsSamples && !facts.samplesCleared;
+  flag('SAMPLES_NOT_CLEARED', uncleared, 'The recording has samples that are not cleared.');
   flag('MISSING_ISWC', composition?.iswc === null, 'The composition has no ISWC.');
+  const pro = composition?.registeredPro === false;
+  flag('NOT_REGISTERED_PRO', pro, 'The composition is not registered with a PRO.');
+  const mlc = composition?.registeredMlc === false;
+  flag('NOT_REGISTERED_MLC', mlc, 'The composition is not registered with The MLC.');
+  const soundExchange = !facts.registeredSoundExchange;
+  flag('NOT_REGISTERED_SOUNDEXCHANGE', soundExchange, 'Not registered with SoundExchange.');
+  flag('NO_INSTRUMENTAL', !facts.hasInstrumental, 'The recording has no instrumental.');
+  const exclusive = 'An exclusive agreement with another party covers this song.';
+  flag('EXCLUSIVE_AGREEMENT', facts.exclusiveAgreement, exclusive);
 
   const ids = { recordingId: facts.recordingId, compositionId: composition?.id ?? null };
   const issues = (codes: readonly ReadinessCode[], severity: 'blocking' | 'warning') =>

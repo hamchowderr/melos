@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { CatalogFocus } from '../../src/lib/dto/catalog';
 import * as ws from '../../src/server/db/schema/workspace.generated';
 import type { TenantContext } from '../../src/server/services/tenant-context';
+import { northstarWarnings } from './catalog-support';
 import * as rig from './rights-support';
 
 const { AT, accepted, getWorkspaceDatabase, ID, K, keys, refused, table, withRole } = rig;
@@ -27,7 +28,10 @@ describe('melos-rpr.10: getMusicWorkspace assembles MusicWorkspaceDTO (§3.4, DE
       ...accepted(await catalog.getSongCatalog(env.northstar, focus)),
       rights: accepted(await rights.getRightsSummary(env.northstar, focus)),
       readiness: [
-        { recordingId: keys.rec_MIDNIGHT, oneStopReady: true, syncReady: true, issues: [] },
+        {
+          ...{ recordingId: keys.rec_MIDNIGHT, oneStopReady: true, syncReady: true },
+          issues: northstarWarnings(keys.rec_MIDNIGHT, keys.cmp_MIDNIGHT),
+        },
       ],
       pitchSummary: {
         ...{ itemCount: 3, countsByStatus: { archived: 1, awaiting_reply: 1, sent: 1 } },

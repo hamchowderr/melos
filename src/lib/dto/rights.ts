@@ -21,10 +21,17 @@ export const ONE_STOP_CODES = [
 ] as const;
 
 /** Codes that block only `syncReady` (P-04), in §6.5 order. */
-export const SYNC_ONLY_CODES = ['MISSING_ISRC', 'NO_LISTEN_LINK'] as const;
+export const SYNC_ONLY_CODES = ['MISSING_ISRC', 'NO_LISTEN_LINK', 'SAMPLES_NOT_CLEARED'] as const;
 
 /** Codes that never block (§6.5). */
-export const WARNING_CODES = ['MISSING_ISWC'] as const;
+export const WARNING_CODES = [
+  'MISSING_ISWC',
+  'NOT_REGISTERED_PRO',
+  'NOT_REGISTERED_MLC',
+  'NOT_REGISTERED_SOUNDEXCHANGE',
+  'NO_INSTRUMENTAL',
+  'EXCLUSIVE_AGREEMENT',
+] as const;
 
 type CodeLists = typeof ONE_STOP_CODES | typeof SYNC_ONLY_CODES | typeof WARNING_CODES;
 export type ReadinessCode = CodeLists[number];

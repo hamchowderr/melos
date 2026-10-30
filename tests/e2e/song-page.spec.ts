@@ -1,6 +1,14 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { AUTH_REDIRECT, signInAsJordan } from './support';
 
+/** The §6.5 warnings every demo song carries: no registrations and no instrumental (RGT-010). */
+const NORTHSTAR_WARNINGS = [
+  /NOT_REGISTERED_PRO/,
+  /NOT_REGISTERED_MLC/,
+  /NOT_REGISTERED_SOUNDEXCHANGE/,
+  /NO_INSTRUMENTAL/,
+];
+
 // Read specs on the seeded Northstar catalog (D-9), with ids from docs/fixtures/northstar-demo.json.
 const MIDNIGHT_DRIVE = /\/catalog\/compositions\/cmp_01KZ6VFGM03FXFCHY5DDZY6BQT$/;
 
@@ -68,13 +76,14 @@ test('melos-rpr.16: Ocean Blue shows publishing WORLD at 85.00% with its readine
   const world = rights.getByRole('table', { name: 'Publishing WORLD' });
   await expect(world.getByTestId('share-total')).toHaveText('85.00%');
   await expect(world.getByRole('row', { name: /Silverline Songs/ })).toContainText('Self');
-  // EXPECTED.md §2: three one-stop codes, then the sync-only code.
+  // EXPECTED.md §2: three one-stop codes, the sync-only code, then the warnings.
   const issues = rights.getByRole('list', { name: 'Issues' }).getByRole('listitem');
   await expect(issues).toHaveText([
     /PUBLISHING_TOTAL_INCOMPLETE/,
     /PUBLISHING_NOT_CONTROLLED/,
     /NO_LICENSING_CONTACT/,
     /MISSING_ISRC/,
+    ...NORTHSTAR_WARNINGS,
   ]);
   await expect(
     rights.getByRole('heading', { name: 'Licensing contacts' }).locator('..'),
@@ -92,7 +101,9 @@ test('melos-rpr.16: Midnight Drive is One Stop Ready with Silverline Songs as im
   const rights = page.getByRole('region', { name: 'Rights' });
   const contacts = rights.getByRole('list', { name: 'Licensing contacts' }).getByRole('listitem');
   await expect(contacts).toHaveText([/^Silverline Songs\s*Implicit$/]);
-  await expect(rights.getByRole('list', { name: 'Issues' })).toHaveCount(0);
+  // Nothing blocks; only the warnings every demo song carries (EXPECTED.md §2).
+  const issues = rights.getByRole('list', { name: 'Issues' }).getByRole('listitem');
+  await expect(issues).toHaveText(NORTHSTAR_WARNINGS);
   await expect(
     rights.getByRole('table', { name: 'Writers' }).getByTestId('share-total'),
   ).toHaveText('100.00%');
@@ -122,6 +133,7 @@ test('melos-rpr.16: /rights lists Ocean Blue and Neon Static as not ready', asyn
     /PUBLISHING_NOT_CONTROLLED/,
     /NO_LICENSING_CONTACT/,
     /MISSING_ISRC/,
+    ...NORTHSTAR_WARNINGS,
   ]);
   await panel.getByRole('button', { name: 'Close' }).click();
   await expect(panel).toHaveCount(0);

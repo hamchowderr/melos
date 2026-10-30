@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceRole } from '../../src/lib/auth/permissions';
 import type { RightsHolderDTO } from '../../src/lib/dto/rights';
 import type { TenantContext } from '../../src/server/services/tenant-context';
+import { northstarWarnings } from './catalog-support';
 import { openWithoutForeignKeys } from './support';
 
 type Connections = typeof import('../../src/server/services/workspace-connections');
@@ -93,7 +94,7 @@ describe('melos-rpr.7: RightsService reads a song rights summary (RGT-001 to RGT
         },
       ],
       licensingContacts: [{ ...silverline, implicit: true }],
-      issues: [],
+      issues: northstarWarnings(keys.rec_MIDNIGHT, keys.cmp_MIDNIGHT),
     });
     expect(await summary('composition', keys.cmp_MIDNIGHT)).toEqual(midnight);
   });

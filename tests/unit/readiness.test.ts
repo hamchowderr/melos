@@ -24,6 +24,7 @@ const pub = (...sets: [string, ShareFact[]][]) =>
 const SONG: Composition = {
   id: 'cmp_A',
   iswc: 'T9000000010',
+  ...{ registeredPro: true, registeredMlc: true },
   writers: [{ shareBp: 10000 }],
   publishing: pub(['WORLD', [own()]]),
 };
@@ -32,6 +33,8 @@ const facts = (change: Partial<Facts> = {}): Facts => ({
   recordingId: 'rec_A',
   isrc: 'USDMO2600001',
   hasPrimaryLink: true,
+  ...{ containsSamples: false, samplesCleared: false, registeredSoundExchange: true },
+  ...{ hasInstrumental: true, exclusiveAgreement: false },
   selfParties: { publishing: SELF, master: SELF },
   composition: SONG,
   masters: [own()],
@@ -76,18 +79,26 @@ const CASES: [string, Facts][] = [
   ['MASTER_NOT_CONTROLLED NO_LICENSING_CONTACT', facts({ masters: [other(10000)] })],
   ['MISSING_ISRC', facts({ isrc: null })],
   ['NO_LISTEN_LINK', facts({ hasPrimaryLink: false })],
+  ['SAMPLES_NOT_CLEARED', facts({ containsSamples: true })],
   ['MISSING_ISWC', song({ iswc: null })],
+  ['NOT_REGISTERED_PRO', song({ registeredPro: false })],
+  ['NOT_REGISTERED_MLC', song({ registeredMlc: false })],
+  ['NOT_REGISTERED_SOUNDEXCHANGE', facts({ registeredSoundExchange: false })],
+  ['NO_INSTRUMENTAL', facts({ hasInstrumental: false })],
+  ['EXCLUSIVE_AGREEMENT', facts({ exclusiveAgreement: true })],
 ];
 
 describe('evaluateRecordingReadiness (§6.5)', () => {
   it('lists every code in §6.5 order, as validate.mjs does, with a focused case each', () => {
     const contract = readFileSync('docs/CONTRACT.md', 'utf8');
-    const [, oneStop, sync] = contract.split(/### 6\.[56] |`syncReady\(R\)` is true/);
+    const [, oneStop, sync, warning] = contract.split(
+      /### 6\.[56] |`syncReady\(R\)` is true|^Warning only/m,
+    );
     const row = /^\| `[A-Z_]+`(?: \/ `[A-Z_]+`)? \|/gm;
     const codes = (s: string, re = row) => (s.match(re) ?? []).join().match(/[A-Z][A-Z_]{3,}/g);
     expect(codes(oneStop)).toEqual(ONE_STOP_CODES);
     expect(codes(sync)).toEqual(SYNC_ONLY_CODES);
-    expect(codes(sync, /^Warning only[^`]*`[A-Z_]+`/gm)).toEqual(WARNING_CODES);
+    expect(codes(warning)).toEqual(WARNING_CODES);
     const script = readFileSync('docs/fixtures/validate.mjs', 'utf8');
     const reference = [...script.matchAll(/\[\s*'(blocking|sync|warning)',\s*'([A-Z_]+)'/g)];
     const kinds = { blocking: ONE_STOP_CODES, sync: SYNC_ONLY_CODES, warning: WARNING_CODES };
@@ -120,6 +131,11 @@ describe('evaluateRecordingReadiness (§6.5)', () => {
       'PUBLISHING_NOT_CONTROLLED: Controlled publishing US 6000 bp, WORLD 0 bp.',
       'NO_LICENSING_CONTACT: No licensing contact.',
     ]);
+  });
+
+  it('lets cleared samples through sync readiness', () => {
+    const cleared = facts({ containsSamples: true, samplesCleared: true });
+    expect(evaluateRecordingReadiness(cleared)).toMatchObject({ syncReady: true, issues: [] });
   });
 
   it('counts an attested row as controlled on both sides', () => {
@@ -162,7 +178,11 @@ describe('evaluateRecordingReadiness (§6.5)', () => {
 /** The northstar-demo.json columns the facts read. */
 type Row = Record<'id' | 'side' | 'territory' | 'title' | 'display_name' | `${string}_id`, string> &
   Record<'isrc' | 'iswc' | 'deleted_at' | 'representation_attested_at', string | null> &
-  Record<'share_bp' | 'writer_share_bp' | 'is_primary', number>;
+  Record<
+    'share_bp' | 'writer_share_bp' | 'is_primary' | 'contains_samples' | 'samples_cleared',
+    number
+  > &
+  Record<'registry_kind' | 'status' | 'relationship', string>;
 const fixture = JSON.parse(readFileSync('docs/fixtures/northstar-demo.json', 'utf8'));
 const keyOf = new Map(Object.entries<string>(fixture.keys).map(([key, id]) => [id, key]));
 const rows = (table: string, column: keyof Row, value: string | null): Row[] =>
@@ -174,6 +194,11 @@ const party = (p: string) => ({
 const selfParty = (side: string) =>
   rows('workspace_self_parties', 'side', side).map((s) => party(s.party_id))[0] ?? null;
 
+const registeredFor = (compositionId: string, kind: string) =>
+  rows('composition_registrations', 'composition_id', compositionId).some(
+    (g) => g.registry_kind === kind && g.status === 'registered',
+  );
+
 /** Facts for a Northstar recording, from the fixture's live rows as RightsService reads them. */
 function northstarFacts(recording: Row): Facts {
   const cmp = rows('compositions', 'id', recording.composition_id).find((c) => !c.deleted_at);
@@ -184,11 +209,25 @@ function northstarFacts(recording: Row): Facts {
     recordingId: recording.id,
     isrc: recording.isrc,
     hasPrimaryLink: rows('recording_links', 'recording_id', recording.id).some((l) => l.is_primary),
+    containsSamples: recording.contains_samples === 1,
+    samplesCleared: recording.samples_cleared === 1,
+    registeredSoundExchange: rows('recording_registrations', 'recording_id', recording.id).some(
+      (g) => g.registry_kind === 'soundexchange' && g.status === 'registered',
+    ),
+    hasInstrumental: rows('recording_assets', 'recording_id', recording.id).some(
+      (a) => a.relationship === 'instrumental',
+    ),
+    // The fixture holds no agreements, so none can be exclusive.
+    exclusiveAgreement: (fixture.workspace.agreements ?? []).length > 0,
     selfParties: { publishing: selfParty('publishing'), master: selfParty('master') },
     composition: cmp
       ? {
           id: cmp.id,
           iswc: cmp.iswc,
+          ...{
+            registeredPro: registeredFor(cmp.id, 'pro'),
+            registeredMlc: registeredFor(cmp.id, 'mlc'),
+          },
           writers: rows('composition_contributors', 'composition_id', cmp.id).map((w) => ({
             shareBp: w.writer_share_bp,
           })),
