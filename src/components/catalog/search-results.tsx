@@ -1,6 +1,7 @@
 import { SongGrid } from '@/components/catalog/song-grid';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { GridFrame } from '@/components/ui/grid-frame';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import {
@@ -34,7 +35,7 @@ const LABELS: Record<Readiness, string> = {
 function SearchForm({ query, readiness }: Pick<Props, 'query' | 'readiness'>) {
   return (
     <search aria-label="Catalog">
-      <form method="get" className="flex flex-wrap gap-2">
+      <form method="get" className="flex flex-wrap items-center gap-2">
         <Input
           type="search"
           name="q"
@@ -42,9 +43,14 @@ function SearchForm({ query, readiness }: Pick<Props, 'query' | 'readiness'>) {
           maxLength={200}
           aria-label="Search songs"
           placeholder="Title, artist, writer or lyric"
-          className="min-w-48 flex-1"
+          className="min-w-48 flex-1 sm:max-w-sm"
         />
-        <NativeSelect name="readiness" defaultValue={readiness ?? ''} aria-label="Readiness">
+        <NativeSelect
+          name="readiness"
+          defaultValue={readiness ?? ''}
+          aria-label="Readiness"
+          className="w-auto"
+        >
           <NativeSelectOption value="">Any readiness</NativeSelectOption>
           {READINESS_FILTERS.map((filter) => (
             <NativeSelectOption key={filter} value={filter}>
@@ -52,7 +58,9 @@ function SearchForm({ query, readiness }: Pick<Props, 'query' | 'readiness'>) {
             </NativeSelectOption>
           ))}
         </NativeSelect>
-        <Button type="submit">Search</Button>
+        <Button type="submit" variant="secondary">
+          Search
+        </Button>
       </form>
     </search>
   );
@@ -60,28 +68,32 @@ function SearchForm({ query, readiness }: Pick<Props, 'query' | 'readiness'>) {
 
 /** The releases in the list, by title (CAT-007); a release has no page of its own yet. */
 function ReleaseList({ releases }: { releases: ReleaseListItem[] }) {
-  if (releases.length === 0) return <p className="text-muted-foreground">No releases</p>;
+  if (releases.length === 0) return <p className="text-sm text-muted-foreground">No releases</p>;
   return (
-    <Table aria-label="Releases">
-      <TableHeader>
-        <TableRow>
-          <TableHead>Title</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Release date</TableHead>
-          <TableHead className="text-right">Tracks</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {releases.map((release) => (
-          <TableRow key={release.id}>
-            <TableCell className="whitespace-normal font-medium">{release.title}</TableCell>
-            <TableCell>{release.releaseType ? words(release.releaseType) : ''}</TableCell>
-            <TableCell className="tabular-nums">{release.releaseDate ?? ''}</TableCell>
-            <TableCell className="text-right tabular-nums">{release.recordingIds.length}</TableCell>
+    <GridFrame>
+      <Table aria-label="Releases">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Title</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Release date</TableHead>
+            <TableHead className="text-right">Tracks</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {releases.map((release) => (
+            <TableRow key={release.id}>
+              <TableCell className="whitespace-normal font-medium">{release.title}</TableCell>
+              <TableCell>{release.releaseType ? words(release.releaseType) : ''}</TableCell>
+              <TableCell className="tabular-nums">{release.releaseDate ?? ''}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {release.recordingIds.length}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </GridFrame>
   );
 }
 
@@ -92,10 +104,10 @@ function ReleaseList({ releases }: { releases: ReleaseListItem[] }) {
 export function SearchResults({ query, readiness, songs, releases }: Props) {
   const searching = query !== '' || readiness !== undefined;
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <SearchForm query={query} readiness={readiness} />
       <section aria-label="Songs" className="flex flex-col gap-2">
-        <h2 className="font-medium">Songs</h2>
+        <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Songs</h2>
         {searching && songs.length === 0 ? (
           <Empty className="border">
             <EmptyHeader>
@@ -108,7 +120,9 @@ export function SearchResults({ query, readiness, songs, releases }: Props) {
         )}
       </section>
       <section aria-label="Releases" className="flex flex-col gap-2">
-        <h2 className="font-medium">Releases</h2>
+        <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          Releases
+        </h2>
         <ReleaseList releases={releases} />
       </section>
     </div>
