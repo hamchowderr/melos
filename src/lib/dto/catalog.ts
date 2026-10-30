@@ -83,6 +83,9 @@ export type CompositionInput = {
  */
 export type CompositionPatch = Partial<Omit<CompositionInput, 'title'>> & { title?: string };
 
+/** createSong input (D-10): the composition, and the ISRC of its first recording, if known. */
+export type SongInput = CompositionInput & { isrc?: string | null };
+
 /** A live composition findCompositionDuplicates matched, and what matched (§3.3, §6.15). */
 export type CompositionDuplicate = {
   compositionId: string;
