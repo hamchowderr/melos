@@ -1,4 +1,5 @@
 import { resolveWorkspacePage } from '@/app/workspace-page';
+import { MetadataPanel } from '@/components/catalog/metadata-panel';
 import { SearchResults } from '@/components/catalog/search-results';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { WorkspaceHeader } from '@/components/workspace/workspace-header';
@@ -7,6 +8,7 @@ import { READINESS_FILTERS, type ReleaseListItem } from '@/lib/dto/catalog';
 import { listSongs, normalizeTitle } from '@/server/services/catalog/read';
 import { listReleases } from '@/server/services/catalog/releases';
 import { READINESS, searchMusic } from '@/server/services/catalog/search';
+import { requirePermission } from '@/server/services/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +57,13 @@ export default async function CatalogPage({ searchParams }: Props) {
     <main>
       <WorkspaceHeader workspaceName={workspace.workspaceName} current="catalog" />
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6">
-        <h1 className="text-lg font-semibold">Catalog</h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-lg font-semibold">Catalog</h1>
+          {/* New song shows only for catalog:create (§6.2). */}
+          {requirePermission(workspace.tenant, { catalog: ['create'] }).ok ? (
+            <MetadataPanel />
+          ) : null}
+        </div>
         {songs.ok && releases.ok ? (
           <SearchResults
             query={query}
