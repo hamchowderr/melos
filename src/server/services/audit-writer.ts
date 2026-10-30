@@ -15,6 +15,8 @@ export type AuditAction =
   | 'metadata_term.create'
   | `${'recording_artists' | 'writer_shares' | 'publishing_shares' | 'master_shares'}.replace`
   | 'licensing_contacts.replace'
+  | 'composition_registrations.replace'
+  | 'recording_registrations.replace'
   | `representation.${'attest' | 'clear'}`
   | 'self_parties.update'
   | 'report.generate'
