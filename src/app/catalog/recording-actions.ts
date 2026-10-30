@@ -1,12 +1,20 @@
 'use server';
 
 import { resolveWorkspaceAction } from '@/app/workspace-action';
-import type { RecordingDuplicate, RecordingInput, RecordingPatch } from '@/lib/dto/catalog';
+import type {
+  RecordingArtistInput,
+  RecordingDuplicate,
+  RecordingInput,
+  RecordingPatch,
+  TermInput,
+} from '@/lib/dto/catalog';
+import { updateRecordingArtists } from '@/server/services/catalog/artists';
 import {
   createRecording,
   findRecordingDuplicates,
   updateRecording,
 } from '@/server/services/catalog/recordings';
+import { ensureTerms } from '@/server/services/catalog/terms';
 import type { ServiceResult } from '@/server/services/service-result';
 
 /** A stored recording write, or the refusal code and the field it names. */
@@ -49,4 +57,30 @@ export async function checkRecordingDuplicates(
   if (workspace.status !== 'ready') return [];
   const found = await findRecordingDuplicates(workspace.tenant, query);
   return found.ok ? found.value : [];
+}
+
+/** Replaces a recording's artist credits (CAT-003); updateRecordingArtists checks every credit. */
+export async function saveRecordingArtists(
+  recordingId: string,
+  artists: RecordingArtistInput[],
+): Promise<RecordingActionResult> {
+  const workspace = await resolveWorkspaceAction();
+  if (workspace.status !== 'ready') return { ok: false, code: workspace.status };
+  return outcome(await updateRecordingArtists(workspace.tenant, recordingId, artists));
+}
+
+/**
+ * Replaces a recording's metadata terms (CAT-006): ensureTerms finds or creates each term by type
+ * and normalized label, then the recording patch sets its `termIds`.
+ */
+export async function saveRecordingTerms(
+  recordingId: string,
+  terms: TermInput[],
+): Promise<RecordingActionResult> {
+  const workspace = await resolveWorkspaceAction();
+  if (workspace.status !== 'ready') return { ok: false, code: workspace.status };
+  const ensured = await ensureTerms(workspace.tenant, terms);
+  if (!ensured.ok) return outcome(ensured);
+  const termIds = ensured.value.map(({ id }) => id);
+  return outcome(await updateRecording(workspace.tenant, recordingId, { termIds }));
 }
