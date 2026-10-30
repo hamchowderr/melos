@@ -6,8 +6,8 @@ import { IdentityEditors } from '@/components/people/identity-editors';
 import { PartyDetails } from '@/components/people/party-details';
 import { PartyForm } from '@/components/people/party-form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
+import { WorkspaceShell } from '@/components/workspace/workspace-shell';
 import { getParty } from '@/server/services/contacts/read';
 import { requirePermission } from '@/server/services/permissions';
 
@@ -29,8 +29,7 @@ export default async function PartyPage({ params }: Props) {
     requirePermission(workspace.tenant, { contact: [action] }).ok;
 
   return (
-    <main>
-      <WorkspaceHeader workspaceName={workspace.workspaceName} current="people" />
+    <WorkspaceShell workspaceName={workspace.workspaceName} current="people">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6">
         {party.ok ? (
           <>
@@ -57,6 +56,6 @@ export default async function PartyPage({ params }: Props) {
           </Alert>
         )}
       </div>
-    </main>
+    </WorkspaceShell>
   );
 }

@@ -1,8 +1,8 @@
 import { resolveWorkspacePage } from '@/app/workspace-page';
 import { PageCard } from '@/components/page-card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
+import { WorkspaceShell } from '@/components/workspace/workspace-shell';
 import { listParties } from '@/server/services/contacts/read';
 import { requirePermission } from '@/server/services/permissions';
 import { getSelfParties } from '@/server/services/rights/self-parties';
@@ -21,8 +21,7 @@ export default async function OwnershipPage() {
   const [selfParties, parties] = await Promise.all([getSelfParties(tenant), listParties(tenant)]);
 
   return (
-    <main>
-      <WorkspaceHeader workspaceName={workspace.workspaceName} current="settings" />
+    <WorkspaceShell workspaceName={workspace.workspaceName} current="settings">
       <div className="flex flex-col items-center gap-4 px-4 py-6">
         <SettingsNav current="ownership" />
         <PageCard title="Ownership" className="max-w-2xl">
@@ -43,6 +42,6 @@ export default async function OwnershipPage() {
           )}
         </PageCard>
       </div>
-    </main>
+    </WorkspaceShell>
   );
 }
