@@ -24,3 +24,6 @@ playwright-report/
 .claude/worktrees/
 
 .vercel
+
+# Vercel bypass cookie from the preview specs
+tests/preview/.auth/
