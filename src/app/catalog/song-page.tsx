@@ -211,7 +211,7 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
             ) : null}
           </PageHeader>
           {/* Recordings and rights on the left; the composition and releases beside them. */}
-          <div className="grid items-start gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="grid items-start gap-4 px-4 pt-3 pb-6 md:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="flex min-w-0 flex-col gap-4">
               {song.value.recordings.map((recording) => (
                 <RecordingSection
@@ -271,7 +271,7 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
           </div>
         </>
       ) : (
-        <div className="p-4">
+        <div className="px-4 pt-3 pb-6 md:px-6">
           {/* The other refusal is FORBIDDEN: this request's role lacks a read it needs (§6.2). */}
           <Alert>
             <AlertTitle>You do not have access to this catalog</AlertTitle>
