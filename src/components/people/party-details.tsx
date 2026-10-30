@@ -41,7 +41,9 @@ export function PartyDetails({ party }: { party: PartyDetailDTO }) {
       'Identifiers',
       join(
         party.identifiers.map(({ identifierType, identifierValue, aliasName }) =>
-          [identifierType, identifierValue, aliasName ? `(${aliasName})` : ''].join(' ').trim(),
+          aliasName
+            ? `${identifierType} ${identifierValue} for ${aliasName}`
+            : `${identifierType} ${identifierValue}`,
         ),
       ),
     ],

@@ -1,7 +1,19 @@
 'use server';
 
 import { resolveWorkspaceAction } from '@/app/workspace-action';
-import type { ContactMethodInput, PartyInput, PartyMatch } from '@/lib/dto/contacts';
+import type {
+  ArtistAliasInput,
+  ContactMethodInput,
+  PartyIdentifierInput,
+  PartyInput,
+  PartyMatch,
+  SocietyAffiliationInput,
+} from '@/lib/dto/contacts';
+import {
+  setArtistAliases,
+  setPartyIdentifiers,
+  setSocietyAffiliations,
+} from '@/server/services/contacts/aliases';
 import { findMatchingParties, setContactMethods } from '@/server/services/contacts/methods';
 import { createParty, deleteParty, updateParty } from '@/server/services/contacts/parties';
 import type { ServiceResult } from '@/server/services/service-result';
@@ -62,4 +74,24 @@ export async function removeParty(partyId: string): Promise<PartyActionResult> {
   const workspace = await resolveWorkspaceAction();
   if (workspace.status !== 'ready') return { ok: false, code: workspace.status };
   return outcome(await deleteParty(workspace.tenant, partyId));
+}
+
+/** A party's identity sets (CAT-008), each replaced whole by its editor. */
+export type IdentitySet =
+  | { set: 'aliases'; rows: ArtistAliasInput[] }
+  | { set: 'identifiers'; rows: PartyIdentifierInput[] }
+  | { set: 'societyAffiliations'; rows: SocietyAffiliationInput[] };
+
+/** Replaces a party's aliases, identifiers or society affiliations; the service checks each row. */
+export async function saveIdentitySet(
+  partyId: string,
+  input: IdentitySet,
+): Promise<PartyActionResult> {
+  const workspace = await resolveWorkspaceAction();
+  if (workspace.status !== 'ready') return { ok: false, code: workspace.status };
+  const { tenant } = workspace;
+  if (input.set === 'aliases') return outcome(await setArtistAliases(tenant, partyId, input.rows));
+  if (input.set === 'identifiers')
+    return outcome(await setPartyIdentifiers(tenant, partyId, input.rows));
+  return outcome(await setSocietyAffiliations(tenant, partyId, input.rows));
 }
