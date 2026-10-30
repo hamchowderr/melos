@@ -1,4 +1,5 @@
 import { ExternalLinkIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { ArtistChips } from '@/components/catalog/artist-chips';
 import { DetailList } from '@/components/catalog/detail-list';
 import { ReadinessBadges } from '@/components/rights/readiness-badges';
@@ -16,13 +17,15 @@ export const recordingTitle = ({ title, versionTitle }: RecordingDTO) =>
 type Props = {
   recording: RecordingDTO;
   readiness?: Pick<RecordingReadiness, 'oneStopReady' | 'syncReady'>;
+  /** The recording's Edit control, for a role with catalog:update (§6.2). */
+  editor?: ReactNode;
 };
 
 /**
  * One of the song's recordings (§3.4): its readiness (§6.5), identifiers, musical details, links,
  * credits and terms.
  */
-export function RecordingSection({ recording, readiness }: Props) {
+export function RecordingSection({ recording, readiness, editor }: Props) {
   const { primaryLink, previewStartMs, isrc, durationMs } = recording;
   const title = recordingTitle(recording);
   const start = previewStartMs === null ? '' : ` · starts ${formatPlaybackTime(previewStartMs)}`;
@@ -49,6 +52,7 @@ export function RecordingSection({ recording, readiness }: Props) {
           </CardTitle>
           <ArtistChips artists={recording.artists} />
           {readiness ? <ReadinessBadges {...readiness} /> : null}
+          {editor}
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {primaryLink ? (
