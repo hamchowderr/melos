@@ -53,10 +53,21 @@ async function owner(label: string) {
 }
 
 /** Calls the route as a browser would for a URL from the storage, with the session cookie. */
-function call(client: TestClient, method: 'GET' | 'PUT', url: string, body?: string, type = '') {
+function call(
+  client: TestClient,
+  method: 'GET' | 'PUT',
+  url: string,
+  body?: string,
+  type = '',
+  range = '',
+) {
   const target = new URL(url, BASE_URL);
   const key = target.pathname.split('/').slice(4).map(decodeURIComponent);
-  const headers = { cookie: client.cookie, ...(type ? { 'content-type': type } : {}) };
+  const headers = {
+    cookie: client.cookie,
+    ...(type ? { 'content-type': type } : {}),
+    ...(range ? { range } : {}),
+  };
   const request = new Request(target, { method, headers, body });
   return assetRoute[method](request, { params: Promise.resolve({ key }) });
 }
@@ -97,6 +108,17 @@ describe('AST-INT-001: the local asset route serves a key only in its own worksp
       'content-security-policy': 'sandbox',
       'x-content-type-options': 'nosniff',
     });
+    // AudioPlayer seeks with range requests (melos-rpr.40).
+    const part = await call(alpha.client, 'GET', download, undefined, '', 'bytes=6-');
+    expect([part.status, await part.text(), part.headers.get('content-range')]).toEqual([
+      206,
+      'audio',
+      'bytes 6-10/11',
+    ]);
+    const tail = await call(alpha.client, 'GET', download, undefined, '', 'bytes=-5');
+    expect([tail.status, await tail.text()]).toEqual([206, 'audio']);
+    const past = await call(alpha.client, 'GET', download, undefined, '', 'bytes=20-');
+    expect(past.status).toBe(416);
     await expectRefusal(await call(new TestClient(), 'GET', download), 401, 'unauthenticated');
     await expectRefusal(await call(alpha.client, 'GET', `${download}x`), 403, 'invalid-signature');
     const retyped = await call(alpha.client, 'PUT', upload, 'html', 'text/html');

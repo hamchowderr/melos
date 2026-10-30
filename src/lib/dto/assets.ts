@@ -79,3 +79,11 @@ export type AssetLinkDTO = {
   entityId: string;
   relationship: string;
 };
+
+/** An audio asset attached to a recording (CAT-005), newest first. */
+export type RecordingAudioDTO = {
+  recordingId: string;
+  assetId: string;
+  fileName: string;
+  relationship: string;
+};

@@ -1,5 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { resolveWorkspacePage } from '@/app/workspace-page';
+import { AssetUpload } from '@/components/catalog/asset-upload';
+import { AudioPlayer } from '@/components/catalog/audio-player';
 import { CompositionSection } from '@/components/catalog/composition-section';
 import { DeleteSong } from '@/components/catalog/delete-song';
 import { MetadataPanel } from '@/components/catalog/metadata-panel';
@@ -21,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
 import type { CatalogFocus, RecordingDTO } from '@/lib/dto/catalog';
+import { getDownloadUrl, listRecordingAudio } from '@/server/services/assets/asset-service';
 import { getMusicWorkspace } from '@/server/services/catalog/music-workspace';
 import { listArtistAliases, listParties } from '@/server/services/contacts/read';
 import { requirePermission } from '@/server/services/permissions';
@@ -151,6 +154,37 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
       />
     ) : null;
 
+  // Each recording plays its newest uploaded audio from a URL signed for this page (P-35).
+  const audio = await listRecordingAudio(tenant, recordingIds);
+  const newest = new Map<string, string>();
+  for (const { recordingId, assetId } of audio.ok ? audio.value : []) {
+    if (!newest.has(recordingId)) newest.set(recordingId, assetId);
+  }
+  const signed = new Map(
+    await Promise.all(
+      [...newest].map(async ([recordingId, assetId]) => {
+        const url = await getDownloadUrl(tenant, assetId);
+        return [recordingId, url.ok ? { assetId, url: url.value.url } : null] as const;
+      }),
+    ),
+  );
+  const media = (recording: RecordingDTO) => {
+    const playable = signed.get(recording.id);
+    const title = recordingTitle(recording);
+    return (
+      <>
+        {playable ? (
+          <AudioPlayer
+            {...playable}
+            previewStartMs={recording.previewStartMs}
+            label={`Audio for ${title}`}
+          />
+        ) : null}
+        {can('update') ? <AssetUpload recordingId={recording.id} title={title} /> : null}
+      </>
+    );
+  };
+
   const target = composition
     ? { compositionId: composition.id }
     : { recordingId: recordingIds[0] ?? '' };
@@ -186,6 +220,7 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
                 key={recording.id}
                 recording={recording}
                 readiness={readiness.get(recording.id)}
+                media={media(recording)}
                 editor={
                   can('update') ? (
                     <div key={JSON.stringify(recording)} className="flex flex-wrap gap-2">
