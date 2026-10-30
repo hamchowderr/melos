@@ -106,3 +106,23 @@ test('melos-rpr.22: Jordan searches the catalog and filters it by readiness', as
   await expect(titles).toHaveText(['Neon Static', 'Ocean Blue']);
   await expect(page.getByRole('region', { name: 'Releases' })).toBeVisible();
 });
+
+test('melos-rpr.48: at phone width Catalog lists each song as a card with no sideways scroll', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInAsJordan(page);
+  await page.goto('/catalog', AUTH_REDIRECT);
+  await expect(page.getByRole('table')).toBeHidden();
+  const cards = page.getByRole('list', { name: 'Songs' }).getByRole('listitem');
+  await expect(cards).toHaveCount(5);
+  await expect(cards.nth(2)).toHaveText(
+    /^Neon Static\s*Alex Ramirez · 1 recording\s*Not one-stop ready\s*Not sync ready$/,
+  );
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBe(0);
+  await cards.getByRole('link', { name: 'Midnight Drive', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Midnight Drive', AUTH_REDIRECT);
+});
