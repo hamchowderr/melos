@@ -23,6 +23,24 @@ const songReadiness = ({ recordings }: SongListItem) => ({
   syncReady: recordings.every(({ syncReady }) => syncReady),
 });
 
+/** A song's title, linked to its page, with any alternate titles under it. */
+function SongTitle({ song }: { song: SongListItem }) {
+  return (
+    <>
+      <Link href={songHref(song)} className="font-medium underline-offset-4 hover:underline">
+        {song.title}
+      </Link>
+      {song.altTitles.length > 0 ? (
+        <span className="block text-xs text-muted-foreground">
+          Also known as {song.altTitles.join(', ')}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+const songKey = (song: SongListItem) => song.compositionId ?? song.primaryRecordingId;
+
 /** The catalog's songs (§2.3, CAT-009), in the order CatalogService lists them. */
 export function SongGrid({ songs }: { songs: SongListItem[] }) {
   if (songs.length === 0) {
@@ -37,41 +55,51 @@ export function SongGrid({ songs }: { songs: SongListItem[] }) {
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Title</TableHead>
-          <TableHead>Primary artists</TableHead>
-          <TableHead>Readiness</TableHead>
-          <TableHead className="text-right">Recordings</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <>
+      {/* Phone width: one card per song, so the Recordings column isn't cut off. */}
+      <ul aria-label="Songs" className="flex flex-col gap-2 sm:hidden">
         {songs.map((song) => (
-          <TableRow key={song.compositionId ?? song.primaryRecordingId}>
-            <TableCell className="whitespace-normal">
-              <Link
-                href={songHref(song)}
-                className="font-medium underline-offset-4 hover:underline"
-              >
-                {song.title}
-              </Link>
-              {song.altTitles.length > 0 ? (
-                <span className="block text-xs text-muted-foreground">
-                  Also known as {song.altTitles.join(', ')}
-                </span>
-              ) : null}
-            </TableCell>
-            <TableCell className="whitespace-normal">
+          <li key={songKey(song)} className="flex flex-col gap-1.5 rounded-lg border p-3">
+            <SongTitle song={song} />
+            <p className="text-sm">
               {song.primaryArtistNames.join(', ')}
-            </TableCell>
-            <TableCell>
-              <ReadinessBadges {...songReadiness(song)} />
-            </TableCell>
-            <TableCell className="text-right tabular-nums">{song.recordings.length}</TableCell>
-          </TableRow>
+              <span className="text-muted-foreground">
+                {' · '}
+                {song.recordings.length === 1
+                  ? '1 recording'
+                  : `${song.recordings.length} recordings`}
+              </span>
+            </p>
+            <ReadinessBadges {...songReadiness(song)} />
+          </li>
         ))}
-      </TableBody>
-    </Table>
+      </ul>
+      <Table className="hidden sm:table">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Title</TableHead>
+            <TableHead>Primary artists</TableHead>
+            <TableHead>Readiness</TableHead>
+            <TableHead className="text-right">Recordings</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {songs.map((song) => (
+            <TableRow key={songKey(song)}>
+              <TableCell className="whitespace-normal">
+                <SongTitle song={song} />
+              </TableCell>
+              <TableCell className="whitespace-normal">
+                {song.primaryArtistNames.join(', ')}
+              </TableCell>
+              <TableCell>
+                <ReadinessBadges {...songReadiness(song)} />
+              </TableCell>
+              <TableCell className="text-right tabular-nums">{song.recordings.length}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </>
   );
 }
