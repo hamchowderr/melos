@@ -14,7 +14,12 @@ import type { RightsHolderDTO, RightsSummaryDTO } from '@/lib/dto/rights';
 import { formatShare } from '@/lib/shares';
 import { words } from '@/lib/words';
 
-type Props = { rights: RightsSummaryDTO; recordingTitles: Map<string, string> };
+type Props = {
+  rights: RightsSummaryDTO;
+  recordingTitles: Map<string, string>;
+  /** The writer split editor, for a role with rights:update (§6.2). */
+  writerEditor?: ReactNode;
+};
 
 /** A share table with its §4.3 view total in the footer. */
 function ShareTable({
@@ -78,7 +83,7 @@ const holderRows = (holders: RightsHolderDTO[]) =>
  * A song's rights (§2.3 RightsPanel, RGT-004, RGT-005): writers, publishing per territory and
  * masters per recording with their totals, licensing contacts and the readiness issues.
  */
-export function RightsPanel({ rights, recordingTitles }: Props) {
+export function RightsPanel({ rights, recordingTitles, writerEditor }: Props) {
   const writers = rights.writers.map((writer) => ({
     key: writer.contributorId,
     name: writer.displayName,
@@ -101,6 +106,7 @@ export function RightsPanel({ rights, recordingTitles }: Props) {
               <div className="flex flex-col gap-2">
                 <h3 className="font-medium">Writers</h3>
                 <ShareTable label="Writers" rows={writers} totalBp={rights.writerTotalBp} />
+                {writerEditor}
               </div>
               {rights.publishing.map(({ territory, totalBp, holders }) => (
                 <div key={territory} className="flex flex-col gap-2">

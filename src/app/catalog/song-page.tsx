@@ -4,11 +4,15 @@ import { CompositionSection } from '@/components/catalog/composition-section';
 import { RecordingSection, recordingTitle } from '@/components/catalog/recording-section';
 import { ReleaseSection } from '@/components/catalog/release-section';
 import { RightsPanel } from '@/components/rights/rights-panel';
+import { RightsSplitEditor } from '@/components/rights/rights-split-editor';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
 import type { CatalogFocus } from '@/lib/dto/catalog';
 import { getMusicWorkspace } from '@/server/services/catalog/music-workspace';
+import { listParties } from '@/server/services/contacts/read';
+import { requirePermission } from '@/server/services/permissions';
+import { getWriterSharesHash } from '@/server/services/rights/shares';
 
 /**
  * A song's page (§2.3 MusicWorkspaceCard, D-12) for the composition or recording id in its route.
@@ -28,6 +32,27 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
   if (focus.entityType === 'recording' && composition) {
     redirect(`/catalog/compositions/${composition.id}`);
   }
+  // Edit shows only for rights:update (§6.2); the hash and people load only then.
+  const { tenant } = workspace;
+  const editable = song.ok && composition && requirePermission(tenant, { rights: ['update'] }).ok;
+  const [hash, people] = editable
+    ? await Promise.all([
+        getWriterSharesHash(tenant, composition.id),
+        listParties(tenant, { kind: 'person' }),
+      ])
+    : [];
+  const writerEditor =
+    song.ok && composition && hash?.ok && people?.ok ? (
+      <RightsSplitEditor
+        compositionId={composition.id}
+        beforeHash={hash.value}
+        writers={song.value.rights.writers}
+        people={people.value.map(({ partyId, displayName }) => ({
+          value: partyId,
+          label: displayName,
+        }))}
+      />
+    ) : undefined;
 
   return (
     <main>
@@ -49,6 +74,7 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
             <RightsPanel
               rights={song.value.rights}
               recordingTitles={new Map(song.value.recordings.map((r) => [r.id, recordingTitle(r)]))}
+              writerEditor={writerEditor}
             />
             <ReleaseSection releases={song.value.releases} recordings={song.value.recordings} />
           </>
