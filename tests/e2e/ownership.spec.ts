@@ -1,9 +1,8 @@
-import { createClient } from '@libsql/client';
 import { expect, type Page, test } from '@playwright/test';
 import {
   AUTH_REDIRECT,
   activeOrganizationId,
-  activeWorkspaceId,
+  insertWorkspaceRows,
   setMemberRole,
   signInAsJordan,
   signUpWithWorkspace,
@@ -14,23 +13,17 @@ const picker = (page: Page, side: string) => page.getByLabel(side, { exact: true
 
 /** Setup rows for a write spec (D-9): a person and two organizations in the active workspace. */
 async function addParties(page: Page) {
-  const workspaceId = await activeWorkspaceId(await activeOrganizationId(page));
-  const url = `file:./data/e2e-workspaces/melos-ws-${workspaceId.slice('ws_'.length)}.db`;
-  const client = createClient({ url });
   const at = new Date().toISOString();
-  const party = (id: string, kind: string, name: string) => ({
-    sql: 'INSERT INTO parties (id, party_kind, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-    args: [id, kind, name, at, at],
+  const party = (id: string, party_kind: string, display_name: string) => ({
+    ...{ id, party_kind, display_name, created_at: at, updated_at: at },
   });
-  try {
-    await client.batch([
+  await insertWorkspaceRows(page, {
+    parties: [
       party('pty_RILEY', 'person', 'Riley Stone'),
       party('pty_HARBOR', 'organization', 'Harbor Lane Music'),
       party('pty_TIDE', 'organization', 'Tidewater Records'),
-    ]);
-  } finally {
-    client.close();
-  }
+    ],
+  });
 }
 
 /** Opens a picker, checks the parties it lists and picks one; a click before hydration retries. */
