@@ -221,3 +221,25 @@ export async function getParty(
     },
   );
 }
+
+/** An artist alias with its party, for the recording artist picker (CAT-003). */
+export type AliasOption = { id: string; partyId: string; aliasName: string };
+
+/** Every live party's artist aliases (CAT-008), by name, for contact:read. One batch. */
+export async function listArtistAliases(
+  tenant: TenantContext,
+): Promise<ServiceResult<AliasOption[]>> {
+  if (!canRead(tenant)) return failure('FORBIDDEN');
+  const [rows] = await sanitized(tenant.workspaceId, async () => {
+    const database = await getWorkspaceDatabase(tenant.workspaceId);
+    const { id, partyId, aliasName } = artistAliases;
+    return database.batch([
+      database
+        .select({ id, partyId, aliasName })
+        .from(artistAliases)
+        .innerJoin(parties, and(eq(parties.id, partyId), isNull(parties.deletedAt)))
+        .orderBy(asc(aliasName), asc(id)),
+    ]);
+  });
+  return success(rows);
+}

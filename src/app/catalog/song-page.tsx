@@ -3,9 +3,11 @@ import { resolveWorkspacePage } from '@/app/workspace-page';
 import { CompositionSection } from '@/components/catalog/composition-section';
 import { DeleteSong } from '@/components/catalog/delete-song';
 import { MetadataPanel } from '@/components/catalog/metadata-panel';
+import { RecordingArtistsEditor } from '@/components/catalog/recording-artists-editor';
 import { RecordingLinksEditor } from '@/components/catalog/recording-links-editor';
 import { RecordingPanel } from '@/components/catalog/recording-panel';
 import { RecordingSection, recordingTitle } from '@/components/catalog/recording-section';
+import { RecordingTermsEditor } from '@/components/catalog/recording-terms-editor';
 import { ReleaseForm } from '@/components/catalog/release-form';
 import { ReleaseSection } from '@/components/catalog/release-section';
 import { FillOwnership } from '@/components/rights/fill-ownership';
@@ -17,9 +19,9 @@ import { RightsSplitEditor } from '@/components/rights/rights-split-editor';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { WorkspaceHeader } from '@/components/workspace/workspace-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
-import type { CatalogFocus } from '@/lib/dto/catalog';
+import type { CatalogFocus, RecordingDTO } from '@/lib/dto/catalog';
 import { getMusicWorkspace } from '@/server/services/catalog/music-workspace';
-import { listParties } from '@/server/services/contacts/read';
+import { listArtistAliases, listParties } from '@/server/services/contacts/read';
 import { requirePermission } from '@/server/services/permissions';
 import { listAgreements } from '@/server/services/rights/agreements';
 import { proposeDefaultOwnership } from '@/server/services/rights/default-ownership';
@@ -132,6 +134,22 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
       />
     ) : null;
 
+  // The artist editor's parties and aliases load only for catalog:update.
+  const [artistParties, aliases] =
+    song.ok && can('update')
+      ? await Promise.all([listParties(tenant), listArtistAliases(tenant)])
+      : [];
+  const artistEditor = (recording: RecordingDTO) =>
+    artistParties?.ok && aliases?.ok ? (
+      <RecordingArtistsEditor
+        recordingId={recording.id}
+        title={recordingTitle(recording)}
+        artists={recording.artists}
+        parties={artistParties.value.map(option)}
+        aliases={aliases.value}
+      />
+    ) : null;
+
   const target = composition
     ? { compositionId: composition.id }
     : { recordingId: recordingIds[0] ?? '' };
@@ -179,6 +197,12 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
                         recordingId={recording.id}
                         title={recordingTitle(recording)}
                         links={recording.links}
+                      />
+                      {artistEditor(recording)}
+                      <RecordingTermsEditor
+                        recordingId={recording.id}
+                        title={recordingTitle(recording)}
+                        terms={recording.terms}
                       />
                     </div>
                   ) : null
