@@ -3,6 +3,7 @@ import { resolveWorkspacePage } from '@/app/workspace-page';
 import { CompositionSection } from '@/components/catalog/composition-section';
 import { DeleteSong } from '@/components/catalog/delete-song';
 import { MetadataPanel } from '@/components/catalog/metadata-panel';
+import { RecordingLinksEditor } from '@/components/catalog/recording-links-editor';
 import { RecordingPanel } from '@/components/catalog/recording-panel';
 import { RecordingSection, recordingTitle } from '@/components/catalog/recording-section';
 import { ReleaseSection } from '@/components/catalog/release-section';
@@ -140,12 +141,18 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
                 readiness={readiness.get(recording.id)}
                 editor={
                   can('update') ? (
-                    <RecordingPanel
-                      key={JSON.stringify(recording)}
-                      compositionId={composition?.id ?? ''}
-                      songTitle={recording.title}
-                      recording={recording}
-                    />
+                    <div key={JSON.stringify(recording)} className="flex flex-wrap gap-2">
+                      <RecordingPanel
+                        compositionId={composition?.id ?? ''}
+                        songTitle={recording.title}
+                        recording={recording}
+                      />
+                      <RecordingLinksEditor
+                        recordingId={recording.id}
+                        title={recordingTitle(recording)}
+                        links={recording.links}
+                      />
+                    </div>
                   ) : null
                 }
               />
