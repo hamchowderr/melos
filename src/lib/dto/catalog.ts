@@ -129,7 +129,11 @@ export type RecordingInput = {
  * updateRecording `patch` (§3.3): an omitted field is kept and null clears it; `links` replaces the
  * set. A changed `compositionId` moves the recording to another song.
  */
-export type RecordingPatch = Partial<Omit<RecordingInput, 'title'>> & { title?: string };
+/** `termIds` replaces the recording's metadata terms (CAT-006), from ensureTerms. */
+export type RecordingPatch = Partial<Omit<RecordingInput, 'title'>> & {
+  title?: string;
+  termIds?: string[];
+};
 
 /** A live recording findRecordingDuplicates matched, and what matched (§3.3, §6.15). */
 export type RecordingDuplicate = {
@@ -166,6 +170,12 @@ export type RecordingContributorDTO = {
 };
 
 export type MetadataTermDTO = { id: string; termType: string; label: string };
+
+/** The metadata_terms.term_type values the §4.2 CHECK allows. */
+export const TERM_TYPES = ['genre', 'mood', 'instrument', 'keyword', 'sounds_like'] as const;
+
+/** A term ensureTerms finds or creates by type and normalized label (CAT-006, G-4). */
+export type TermInput = { termType: (typeof TERM_TYPES)[number]; label: string };
 
 export type RecordingDTO = {
   id: string;

@@ -10,7 +10,12 @@ import {
   type RecordingPatch,
 } from '../../../lib/dto/catalog';
 import { normalizeIsrc } from '../../../lib/identifiers';
-import { compositions, recordingLinks, recordings } from '../../db/schema/workspace.generated';
+import {
+  compositions,
+  recordingLinks,
+  recordings,
+  recordingTerms,
+} from '../../db/schema/workspace.generated';
 import { workspaceIntegrityGuard as guard } from '../integrity-guard';
 import { requirePermission } from '../permissions';
 import { failure, type ServiceResult, success } from '../service-result';
@@ -129,7 +134,12 @@ async function load(tx: WorkspaceTransaction, id: string) {
     .from(recordingLinks)
     .where(eq(recordingLinks.recordingId, id))
     .orderBy(asc(recordingLinks.id));
-  return { ...row, links };
+  const terms = await tx
+    .select({ termId: recordingTerms.termId })
+    .from(recordingTerms)
+    .where(eq(recordingTerms.recordingId, id))
+    .orderBy(asc(recordingTerms.termId));
+  return { ...row, links, termIds: terms.map(({ termId }) => termId) };
 }
 
 /** Stores `links` as the recording's whole set; monotonic `lnk_` ulids keep the input order. */
@@ -211,7 +221,8 @@ export async function createRecording(
  * transaction and reindexes the songs it touched (§4.3). catalog:update (§6.2) and VALIDATION come
  * first; a recording or target composition with no live row is NOT_FOUND; then INVALID_ISRC or
  * CONFLICT for a changed ISRC. A move the song-level pitch rule forbids is SONG_LEVEL_CONFLICT
- * (§4.4 rule 3). `links` replaces the set. A patch that changes nothing writes nothing and adds no
+ * (§4.4 rule 3). `links` replaces the set, and `termIds` the metadata terms (CAT-006); an id with
+ * no term is NOT_FOUND. A patch that changes nothing writes nothing and adds no
  * audit row; otherwise audits recording.update before and after (§6.6).
  */
 export async function updateRecording(
@@ -241,11 +252,18 @@ export async function updateRecording(
     const changed = keys.filter((key) => set[key] !== undefined && set[key] !== before[key]);
     const links = patch.links && linksOf(patch.links);
     const relinked = links && JSON.stringify(links) !== JSON.stringify(before.links);
-    if (!changed.length && !relinked) return success(recordingId);
+    const termIds = patch.termIds && [...new Set(patch.termIds)].sort();
+    const retermed = termIds && termIds.join('\n') !== before.termIds.join('\n');
+    if (!changed.length && !relinked && !retermed) return success(recordingId);
     const stamp = { updatedAt: new Date().toISOString(), updatedBy: tenant.userId };
     const fields = Object.fromEntries(changed.map((key) => [key, set[key]]));
     await guard.update(tx, recordings, { ...fields, ...stamp }, eq(recordings.id, recordingId));
     if (relinked) await replaceLinks(tx, tenant, recordingId, links);
+    if (retermed) {
+      await guard.delete(tx, recordingTerms, eq(recordingTerms.recordingId, recordingId));
+      const rows = termIds.map((termId) => ({ recordingId, termId }));
+      if (rows.length) await guard.insert(tx, recordingTerms, rows);
+    }
     const after = await load(tx, recordingId);
     if (!after) throw new Error(`Recording ${recordingId} was not stored`);
     // A move reindexes both songs: the old song's row still lists the moved recording's artists.
