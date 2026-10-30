@@ -2439,7 +2439,7 @@ Owner decisions 2026-10-30 place CAT-010 to CAT-012, RGT-009 and RGT-010 in epic
 | U-30 | `after()` keeps a streaming CopilotKit route's run and finalization alive on Vercel after the client disconnects | Phase 5, preview deploy |
 | U-31 | Column names in DistroKid, TuneCore and CD Baby earnings statement exports | Phase 10 |
 | U-32 | Column names and sheet layout of The MLC portal catalog export | Phase 10 |
-| U-33 | MusicBrainz ISRC lookup rate limit and User-Agent rule; Deezer ISRC lookup endpoint and its terms of use | Phase 10 |
+| U-33 | Partly closed: MusicBrainz takes about one request per second per client and wants a User-Agent naming the application and a contact; an unknown ISRC answers 404. Deezer answers `GET /track/isrc:<ISRC>` without a key and reports an unknown ISRC as HTTP 200 with `error.code` 800. Both recorded on 2026-10-30 in `tests/fixtures/lookup/`. Still open: Deezer's terms of use for showing its data in Melos | Phase 10 |
 
 Source-document URLs marked "no" in §9 were not re-fetched for this contract; none of the contract's decisions depends on them alone.
 

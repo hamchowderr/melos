@@ -25,7 +25,8 @@
       "!.codex",
       "!.cursor",
       "!.agents",
-      "!**/docs/source"
+      "!**/docs/source",
+      "!**/tests/fixtures/lookup"
     ]
   },
   "formatter": {
