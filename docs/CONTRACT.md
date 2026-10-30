@@ -46,6 +46,7 @@ Document abbreviations used in alias columns:
 | 2026-09-12 | Email: Resend. File storage: Cloudflare R2. They are the first production adapters behind `EmailTransport` and `AssetStorage` (ADR-012, ADR-011) and are in the MVP build order. Sandbox and local adapters stay for development and tests. |
 | 2026-09-12 | The primary persona is the independent sync artist: a songwriter/producer pitching their own catalog through licensing agents and music supervisors. Demo persona: Jordan Taylor (FX ICP-01). Defaults and UX priorities in this contract follow this persona. |
 | 2026-09-13 | Model calls go through the Vercel AI Gateway, not a direct provider key or the Mastra Gateway. Mastra stays the agent framework (ADR-034). |
+| 2026-10-30 | Catalog import and song codes (plan "Artist catalog import and licensing codes", approved in the project thread of that name). (1) MVP import adds presets for distributor earnings statements and The MLC catalog export on the CSV pipeline; DDEX feeds and live distributor connections stay out of scope (IMP-014, IMP-015). (2) Missing song details are suggested by ISRC from MusicBrainz and Deezer and saved only when the user accepts; Spotify is not used (IMP-016). (3) A log of issued licenses comes after the MVP exit gate (phase 12). (4) Each song records where it is registered and the code each registry returned, and readiness warns about gaps (CAT-010 to CAT-012, RGT-009, RGT-010). |
 
 ### 1.2.1 Origin research used by this contract
 
@@ -183,6 +184,8 @@ Tool IDs are the Mastra `createTool` ids. Frontend tools are CopilotKit frontend
 | `publishing_interests` | ws | same name: BP §3.3, §5 · `publishing_splits`: TS §8 RGT-002 · `Publishing`: legacy | |
 | `master_interests` | ws | same name: BP §3.3, §5 · `master_owner_splits`: TS §8 RGT-003 · `MasterOwner`: legacy | |
 | `agreements` | ws | `assets + agreements`: BP App A.2 PDF Agreements · `agreements + assets`: BP App A.6 Signed Agreement · `agreement_asset_id` column: BP §5 | NEW table. |
+| `composition_registrations` | ws | — | NEW table (owner decision 2026-10-30). Where a composition is registered (PRO, The MLC, HFA) and the work code returned. |
+| `recording_registrations` | ws | — | NEW table (owner decision 2026-10-30). Where a recording is registered (SoundExchange) and the code returned. |
 | `licensing_contacts` | ws | `licensing_contacts / party relationships`: BP App A.2 · "composition/recording licensing contacts": BP App A.1 SONGSJnctContact | NEW table. |
 | Representation attestation columns on `publishing_interests` and `master_interests` | ws | "rights attestations": BP §3.3 · "explicit representation/authorization attestation": BP §6 | Records authorization for the workspace's own party to represent a holder (§6.5). |
 | `workspace_self_parties` | ws | "the workspace's own party": owner decision 2026-09-12 (RGT-008) | NEW table. The parties that are "me" for this workspace, per rights side. |
@@ -288,7 +291,7 @@ The same React components render in chat (tool rendering) and in full-page views
 
 | Canonical | Aliases seen (doc §) | Owns |
 |---|---|---|
-| `CatalogService` | `CompositionService`, `RecordingService`, `CatalogService`: TS §8 | Compositions, recordings, releases, artists, links, terms, search index. |
+| `CatalogService` | `CompositionService`, `RecordingService`, `CatalogService`: TS §8 | Compositions, recordings, releases, artists, links, terms, registrations, search index. |
 | `AssetService` | same name: TS §8 · "AssetStorage interface": TS §21 | Asset metadata and the `AssetStorage` adapter. |
 | `RightsService` | same name: TS §8 | Shares, agreements, representation, licensing contacts, readiness, default-owner proposals. |
 | `ContactService` | `CRMService`: TS §8 | Parties used as contacts, contact roles and methods. |
@@ -296,6 +299,7 @@ The same React components render in chat (tool rendering) and in full-page views
 | `OutreachService` | same name: TS §8 · "provider adapter": BP §12.2, §14.3; TS §11 | Messages and the `EmailTransport` adapter. |
 | `ReportService` | same name: TS §8 · "Report engine": BP §13 | Templates, previews, snapshots, PDF rendering. |
 | `ImportService` | NEW | Airtable and CSV import pipeline. |
+| `CatalogLookupService` | NEW (owner decision 2026-10-30) | ISRC lookups on MusicBrainz and Deezer that return suggestions only; it writes nothing (IMP-016). |
 | `AuditWriter` | NEW | `audit_log` rows inside service transactions. |
 | `TenantContextResolver` | "request-scoped workspace DB resolver": BP §16 Phase 1 | Session to workspace context (§7.1). |
 | `WorkspaceProvisioner` | "workspace provisioning": BP §16 Phase 1; TS TEN-004 | Creates, migrates and deletes workspace databases. |
@@ -686,7 +690,7 @@ CREATE TABLE party_identifiers (
   id                TEXT PRIMARY KEY,
   party_id          TEXT NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
   artist_alias_id   TEXT REFERENCES artist_aliases(id) ON DELETE SET NULL,  -- an AKA can carry its own IPI
-  identifier_type   TEXT NOT NULL,   -- IPI, ISNI, SOCIETY_MEMBER_ID, OTHER
+  identifier_type   TEXT NOT NULL,   -- IPI, IPI_BASE, ISNI, SOCIETY_MEMBER_ID, OTHER (IPI checks: §4.4)
   identifier_value  TEXT NOT NULL,
   issuing_body      TEXT,
   is_primary        INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0,1)),
@@ -761,6 +765,8 @@ CREATE TABLE recordings (
   copyright_registration_number  TEXT,
   copyright_date                 TEXT,
   first_release_date             TEXT,
+  contains_samples               INTEGER NOT NULL DEFAULT 0 CHECK (contains_samples IN (0,1)),   -- CAT-011
+  samples_cleared                INTEGER NOT NULL DEFAULT 0 CHECK (samples_cleared IN (0,1)),
   notes                          TEXT,
   created_at                     TEXT NOT NULL,
   updated_at                     TEXT NOT NULL,
@@ -907,6 +913,8 @@ CREATE TABLE agreements (
   counterparty_party_id  TEXT REFERENCES parties(id) ON DELETE RESTRICT,
   effective_on           TEXT,
   expires_on             TEXT,
+  is_exclusive           INTEGER NOT NULL DEFAULT 0 CHECK (is_exclusive IN (0,1)),   -- RGT-009
+  exclusivity_scope      TEXT,     -- free text, such as "sync, worldwide"
   asset_id               TEXT REFERENCES assets(id) ON DELETE RESTRICT,
   notes                  TEXT,
   created_at             TEXT NOT NULL,
@@ -987,6 +995,40 @@ CREATE TABLE licensing_contacts (
   created_by      TEXT,
   updated_by      TEXT,
   CHECK ((recording_id IS NULL) != (composition_id IS NULL))
+);
+
+-- ---------- Registrations (CAT-010, owner decision 2026-10-30) ----------
+-- Where a song is registered and the code the registry returned. Copyright office numbers stay on
+-- compositions and recordings. society_code names the PRO (ASCAP, BMI, SESAC, GMR, ...; not constrained,
+-- like party_society_affiliations) and is required for registry_kind 'pro' only (P-48).
+CREATE TABLE composition_registrations (
+  id              TEXT PRIMARY KEY,                           -- creg_<ulid>
+  composition_id  TEXT NOT NULL REFERENCES compositions(id) ON DELETE CASCADE,
+  registry_kind   TEXT NOT NULL CHECK (registry_kind IN ('pro','mlc','hfa','other')),
+  society_code    TEXT,
+  status          TEXT NOT NULL DEFAULT 'registered' CHECK (status IN ('pending','registered')),
+  work_code       TEXT,      -- PRO work ID, MLC song code or HFA song code
+  registered_on   TEXT,
+  notes           TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  created_by      TEXT,
+  updated_by      TEXT,
+  CHECK ((registry_kind = 'pro') = (society_code IS NOT NULL))
+);
+
+CREATE TABLE recording_registrations (
+  id                 TEXT PRIMARY KEY,                        -- rreg_<ulid>
+  recording_id       TEXT NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+  registry_kind      TEXT NOT NULL CHECK (registry_kind IN ('soundexchange','other')),
+  status             TEXT NOT NULL DEFAULT 'registered' CHECK (status IN ('pending','registered')),
+  registration_code  TEXT,
+  registered_on      TEXT,
+  notes              TEXT,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL,
+  created_by         TEXT,
+  updated_by         TEXT
 );
 
 -- ---------- Derived totals (never stored; live rows only) ----------
@@ -1328,6 +1370,8 @@ CREATE INDEX idx_master_recording         ON master_interests(recording_id);
 CREATE INDEX idx_master_party             ON master_interests(owner_party_id);
 CREATE INDEX idx_licensing_recording      ON licensing_contacts(recording_id);
 CREATE INDEX idx_licensing_composition    ON licensing_contacts(composition_id);
+CREATE UNIQUE INDEX uq_composition_registrations ON composition_registrations(composition_id, registry_kind, ifnull(society_code, ''));
+CREATE UNIQUE INDEX uq_recording_registrations   ON recording_registrations(recording_id, registry_kind) WHERE registry_kind != 'other';
 CREATE UNIQUE INDEX uq_contacts_party_active ON contacts(party_id) WHERE deleted_at IS NULL;   -- P-09
 CREATE INDEX idx_contact_roles_role       ON contact_roles(role);
 CREATE INDEX idx_pitches_contact          ON pitches(contact_id);
@@ -1361,6 +1405,8 @@ CREATE INDEX idx_import_issues_run        ON import_issues(import_run_id, severi
 - **Writer shares count once.** `composition_contributors` has one row per writer party per composition; the roles a writer holds live in `composition_contributor_roles`. A composer who is also the lyricist contributes one share.
 - **Identifier uniqueness.** ISRC, ISWC and UPC/EAN are unique among live rows through partial unique indexes with `deleted_at IS NULL`, so a soft-deleted song does not block re-entering its identifier.
 - **Identifier checks (owner decisions 2026-09-14, D-1 and D-2; closes U-11).** Services store the value the pure normalizers in `src/lib/identifiers.ts` return, and refuse an input they reject with `INVALID_ISRC`, `INVALID_ISWC` or `INVALID_UPC_EAN`. `normalizeIsrc` removes hyphens and whitespace, requires the `recordings.isrc` shape with ASCII letters in either case, and then uppercases, so a letter such as `ı` that uppercases to an ASCII letter is refused; an ISRC has no check digit ([SRC-080]). `normalizeIswc` removes dots, hyphens and whitespace wherever they appear, so it accepts `T-123.456.789-C` and `T1234567890`; it requires `T` in either case and ten digits, and checks the ISO 15707 check digit, (10 − (1 + Σ i·dᵢ) mod 10) mod 10 over the nine work digits ([SRC-110]), only on a new or changed value: an input equal to the stored value passes on its shape, because existing values such as the demo fixture's ISWCs fail the check. `normalizeUpcEan` removes hyphens and whitespace and requires 12 digits (UPC) or 13 (EAN) ending in the GS1 mod-10 check digit: weights 3 and 1 alternate leftward from the digit before it, and it brings the sum up to a multiple of ten ([SRC-109]). A UPC/EAN stays TEXT so leading zeros survive (BP §2.2). The `releases.upc_ean` CHECK still admits 8 or more digits, and legacy values that fail the check become import issues in phase 10.
+- **IPI checks (owner decision 2026-10-30, CAT-012, P-47).** `normalizeIpi` in `src/lib/identifiers.ts` handles `party_identifiers` rows of type `IPI` and `IPI_BASE`. An IPI name number: remove spaces, dots and hyphens, require 9 to 11 ASCII digits, and left-pad to 11 with zeros, because societies print it with and without leading zeros. An IPI base number: remove spaces, require `I`, nine digits and one check digit with optional hyphens, and store it as `I-NNNNNNNNN-N`. Neither check digit is verified until a primary source for the algorithm is in §9. Like ISWC, the check runs only on a new or changed value; a refused value is `INVALID_IPI` (P-46).
+- **Registrations (CAT-010).** `CatalogService.replaceCompositionRegistrations` and `replaceRecordingRegistrations` replace a song's full set, upserting on (`composition_id`, `registry_kind`, `society_code`) and (`recording_id`, `registry_kind`); `other` rows are matched by id. Permission `catalog:update`. There is no agent tool for them at MVP.
 - **Deliberate polymorphic tables.** `audit_log`, `control_audit_log` and `external_references` keep `entity_type` + `entity_id` without foreign keys. Audit rows must survive the deletion of what they describe. Services remove `external_references` rows in the same transaction as a hard delete.
 - **Publishing territory (RGT-007, P-05).** A composition has either one `WORLD` share set or one share set per country, not both. Each set is complete at 10000.
 - **Share totals (owner decision 2026-09-14, D-3).** A share-set replace refuses a set, or a territory set, whose total exceeds 10000 basis points and accepts a total below 10000; readiness then reports the incomplete set (`WRITER_TOTAL_INCOMPLETE`, `PUBLISHING_TOTAL_INCOMPLETE`, `MASTER_TOTAL_INCOMPLETE`; §6.5).
@@ -1475,6 +1521,9 @@ Requirement IDs from TS are kept verbatim and never renumbered. Requirement text
 | CAT-007 NEW | Releases carry UPC/EAN as text, label, distributor, release date and ordered tracks. | BP §3.2, App A.2 | `releases`, `release_tracks`, `release_assets` | `CatalogService` | `createRelease` | `MusicWorkspaceCard` | CAT-INT-007 |
 | CAT-008 NEW | Artist aliases, with identifiers attachable to a specific alias. | BP §3.1, §11.2; [SRC-083] BMI AKA note via SA §2 | `artist_aliases`, `party_identifiers.artist_alias_id` | `ContactService` | `createContact`, `updateContact` | `ContactCard` | CAT-INT-008 |
 | CAT-009 NEW | Search returns one result per song: a composition with its recordings. The agent prompts only for genuinely distinct songs, or for a song with several recordings and no primary recording when a recording is needed (§3.5). | Review B2; TS DEMO-001 | `compositions`, `recordings`, `catalog_search` | `CatalogService` | `searchMusic` | `SongGrid`, `ConflictResolver` | CAT-INT-009: every Northstar song resolves without `ConflictResolver`; two distinct songs with one title render it |
+| CAT-010 NEW | Record where a song is registered (PRO, The MLC, HFA for the composition; SoundExchange for the recording), with status pending or registered and the code each registry returned. | Owner decision 2026-10-30 | `composition_registrations`, `recording_registrations` | `CatalogService` | `getMusicWorkspace` | `MetadataPanel` | CAT-INT-010 |
+| CAT-011 NEW | Mark a recording that contains samples or interpolations, and whether they are cleared. | Owner decision 2026-10-30 | `recordings.contains_samples`, `recordings.samples_cleared` | `CatalogService` | `getMusicWorkspace`, `updateRecording` | `MetadataPanel` | CAT-INT-011 |
+| CAT-012 NEW | IPI name and base numbers are normalized and checked on new or changed values (§4.4). | Owner decision 2026-10-30; [SRC-082] | `party_identifiers` | `ContactService` | `updateContact` | `ContactCard` | CAT-INT-012 |
 | RGT-001 | Unlimited songwriter shares per composition. | Songwriting junction | `composition_contributors` | `RightsService` | `updateWriterShares` | `RightsPanel`, `RightsSplitEditor` | RGT-E2E-001 |
 | RGT-002 | Unlimited publisher shares per composition. | Publishing junction | `publishing_interests` | `RightsService` | `updatePublishingShares` | `RightsPanel`, `RightsSplitEditor` | RGT-E2E-002 |
 | RGT-003 | Unlimited master owners per recording. | MasterOwner junction | `master_interests` | `RightsService` | `updateMasterShares` | `RightsPanel`, `RightsSplitEditor` | RGT-E2E-003 |
@@ -1483,6 +1532,8 @@ Requirement IDs from TS are kept verbatim and never renumbered. Requirement text
 | RGT-006 NEW | Agreements link to publishing interests, master interests, licensing contacts and representation attestations. | BP §3.3, App A.2, A.6 | `agreements` | `RightsService` | `updatePublishingShares`, `updateMasterShares`, `attestRepresentation` | `RightsPanel` | RGT-INT-006 |
 | RGT-007 NEW | Publishing totals validate to 10000 per territory set; a composition cannot mix a WORLD set with country sets. | BP §5 territory column; P-05 | `publishing_interests` | `RightsService` | `updatePublishingShares` | `RightsSplitEditor` | RGT-INT-007 |
 | RGT-008 NEW | Default-owner autofill: when the workspace's own party owns 100%, an explicit user action fills empty writer, publishing and master share sets for that party. The proposal is shown for review, is saved only through the normal share tools with validation, approval (agent path) and audit, and never overwrites existing rows. The agent calls `proposeDefaultOwnership` only when the user asks and never infers ownership silently. | Owner decision 2026-09-12 | `workspace_self_parties`, share tables, `audit_log` | `RightsService` | `proposeDefaultOwnership`, then `updateWriterShares`, `updatePublishingShares`, `updateMasterShares` | `RightsSplitEditor` ("Fill with my ownership"), `/settings/ownership` | RGT-E2E-008 |
+| RGT-009 NEW | Agreements record whether they are exclusive and the scope of the exclusivity. | Owner decision 2026-10-30 | `agreements.is_exclusive`, `agreements.exclusivity_scope` | `RightsService` | `getRightsSummary` | `RightsPanel` | RGT-INT-009 |
+| RGT-010 NEW | Readiness adds `SAMPLES_NOT_CLEARED` (blocks sync readiness) and the registration, instrumental and exclusivity warnings in §6.5. | Owner decision 2026-10-30 | `composition_registrations`, `recording_registrations`, `recordings`, `agreements`, `recording_assets` | `RightsService` | `getReadinessIssues`, `getRightsSummary` | `ReadinessChecklist` | RGT-INT-010 |
 
 ### 5.4 CRM, outreach, reports, audit
 
@@ -1528,6 +1579,9 @@ Requirement IDs from TS are kept verbatim and never renumbered. Requirement text
 | IMP-011 NEW | CSV import for large catalogs (1,000+ tracks) runs on the same pipeline: dry-run preview, validation report, confirm before write, idempotent re-import, external references. | import tables, `assets` (`import_source`) | `ImportService` | `/settings/import`, `ImportReport` | IMP-INT-011; IMP-INT-014: re-importing a file with only `title`, `isrc` and `bpm` columns under the same source key updates only `bpm` and produces no `orphaned` or deleted writer, publisher, master, artist or term targets |
 | IMP-012 NEW | Every CSV row is identified by an `external_id` column or, when absent, by ISRC. A row with neither is an error-severity issue. Re-importing a file with the same source key matches rows by that identity. Several targets of one role from one row, such as two writers, are told apart by `target_key` (§7.6). | `external_references` | `ImportService` | `ImportReport` | IMP-INT-012 |
 | IMP-013 NEW | CSV apply commits in batches of at most 500 rows per transaction and resumes from the last committed batch after a failure. A 5,000-row fixture file passes dry-run, apply and re-apply with zero duplicates (P-25). | `import_runs.resume_cursor` | `ImportService` | `ImportReport` | IMP-INT-013 |
+| IMP-014 NEW | Preset for distributor earnings statements (DistroKid, TuneCore, CD Baby): maps the file onto the CSV pipeline, one recording per distinct ISRC and one release per distinct UPC. Column maps are fixed from one recorded sample per distributor (U-31). Owner decision 2026-10-30. | catalog tables, import tables | `ImportService` | `/settings/import`, `ImportReport` | IMP-INT-015 |
+| IMP-015 NEW | Preset for The MLC catalog export: works, writers and publishers with IPIs and shares, the MLC song code as a `composition_registrations` row, linked ISRCs as recordings. Column map fixed from a recorded sample (U-32). Owner decision 2026-10-30. | catalog, rights and party tables, import tables | `ImportService` | `/settings/import`, `ImportReport` | IMP-INT-016 |
+| IMP-016 NEW | Suggest missing recording details by ISRC from MusicBrainz and Deezer (U-33). Suggestions are shown for review and written only when the user accepts, through the normal services and audit. Spotify is not used. Owner decision 2026-10-30. | — | `CatalogLookupService` | `MetadataPanel` | IMP-INT-017 |
 
 ### 5.6 Demo conversations
 
@@ -1829,8 +1883,20 @@ Let `R` be a recording, `C` its composition, `SP` the workspace self party for s
 |---|---|
 | `MISSING_ISRC` | `R.isrc IS NULL` |
 | `NO_LISTEN_LINK` | no `recording_links` row for `R` has `is_primary = 1` |
+| `SAMPLES_NOT_CLEARED` | `R.contains_samples = 1` and `R.samples_cleared = 0` (RGT-010) |
 
-Warning only (never blocks): `MISSING_ISWC` when `C.iswc IS NULL`.
+Warning only (never blocks):
+
+| Code | Warns when |
+|---|---|
+| `MISSING_ISWC` | `C.iswc IS NULL` |
+| `NOT_REGISTERED_PRO` | `C` has no `composition_registrations` row with `registry_kind = 'pro'` and `status = 'registered'` (RGT-010) |
+| `NOT_REGISTERED_MLC` | `C` has no registered `mlc` row (RGT-010) |
+| `NOT_REGISTERED_SOUNDEXCHANGE` | `R` has no registered `soundexchange` row in `recording_registrations` (RGT-010) |
+| `NO_INSTRUMENTAL` | `R` has no `recording_assets` row with `relationship = 'instrumental'` (RGT-010) |
+| `EXCLUSIVE_AGREEMENT` | an agreement with `is_exclusive = 1` that has not expired (`expires_on` is NULL or not before today in the workspace timezone) is linked to a share or licensing contact of `R` or `C`, and its counterparty is not a self party (RGT-010) |
+
+The rebuilt demo fixture seeds no registrations, so every fixture song carries the three `NOT_REGISTERED_*` warnings; the expected blocking codes below do not change.
 
 **Implicit licensing contact (P-28).** When `C` exists, `SM` is set, no `PUBLISHING_TOTAL_*` or `MASTER_TOTAL_*` code applies and neither `PUBLISHING_NOT_CONTROLLED` nor `MASTER_NOT_CONTROLLED` applies, the workspace controls 100% of both sides, which is the legacy "can you just deal with me" case ([SRC-003]). The master self party `SM` is then the licensing contact, `NO_LICENSING_CONTACT` does not apply, and `RightsSummaryDTO.licensingContacts` lists `SM` with `implicit: true`. An explicit `licensing_contacts` row always takes precedence. In every other case an explicit contact is required.
 
@@ -1856,7 +1922,7 @@ DEMO-003 therefore lists Ocean Blue and Neon Static.
 
 **Decision.** `audit_log` (§4.3) in each workspace database and `control_audit_log` in `melos-control`. `AuditWriter` writes the row inside the service transaction that performs the mutation. `pitch_events` remains the domain history for pitch cells, notes and messages; those changes do not also write `audit_log` (AUD-001). Approvals and declines always write `audit_log` (AUD-002).
 
-Action vocabulary (`<entity>.<verb>`): `composition.create`, `composition.update`, `composition.delete`, `recording.create`, `recording.update`, `recording.delete`, `release.create`, `release.update`, `release.delete`, `recording_artists.replace`, `metadata_term.create`, `asset.create`, `asset.attach`, `writer_shares.replace`, `publishing_shares.replace`, `master_shares.replace`, `representation.attest`, `representation.clear`, `licensing_contacts.replace`, `self_parties.update`, `agreement.create`, `agreement.update`, `party.create`, `party.update`, `party.delete`, `contact.create`, `contact.update`, `contact.delete`, `report.generate`, `import.apply`, `approval.requested`, `approval.granted`, `approval.declined`, `approval.stale`, `message.draft_updated`. Rights actions store the full share set before and after. Owner decision 2026-09-14 (D-4) added `release.delete`, `metadata_term.create`, `asset.create`, `agreement.create`, `agreement.update`, `party.create`, `party.update` and `party.delete`; `AuditAction` in `src/server/services/audit-writer.ts` types the same list.
+Action vocabulary (`<entity>.<verb>`): `composition.create`, `composition.update`, `composition.delete`, `recording.create`, `recording.update`, `recording.delete`, `release.create`, `release.update`, `release.delete`, `recording_artists.replace`, `metadata_term.create`, `asset.create`, `asset.attach`, `writer_shares.replace`, `publishing_shares.replace`, `master_shares.replace`, `representation.attest`, `representation.clear`, `licensing_contacts.replace`, `composition_registrations.replace`, `recording_registrations.replace`, `self_parties.update`, `agreement.create`, `agreement.update`, `party.create`, `party.update`, `party.delete`, `contact.create`, `contact.update`, `contact.delete`, `report.generate`, `import.apply`, `approval.requested`, `approval.granted`, `approval.declined`, `approval.stale`, `message.draft_updated`. Rights actions store the full share set before and after. Owner decision 2026-09-14 (D-4) added `release.delete`, `metadata_term.create`, `asset.create`, `agreement.create`, `agreement.update`, `party.create`, `party.update` and `party.delete`; `AuditAction` in `src/server/services/audit-writer.ts` types the same list.
 
 **No-op writes.** A call that changes nothing writes nothing and adds no `audit_log` row: a self-party set, an agreement patch or a party child set equal to what is stored, or an `addAsset` link that exists, returns success without writing (rpr.11 and rpr.15 reviews). `tests/integration/phase4-writes.test.ts` (melos-rpr.42) runs every exported Catalog, Contact, Rights and Asset write once to success and once to a refusal, and checks the exact audit actions, no audit row on a refusal, and an empty `PRAGMA foreign_key_check` after each (AUD-001, DAT-001). It fails when a new write is exported without a case, and when a Phase 4 action above has no service that writes it.
 
@@ -2101,7 +2167,7 @@ Owner decisions 2026-09-12. One pipeline, two readers.
    - `update`: the payload hash differs and the current hash equals `applied_row_sha256`;
    - `conflict`: the payload hash differs and the current hash differs from `applied_row_sha256`, meaning the row was edited in Melos. A referenced target that was hard-deleted or soft-deleted in Melos counts as edited (`MELOS_TARGET_DELETED`, `MELOS_TARGET_SOFT_DELETED`) and is never recreated or restored;
    - `orphaned` (P-40): a reference for this `source_system` and `source_container` whose (`source_table`, `source_record_id`, `target_role`, `target_key`) the current snapshot no longer produces, such as a writer removed at the source. A rename is one `orphaned` target plus one `create`. When the current hash equals `applied_row_sha256`, apply removes the target and its reference: relationship targets (shares, contributor roles, credits, artists, links, terms, licensing contacts) are deleted through `IntegrityGuard`; entity targets (parties, compositions, recordings, releases, contacts) are soft-deleted when the guard allows it and otherwise reported; pitch cells and pitch events are never removed and are reported as `SOURCE_TARGET_REMOVED`. When the hashes differ, the target is a `conflict`. An Airtable snapshot always holds every table. A CSV upload produces `orphaned` targets for missing rows only when the user marks it as the full catalog for its source key (`import_runs.full_snapshot = 1`). For missing rows and for rows that are present alike, a target kind can become `orphaned` only when the column that produces it is present and mapped in that file's header: a writer dropped from a mapped `writers` column is `orphaned`, while a file without a `writers` column changes no writer targets. An absent or unmapped column means no change to that kind.
-5. **Validate.** Issues by severity. Error codes block apply: `UNKNOWN_PITCH_STATUS`, `DUPLICATE_ISRC`, `DUPLICATE_ISWC`, `INVALID_ISRC`, `INVALID_ISWC`, `INVALID_UPC_EAN`, `SHARE_OUT_OF_RANGE`, `SHARE_TOTAL_OVER`, `SHARE_SCALE_AMBIGUOUS` (U-17), `CSV_ROW_WITHOUT_IDENTITY`, `CSV_UNMAPPED_REQUIRED_COLUMN`. Warnings: `SHARE_TOTAL_INCOMPLETE`, `UPC_LEADING_ZERO_RISK`, `PARTY_KIND_UNCERTAIN`, `PARTY_MATCH_UNCERTAIN`, `POSSIBLE_DUPLICATE_COMPOSITION`, `BLANK_PITCH_STATUS`, `UNPARSEABLE_DURATION`, `MELOS_EDIT_CONFLICT`, `MELOS_TARGET_DELETED`, `MELOS_TARGET_SOFT_DELETED`, `SOURCE_TARGET_REMOVED`, `ARTWORK_WITHOUT_RELEASE`. Info: `FORMULA_VALUE_NOT_IMPORTED`, `LEGACY_ONE_STOP_MISMATCH`, `WEBSITE_TYPED_AS_EMAIL`.
+5. **Validate.** Issues by severity. Error codes block apply: `UNKNOWN_PITCH_STATUS`, `DUPLICATE_ISRC`, `DUPLICATE_ISWC`, `INVALID_ISRC`, `INVALID_ISWC`, `INVALID_UPC_EAN`, `INVALID_IPI`, `SHARE_OUT_OF_RANGE`, `SHARE_TOTAL_OVER`, `SHARE_SCALE_AMBIGUOUS` (U-17), `CSV_ROW_WITHOUT_IDENTITY`, `CSV_UNMAPPED_REQUIRED_COLUMN`. Warnings: `SHARE_TOTAL_INCOMPLETE`, `UPC_LEADING_ZERO_RISK`, `PARTY_KIND_UNCERTAIN`, `PARTY_MATCH_UNCERTAIN`, `POSSIBLE_DUPLICATE_COMPOSITION`, `BLANK_PITCH_STATUS`, `UNPARSEABLE_DURATION`, `MELOS_EDIT_CONFLICT`, `MELOS_TARGET_DELETED`, `MELOS_TARGET_SOFT_DELETED`, `SOURCE_TARGET_REMOVED`, `ARTWORK_WITHOUT_RELEASE`. Info: `FORMULA_VALUE_NOT_IMPORTED`, `LEGACY_ONE_STOP_MISMATCH`, `WEBSITE_TYPED_AS_EMAIL`.
 6. **Dry-run result.** `import_runs` (`mode = 'dry_run'`) with `planned_json`, plus `import_issues`. Nothing else is written (IMP-002). `ImportReport` shows create, update, unchanged, orphaned and conflict counts per target table, and the issues.
 7. **Apply.** Requires `import:run`, a dry-run with zero errors for the same source hash (a changed source returns `blocked`), and a `ConfirmationCard` confirmation (IMP-003). Writes run through the same services as manual edits, so `IntegrityGuard`, validation and `audit_log` apply (`import.apply` plus per-entity actions with `actor_type = 'import'`). After each write, in the same transaction, the importer re-reads the target and stores its hash as `applied_row_sha256`, so the hash covers values after normalization (an uppercased ISRC, a percent converted to basis points). Imported pitch statuses write `pitch_events` with `event_type = 'imported'`. Attachments copy to `AssetStorage` during apply; Airtable attachment URL lifetime is U-16. CSV apply commits at most 500 rows per transaction and records `resume_cursor` (IMP-013).
 8. **Re-import.** Same stages. `external_references` makes it idempotent: `unchanged` targets are skipped, unedited `orphaned` targets are removed as in stage 4, and `conflict` targets are left untouched and reported (IMP-004).
@@ -2126,6 +2192,12 @@ Owner decisions 2026-09-12. One pipeline, two readers.
 | `genres`, `moods`, `instruments`, `keywords`, `sounds_like` | no | `metadata_terms`; values separated by `;` |
 | `listen_url`, `preview_start` (`m:ss`) | no | `recording_links` (primary), `recordings.preview_start_ms` |
 | `licensing_contact` | no | `licensing_contacts` |
+| `writer_ipis`, `writer_pros` | no | `party_identifiers` (`IPI`) and `party_society_affiliations` (`role = 'writer'`) on each writer; `Name:value` pairs separated by `;` (owner decision 2026-10-30) |
+| `publisher_ipis` | no | `party_identifiers` (`IPI`) on each publisher; `Name:value;…` |
+| `pro`, `pro_work_id` | no | `composition_registrations`, `registry_kind = 'pro'`, `society_code` = `pro` |
+| `mlc_song_code` | no | `composition_registrations`, `registry_kind = 'mlc'` |
+| `soundexchange_registered` (`yes`/`no`) | no | `recording_registrations`, `registry_kind = 'soundexchange'` |
+| `contains_samples`, `samples_cleared` (`yes`/`no`) | no | `recordings` |
 | `lyrics`, `description`, `notes` | no | `compositions` |
 
 CSV sources are identified by a user-chosen source key stored in `source_container`; re-importing a revised file under the same key matches rows by `external_id` or ISRC (IMP-012).
@@ -2192,6 +2264,8 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | 10 | Import pipeline: Airtable and CSV readers, dry-run, validation report, apply, re-import (§7.6). | IMP-001 to IMP-013, IMP-E2E-001 and DAT-001 for import writes pass against recorded fixtures; one dry-run, apply and re-apply against the owner's GIZMO+ base yields zero duplicates, using an access token the owner provides; U-10, U-16 and U-17 closed. |
 | 11 | **MVP exit gate.** | TS §25 final traceability gate as one traced vertical slice: Better Auth workspace resolution, Turso isolation and provisioning, canonical catalog/rights queries, Mastra tool invocation, CopilotKit rendering, AIMock/AGUIMock regression, one approved write. DEMO-001 to DEMO-010 pass as Playwright E2E with AIMock on a Vercel preview deploy backed by Turso Cloud and R2. One live Resend send to an owner-controlled address passes (U-28). SA Gate F real-model eval (TST-AI-005) runs at least once. CI is green and the preview is live; production promotion is a separate human step. |
 | 12 | Post-MVP: production reply ingestion (U-29), CopilotKit Channels, A2UI surfaces (BP §16 phases 9–10), production hardening. | External integration tests and a threat review pass. |
+
+Owner decisions 2026-10-30 place CAT-010 to CAT-012, RGT-009 and RGT-010 in epic `melos-9b6`, which depends only on phase 4 services and gates phase 11. IMP-014 to IMP-016 join phase 10. The issued-license log joins phase 12.
 
 ## 9. Unified source register
 
@@ -2327,7 +2401,9 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | P-43 | Canonical JSON as `canonicalJson` writes it: keys sorted by UTF-16 code unit at every depth, array order kept, no whitespace, `toJSON` applied, undefined left out of objects and written as null in arrays; NaN, Infinity, bigints, boxed primitives and cycles refused | §7.4, §7.6 |
 | P-44 | Local asset URLs: HMAC-SHA256 over method, storage key, content type and `expires`, with expiries from 1 s to 7 days; the signing key is HMAC-SHA256 of the label `melos local asset url` keyed with `BETTER_AUTH_SECRET`, so local storage needs no secret of its own | §7.5 |
 | P-45 | An input that breaks a service rule with no error code of its own is `VALIDATION` with `field`, naming the input, and `reason`, a stable snake_case code; identifier checks keep their `INVALID_*` codes (§4.4); nothing is written and no `audit_log` row is added | §3.1 |
-| P-46 | A refused identifier is `INVALID_ISRC`, `INVALID_ISWC` or `INVALID_UPC_EAN` with the normalizer's `reason` and the input `field`; a unique value a live row already holds is `CONFLICT` with the input `field`; neither writes anything or adds an `audit_log` row | §3.1 |
+| P-46 | A refused identifier is `INVALID_ISRC`, `INVALID_ISWC`, `INVALID_UPC_EAN` or `INVALID_IPI` with the normalizer's `reason` and the input `field`; a unique value a live row already holds is `CONFLICT` with the input `field`; neither writes anything or adds an `audit_log` row | §3.1 |
+| P-47 | IPI name numbers are stored as 11 digits, left-padded with zeros from 9 or 10; base numbers as `I-NNNNNNNNN-N`; check digits are not verified yet | §4.4 |
+| P-48 | Registry kinds: `pro`, `mlc`, `hfa`, `other` for compositions and `soundexchange`, `other` for recordings; status `pending` or `registered`; one row per PRO per composition | §4.3 |
 
 ### 10.2 UNVERIFIED
 
@@ -2361,6 +2437,9 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | U-28 | Resend sending-domain verification and a live send from production configuration | Phase 11 |
 | U-29 | Production mechanism for ingesting inbound replies | Phase 12 |
 | U-30 | `after()` keeps a streaming CopilotKit route's run and finalization alive on Vercel after the client disconnects | Phase 5, preview deploy |
+| U-31 | Column names in DistroKid, TuneCore and CD Baby earnings statement exports | Phase 10 |
+| U-32 | Column names and sheet layout of The MLC portal catalog export | Phase 10 |
+| U-33 | MusicBrainz ISRC lookup rate limit and User-Agent rule; Deezer ISRC lookup endpoint and its terms of use | Phase 10 |
 
 Source-document URLs marked "no" in §9 were not re-fetched for this contract; none of the contract's decisions depends on them alone.
 
