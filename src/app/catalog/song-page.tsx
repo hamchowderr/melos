@@ -6,6 +6,7 @@ import { MetadataPanel } from '@/components/catalog/metadata-panel';
 import { RecordingLinksEditor } from '@/components/catalog/recording-links-editor';
 import { RecordingPanel } from '@/components/catalog/recording-panel';
 import { RecordingSection, recordingTitle } from '@/components/catalog/recording-section';
+import { ReleaseForm } from '@/components/catalog/release-form';
 import { ReleaseSection } from '@/components/catalog/release-section';
 import { HolderSplitEditor } from '@/components/rights/holder-split-editor';
 import { LicensingContactsEditor } from '@/components/rights/licensing-contacts-editor';
@@ -104,6 +105,17 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
       : [],
   );
 
+  // A release's label and distributor are organizations; they load only for catalog:create.
+  const labels =
+    song.ok && can('create') ? await listParties(tenant, { kind: 'organization' }) : null;
+  const releaseForm =
+    song.ok && labels?.ok ? (
+      <ReleaseForm
+        recordings={song.value.recordings.map((r) => ({ value: r.id, label: recordingTitle(r) }))}
+        organizations={labels.value.map(option)}
+      />
+    ) : null;
+
   const target = composition
     ? { compositionId: composition.id }
     : { recordingId: recordingIds[0] ?? '' };
@@ -170,6 +182,7 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
               contactsEditor={contactsEditor}
             />
             <ReleaseSection releases={song.value.releases} recordings={song.value.recordings} />
+            {releaseForm}
           </>
         ) : (
           // The other refusal is FORBIDDEN: this request's role lacks a read it needs (§6.2).
