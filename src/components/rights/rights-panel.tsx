@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
+import { IssueItem } from '@/components/rights/issue-item';
 import { RepresentationControls } from '@/components/rights/representation-controls';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { GridFrame } from '@/components/ui/grid-frame';
 import {
   Table,
   TableBody,
@@ -44,34 +46,36 @@ function ShareTable({
   totalBp: number;
 }) {
   return (
-    <Table aria-label={label}>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Holder</TableHead>
-          <TableHead>Details</TableHead>
-          <TableHead className="text-right">Share</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map(({ key, name, detail, shareBp }) => (
-          <TableRow key={key}>
-            <TableCell className="whitespace-normal">{name}</TableCell>
-            <TableCell className="whitespace-normal">{detail}</TableCell>
-            <TableCell className="text-right tabular-nums">
-              {shareBp === null ? 'Not set' : formatShare(shareBp)}
+    <GridFrame>
+      <Table aria-label={label}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Holder</TableHead>
+            <TableHead>Details</TableHead>
+            <TableHead className="text-right">Share</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map(({ key, name, detail, shareBp }) => (
+            <TableRow key={key}>
+              <TableCell className="whitespace-normal">{name}</TableCell>
+              <TableCell className="whitespace-normal">{detail}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {shareBp === null ? 'Not set' : formatShare(shareBp)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell colSpan={2}>Total</TableCell>
+            <TableCell className="text-right tabular-nums" data-testid="share-total">
+              {formatShare(totalBp)}
             </TableCell>
           </TableRow>
-        ))}
-      </TableBody>
-      <TableFooter>
-        <TableRow>
-          <TableCell colSpan={2}>Total</TableCell>
-          <TableCell className="text-right tabular-nums" data-testid="share-total">
-            {formatShare(totalBp)}
-          </TableCell>
-        </TableRow>
-      </TableFooter>
-    </Table>
+        </TableFooter>
+      </Table>
+    </GridFrame>
   );
 }
 
@@ -195,20 +199,13 @@ export function RightsPanel(props: Props) {
           {rights.issues.length > 0 ? (
             <div className="flex flex-col gap-2">
               <h3 className="font-medium">Issues</h3>
-              <ul aria-label="Issues" className="flex flex-col gap-1">
+              <ul aria-label="Issues" className="flex flex-col gap-2">
                 {rights.issues.map((issue) => (
-                  <li
+                  <IssueItem
                     key={`${issue.recordingId} ${issue.code}`}
-                    className="flex flex-wrap items-center gap-2"
-                  >
-                    <Badge variant={issue.severity === 'blocking' ? 'destructive' : 'outline'}>
-                      {issue.code}
-                    </Badge>
-                    <span className="text-muted-foreground">
-                      {titled ? `${recordingTitles.get(issue.recordingId)}: ` : ''}
-                      {issue.detail}
-                    </span>
-                  </li>
+                    issue={issue}
+                    context={titled ? `${recordingTitles.get(issue.recordingId)}: ` : null}
+                  />
                 ))}
               </ul>
             </div>

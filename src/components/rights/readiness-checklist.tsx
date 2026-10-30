@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { IssueItem } from '@/components/rights/issue-item';
 import { ReadinessBadges } from '@/components/rights/readiness-badges';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
@@ -24,7 +25,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { ReadinessReportDTO } from '@/lib/dto/rights';
-import { words } from '@/lib/words';
 
 type Recording = ReadinessReportDTO['recordings'][number];
 type Props = { recordings: Recording[]; onlyNotReady: boolean };
@@ -53,11 +53,6 @@ function CountChip({ count, severity }: { count: number; severity: 'blocking' | 
   );
 }
 
-/** An issue code as words, keeping identifier acronyms upper case. */
-function issueLabel(code: string) {
-  return words(code.toLowerCase()).replace(/\b(isrc|iswc|ipi|isni)\b/gi, (m) => m.toUpperCase());
-}
-
 /** One recording's issues in the side panel: each as words with its detail, and its code. */
 function IssuesPanel({ recording, onClose }: { recording: Recording | null; onClose: () => void }) {
   return (
@@ -73,23 +68,7 @@ function IssuesPanel({ recording, onClose }: { recording: Recording | null; onCl
             </SheetHeader>
             <ul aria-label={`${recording.title} issues`} className="flex flex-col gap-2 px-4">
               {recording.issues.map((issue) => (
-                <li key={issue.code} className="rounded-lg bg-muted/50 px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <span
-                      aria-hidden
-                      className={
-                        issue.severity === 'blocking'
-                          ? 'size-2 rounded-full bg-red-500'
-                          : 'size-2 rounded-full bg-amber-500'
-                      }
-                    />
-                    <span className="font-medium">{issueLabel(issue.code)}</span>
-                  </div>
-                  <p className="mt-0.5 text-muted-foreground">{issue.detail}</p>
-                  <p className="mt-1 font-mono text-[0.65rem] text-muted-foreground/70">
-                    {issue.code}
-                  </p>
-                </li>
+                <IssueItem key={issue.code} issue={issue} />
               ))}
             </ul>
             <SheetFooter>

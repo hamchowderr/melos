@@ -71,10 +71,10 @@ test('melos-rpr.16: Ocean Blue shows publishing WORLD at 85.00% with its readine
   // EXPECTED.md §2: three one-stop codes, then the sync-only code.
   const issues = rights.getByRole('list', { name: 'Issues' }).getByRole('listitem');
   await expect(issues).toHaveText([
-    /^PUBLISHING_TOTAL_INCOMPLETE/,
-    /^PUBLISHING_NOT_CONTROLLED/,
-    /^NO_LICENSING_CONTACT/,
-    /^MISSING_ISRC/,
+    /PUBLISHING_TOTAL_INCOMPLETE/,
+    /PUBLISHING_NOT_CONTROLLED/,
+    /NO_LICENSING_CONTACT/,
+    /MISSING_ISRC/,
   ]);
   await expect(
     rights.getByRole('heading', { name: 'Licensing contacts' }).locator('..'),
