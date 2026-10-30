@@ -70,3 +70,28 @@ test('melos-rpr.6, melos-rpr.45: Jordan opens People: both tabs, Theo Grant, the
   await expect(page).toHaveURL(REBECCA_CARTER, AUTH_REDIRECT);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Rebecca Carter');
 });
+
+test('melos-rpr.48: at phone width /people lists each party as a card with no sideways scroll', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInAsJordan(page);
+  await page.goto('/people', AUTH_REDIRECT);
+  const panel = page.getByRole('tabpanel');
+  await expect(panel.getByRole('table')).toBeHidden();
+  const cards = panel.getByRole('list', { name: 'People' }).getByRole('listitem');
+  await expect(cards).toHaveCount(7);
+  const theo = cards.filter({ hasText: 'Theo Grant' });
+  await expect(theo.locator('dd')).toHaveText([
+    'theo@bluelantern.example',
+    'Blue Lantern Studios',
+    'Music supervisor',
+  ]);
+  await theo.getByRole('link', { name: 'Theo Grant' }).click();
+  await expect(page).toHaveURL(THEO_GRANT, AUTH_REDIRECT);
+  await page.goBack();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBe(0);
+});

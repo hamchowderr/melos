@@ -76,6 +76,12 @@ const COLUMNS: Record<Props['noun'], Column[]> = {
   ],
 };
 
+/** A cell's content, or a dash when it has none, so a card never shows an empty row. */
+const filled = (content: ReactNode) =>
+  content == null || content === '' || (Array.isArray(content) && content.length === 0)
+    ? '—'
+    : content;
+
 /** People or organizations at /people (§2.3), in the order ContactService lists them. */
 export function PartyTable({ parties, noun }: Props) {
   if (parties.length === 0) {
@@ -89,27 +95,48 @@ export function PartyTable({ parties, noun }: Props) {
     );
   }
 
-  const columns = COLUMNS[noun];
+  const [name, ...details] = COLUMNS[noun];
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {columns.map(({ heading }) => (
-            <TableHead key={heading}>{heading}</TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <>
+      {/* Phone width: one card per party, so no column is squeezed or scrolled off (rpr.48). */}
+      <ul
+        aria-label={noun === 'people' ? 'People' : 'Organizations'}
+        className="flex flex-col gap-2 sm:hidden"
+      >
         {parties.map((party) => (
-          <TableRow key={party.partyId}>
-            {columns.map(({ heading, cell, wrap }) => (
-              <TableCell key={heading} className={wrap ? 'whitespace-normal' : undefined}>
-                {cell(party)}
-              </TableCell>
+          <li key={party.partyId} className="rounded-lg border p-3">
+            {name.cell(party)}
+            <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+              {details.map(({ heading, cell }) => (
+                <Fragment key={heading}>
+                  <dt className="text-muted-foreground">{heading}</dt>
+                  <dd className="break-words">{filled(cell(party))}</dd>
+                </Fragment>
+              ))}
+            </dl>
+          </li>
+        ))}
+      </ul>
+      <Table className="hidden sm:table">
+        <TableHeader>
+          <TableRow>
+            {[name, ...details].map(({ heading }) => (
+              <TableHead key={heading}>{heading}</TableHead>
             ))}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {parties.map((party) => (
+            <TableRow key={party.partyId}>
+              {[name, ...details].map(({ heading, cell, wrap }) => (
+                <TableCell key={heading} className={wrap ? 'whitespace-normal' : undefined}>
+                  {cell(party)}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </>
   );
 }
