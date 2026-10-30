@@ -20,23 +20,47 @@ test('melos-rpr.2: Jordan opens Catalog: 5 songs with their primary artists', as
 
   const table = page.getByRole('table');
   const headers = table.getByRole('columnheader');
-  await expect(headers).toHaveText(['Title', 'Primary artists', 'Readiness', 'Recordings']);
+  await expect(headers).toHaveText([
+    ...['Title', 'Primary artists', 'ISWC', 'ISRC', 'Readiness', 'Recordings'],
+  ]);
   const rows = table.locator('tbody').getByRole('row');
   // Readiness follows EXPECTED.md §2: Neon Static and Ocean Blue are neither one-stop nor sync ready.
   const ready = /^One Stop Ready\s*Sync ready$/;
   const notReady = /^Not one-stop ready\s*Not sync ready$/;
-  const songs: [string | RegExp, string, RegExp][] = [
-    ['Home Again', 'Jordan Taylor', ready],
-    ['Midnight Drive', 'Jordan Taylor', ready],
+  const songs: [string | RegExp, string, string, string, RegExp][] = [
+    ['Home Again', 'Jordan Taylor', 'T-900.000.004-0', 'US-DMO-26-00004', ready],
+    ['Midnight Drive', 'Jordan Taylor', 'T-900.000.001-0', 'US-DMO-26-00001', ready],
     // Alex Ramirez is the primary artist; Jordan Taylor is featured.
-    ['Neon Static', 'Alex Ramirez', notReady],
-    ['Ocean Blue', 'Jordan Taylor', notReady],
-    [/^Paper Planes at 2AM\s*Also known as Paper Planes$/, 'Jordan Taylor', ready],
+    ['Neon Static', 'Alex Ramirez', 'T-900.000.003-0', 'US-DMO-26-00003', notReady],
+    // Ocean Blue's recording has no ISRC.
+    ['Ocean Blue', 'Jordan Taylor', 'T-900.000.002-0', '', notReady],
+    [
+      /^Paper Planes at 2AM\s*Also known as Paper Planes$/,
+      'Jordan Taylor',
+      'T-900.000.005-0',
+      'US-DMO-26-00005',
+      ready,
+    ],
   ];
   await expect(rows).toHaveCount(songs.length);
-  for (const [index, [title, artists, readiness]] of songs.entries()) {
-    await expect(rows.nth(index).getByRole('cell')).toHaveText([title, artists, readiness, '1']);
+  for (const [index, [title, artists, iswc, isrc, readiness]] of songs.entries()) {
+    await expect(rows.nth(index).getByRole('cell')).toHaveText([
+      ...[title, artists, iswc, isrc, readiness, '1'],
+    ]);
   }
+
+  // Sorting by title descending puts Paper Planes first; a row click opens its side panel.
+  const titleSort = headers.getByRole('button', { name: 'Title' });
+  await titleSort.click();
+  await titleSort.click();
+  await expect(headers.first()).toHaveAttribute('aria-sort', 'descending');
+  await expect(rows.first().getByRole('cell').first()).toContainText('Paper Planes at 2AM');
+  await rows.filter({ hasText: 'Neon Static' }).getByRole('cell').nth(1).click();
+  const panel = page.getByRole('dialog', { name: 'Neon Static' });
+  await expect(panel).toContainText('Alex Ramirez');
+  await expect(panel).toContainText('US-DMO-26-00003');
+  await panel.getByRole('link', { name: 'Open song' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Neon Static', AUTH_REDIRECT);
 });
 
 test('melos-rpr.2: a new workspace shows the empty catalog', async ({ page }) => {

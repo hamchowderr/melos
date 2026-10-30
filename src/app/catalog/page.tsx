@@ -2,6 +2,7 @@ import { resolveWorkspacePage } from '@/app/workspace-page';
 import { MetadataPanel } from '@/components/catalog/metadata-panel';
 import { SearchResults } from '@/components/catalog/search-results';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { PageHeader } from '@/components/workspace/page-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
 import { WorkspaceShell } from '@/components/workspace/workspace-shell';
 import { READINESS_FILTERS, type ReleaseListItem } from '@/lib/dto/catalog';
@@ -11,6 +12,8 @@ import { READINESS, searchMusic } from '@/server/services/catalog/search';
 import { requirePermission } from '@/server/services/permissions';
 
 export const dynamic = 'force-dynamic';
+
+const songCount = (count: number) => (count === 1 ? '1 song' : `${count} songs`);
 
 type Props = { searchParams: Promise<{ q?: string; readiness?: string }> };
 
@@ -55,14 +58,11 @@ export default async function CatalogPage({ searchParams }: Props) {
 
   return (
     <WorkspaceShell workspaceName={workspace.workspaceName} current="catalog">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="text-lg font-semibold">Catalog</h1>
-          {/* New song shows only for catalog:create (§6.2). */}
-          {requirePermission(workspace.tenant, { catalog: ['create'] }).ok ? (
-            <MetadataPanel />
-          ) : null}
-        </div>
+      <PageHeader title="Catalog" count={songs.ok ? songCount(songs.value.length) : undefined}>
+        {/* New song shows only for catalog:create (§6.2). */}
+        {requirePermission(workspace.tenant, { catalog: ['create'] }).ok ? <MetadataPanel /> : null}
+      </PageHeader>
+      <div className="flex flex-col gap-4 p-4">
         {songs.ok && releases.ok ? (
           <SearchResults
             query={query}
