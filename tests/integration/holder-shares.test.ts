@@ -150,4 +150,21 @@ describe('melos-rpr.28: updatePublishingShares and updateMasterShares (RGT-002, 
       refused({ code: 'NOT_FOUND' }),
     );
   });
+
+  it('loads each set hash for the editors, which a save accepts once (RGT-002, RGT-003)', async () => {
+    const loaded = await service.getHolderSharesHashes(owner, {
+      compositionId: OCEAN,
+      recordingIds: [NEON],
+    });
+    if (!loaded.ok) throw new Error(JSON.stringify(loaded.error));
+    const { publishing, masters: masterHashes, empty } = loaded.value;
+    expect(Object.keys(publishing)).toEqual(['WORLD']);
+    expect(empty).toBe(service.holderSetHash([]));
+    const shares = [{ partyId: SILVERLINE, shareBp: 10_000 }];
+    const first = { recordingId: NEON, shares, expectedBeforeHash: masterHashes[NEON] };
+    expect((await service.updateMasterShares(owner, first)).ok).toBe(true);
+    expect(await service.updateMasterShares(owner, first)).toEqual(
+      refused({ code: 'STATE_CHANGED' }),
+    );
+  });
 });

@@ -20,6 +20,7 @@ import { workspaceIntegrityGuard as guard } from '../integrity-guard';
 import { requirePermission } from '../permissions';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
+import { getWorkspaceDatabase, sanitized } from '../workspace-connections';
 import { runWorkspaceWrite, type WorkspaceTransaction } from '../workspace-write';
 import { getRightsSummary } from './read';
 import { planByNaturalKey } from './shares';
@@ -63,6 +64,58 @@ export const holderSetHash = (held: Held[]) =>
   createHash('sha256')
     .update(canonicalJson(held.map(({ id: _, ...share }) => share)))
     .digest('hex');
+
+export type HolderHashes = {
+  publishing: Record<string, string>;
+  masters: Record<string, string>;
+  empty: string;
+};
+
+/** Each set's hash, keyed by its territory or recording, from rows in party order. */
+const hashesOf = (rows: (Held & { key: string })[]) => {
+  const sets = Map.groupBy(rows, ({ key }) => key);
+  return Object.fromEntries(
+    [...sets].map(([key, held]) => [key, holderSetHash(held.map(({ key: _, ...row }) => row))]),
+  );
+};
+
+/**
+ * The publishing hashes by territory and the master hashes by recording, as the split editors load
+ * them (RGT-002, RGT-003), for Save to send back as `expectedBeforeHash`. A set with no rows has no
+ * entry; its editor sends `empty`, the hash of no rows. rights:read; a refused role never opens the
+ * database.
+ */
+export async function getHolderSharesHashes(
+  tenant: TenantContext,
+  { compositionId, recordingIds }: { compositionId: string | null; recordingIds: string[] },
+): Promise<ServiceResult<HolderHashes>> {
+  if (!requirePermission(tenant, { rights: ['read'] }).ok) return failure('FORBIDDEN');
+  return sanitized(tenant.workspaceId, async () => {
+    const db = await getWorkspaceDatabase(tenant.workspaceId);
+    const { id, shareBp, agreementId, representationAttestedAt } = publishers;
+    const held = { id, shareBp, agreementId, representationAttestedAt };
+    const publishing = compositionId
+      ? await db
+          .select({ ...held, key: publishers.territory, partyId: publishers.publisherPartyId })
+          .from(publishers)
+          .where(eq(publishers.compositionId, compositionId))
+          .orderBy(asc(publishers.publisherPartyId))
+      : [];
+    const owned = await db
+      .select({
+        ...{ id: masters.id, shareBp: masters.shareBp, agreementId: masters.agreementId },
+        representationAttestedAt: masters.representationAttestedAt,
+        ...{ key: masters.recordingId, partyId: masters.ownerPartyId },
+      })
+      .from(masters)
+      .where(inArray(masters.recordingId, recordingIds))
+      .orderBy(asc(masters.ownerPartyId));
+    return success({
+      ...{ publishing: hashesOf(publishing), masters: hashesOf(owned) },
+      empty: holderSetHash([]),
+    });
+  });
+}
 
 const stamps = (tenant: TenantContext) => {
   const at = new Date().toISOString();
