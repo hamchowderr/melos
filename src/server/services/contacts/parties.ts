@@ -4,6 +4,7 @@ import type { WorkspacePermissions } from '../../../lib/auth/permissions';
 import type { PartyDetailDTO, PartyInput, PartyPatch } from '../../../lib/dto/contacts';
 import { FOREIGN_KEY_RULES } from '../../db/fk-rules.generated';
 import { organizations, parties, people } from '../../db/schema/workspace.generated';
+import type { AuditWriter } from '../audit-writer';
 import { reindexRecording, reindexSong } from '../catalog/search-index';
 import { workspaceIntegrityGuard as guard } from '../integrity-guard';
 import { requirePermission } from '../permissions';
@@ -107,6 +108,36 @@ const partyOf = (tenant: TenantContext, written: ServiceResult<string>) =>
   written.ok ? getParty(tenant, written.value) : written;
 
 /**
+ * Inserts a person or an organization with its subtype row and audits party.create (D-4) in the
+ * caller's write transaction; createContact uses it to add a contact's new party in the same write.
+ * The caller has checked contact:create and `invalidParty`. Returns the new party id.
+ */
+export async function insertParty(
+  tx: WorkspaceTransaction,
+  audit: AuditWriter,
+  tenant: TenantContext,
+  input: PartyInput,
+) {
+  const [id, at, name] = [`pty_${ulid()}`, new Date().toISOString(), input.displayName.trim()];
+  await guard.insert(tx, parties, [
+    {
+      ...{ id, partyKind: input.partyKind, displayName: name, notes: input.notes ?? null },
+      ...{ createdAt: at, updatedAt: at, createdBy: tenant.userId, updatedBy: tenant.userId },
+    },
+  ]);
+  const { table, row } = subtypeOf(id, input.partyKind, name, input);
+  await guard.insert(tx, table, [row]);
+  await audit.write({
+    ...{ action: 'party.create', entityType: 'party', entityId: id },
+    ...{ before: null, after: (await load(tx, id)) ?? null },
+  });
+  return id;
+}
+
+/** VALIDATION for a new party's fields, before the database opens. */
+export const invalidParty = (input: PartyInput) => invalid(input, true);
+
+/**
  * Creates a person or an organization with its subtype row (§4.2, D-5) in one audited write.
  * contact:create (§6.2) and VALIDATION come first, before the database opens. `legalName` defaults
  * to the display name. Audits party.create (D-4), then returns the PartyDetailDTO.
@@ -118,22 +149,9 @@ export async function createParty(
   if (!requirePermission(tenant, CREATE).ok) return failure('FORBIDDEN');
   const refused = invalid(input, true);
   if (refused) return refused;
-  const written = await runWorkspaceWrite(tenant, CREATE, async (tx, audit) => {
-    const [id, at, name] = [`pty_${ulid()}`, new Date().toISOString(), input.displayName.trim()];
-    await guard.insert(tx, parties, [
-      {
-        ...{ id, partyKind: input.partyKind, displayName: name, notes: input.notes ?? null },
-        ...{ createdAt: at, updatedAt: at, createdBy: tenant.userId, updatedBy: tenant.userId },
-      },
-    ]);
-    const { table, row } = subtypeOf(id, input.partyKind, name, input);
-    await guard.insert(tx, table, [row]);
-    await audit.write({
-      ...{ action: 'party.create', entityType: 'party', entityId: id },
-      ...{ before: null, after: (await load(tx, id)) ?? null },
-    });
-    return success(id);
-  });
+  const written = await runWorkspaceWrite(tenant, CREATE, async (tx, audit) =>
+    success(await insertParty(tx, audit, tenant, input)),
+  );
   return partyOf(tenant, written);
 }
 
