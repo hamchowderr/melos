@@ -180,3 +180,24 @@ export type WriterSharesInput = {
   shares: WriterShareInput[];
   expectedBeforeHash?: string;
 };
+
+/** One holder in a publishing or master share set (RGT-002, RGT-003), keyed by party. */
+export type HolderShareInput = { partyId: string; shareBp: number; agreementId?: string | null };
+
+/**
+ * A publishing share-set replace for one territory (RGT-007, P-05): 'WORLD' or an ISO 3166-1
+ * alpha-2 code, never both for one composition.
+ */
+export type PublishingSharesInput = {
+  compositionId: string;
+  territory: string;
+  shares: HolderShareInput[];
+  expectedBeforeHash?: string;
+};
+
+/** A master share-set replace for one recording (RGT-003). */
+export type MasterSharesInput = {
+  recordingId: string;
+  shares: HolderShareInput[];
+  expectedBeforeHash?: string;
+};
