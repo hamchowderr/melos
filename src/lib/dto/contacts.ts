@@ -149,3 +149,35 @@ export type SocietyAffiliationInput = {
   startsOn?: string | null;
   endsOn?: string | null;
 };
+
+/**
+ * ContactDetailDTO (§3.4): the ContactSummary fields, the party's methods, and its pitch items and
+ * recent messages, which stay empty until phase 8 (PROPOSED, melos-rpr.27); so does openItemCount.
+ */
+export type ContactDetailDTO = {
+  contactId: string;
+  partyId: string;
+  displayName: string;
+  organizationPartyId: string | null;
+  organizationName: string | null;
+  roles: string[];
+  primaryEmail: string | null;
+  openItemCount: number;
+  relationshipNotes: string | null;
+  active: boolean;
+  methods: ContactMethodDTO[];
+  pitchItems: never[];
+  recentMessages: never[];
+};
+
+/** createContact input (§3.3): exactly one of an existing `partyId` or a new `party`. */
+export type ContactInput = {
+  partyId?: string;
+  party?: PartyInput;
+  organizationPartyId?: string | null;
+  roles?: string[];
+  relationshipNotes?: string | null;
+};
+
+/** updateContact patch: an absent field keeps its value; `roles` replaces the set. */
+export type ContactPatch = Omit<ContactInput, 'partyId' | 'party'> & { active?: boolean };
