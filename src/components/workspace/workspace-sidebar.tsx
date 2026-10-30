@@ -34,7 +34,7 @@ export function WorkspaceSidebarContent({ workspaceName, current, menu }: Worksp
         <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       </Link>
       <WorkspaceNav current={current} />
-      <div className="mt-auto border-t pt-2">
+      <div className="mt-auto">
         <SignOutButton variant="ghost" size="sm" />
       </div>
     </div>
