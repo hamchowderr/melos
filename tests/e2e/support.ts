@@ -101,6 +101,30 @@ export async function activeWorkspaceId(organizationId: string): Promise<string>
   return String(rows[0].id);
 }
 
+/**
+ * Setup rows for a write spec (D-9), inserted straight into the browser's active workspace
+ * database: `rows` maps a table to the rows to insert, each with its columns by name.
+ */
+export async function insertWorkspaceRows(
+  page: Page,
+  rows: Record<string, Record<string, string | number>[]>,
+): Promise<void> {
+  const workspaceId = await activeWorkspaceId(await activeOrganizationId(page));
+  const url = `file:./data/e2e-workspaces/melos-ws-${workspaceId.slice('ws_'.length)}.db`;
+  const client = createClient({ url });
+  const statements = Object.entries(rows).flatMap(([table, values]) =>
+    values.map((row) => ({
+      sql: `INSERT INTO ${table} (${Object.keys(row)}) VALUES (${Object.keys(row).map(() => '?')})`,
+      args: Object.values(row),
+    })),
+  );
+  try {
+    await client.batch(statements);
+  } finally {
+    client.close();
+  }
+}
+
 /** Moves an organization's registry row to another status, as a failed provisioning would. */
 export async function setWorkspaceStatus(organizationId: string, status: string): Promise<void> {
   const sql = 'UPDATE workspace_registry SET status = ? WHERE organization_id = ?';
