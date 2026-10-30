@@ -37,7 +37,7 @@ export default async function PeoplePage() {
           </>
         ) : null}
       </PageHeader>
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4 px-4 pt-3 pb-6 md:px-6">
         {parties.ok ? (
           <Tabs defaultValue="person">
             <TabsList>
