@@ -165,7 +165,13 @@ describe('melos-rpr.1: CatalogService reads songs and song details (CAT-002, CAT
         {
           ...{ id: keys.rec_MIDNIGHT, title: 'Midnight Drive', versionTitle: null },
           ...{ isrc: 'USDMO2600001', durationMs: null, bpm: null, musicalKey: null },
-          ...{ previewStartMs: 42000, primaryLink, links: [primaryLink] },
+          ...{
+            previewStartMs: 42000,
+            containsSamples: false,
+            samplesCleared: false,
+            primaryLink,
+            links: [primaryLink],
+          },
           ...{ artists: [{ ...JORDAN, role: 'primary', billingOrder: 0 }] },
           ...{ contributors: [], terms: [], registrations: [] },
         },

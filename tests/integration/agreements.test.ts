@@ -93,14 +93,16 @@ describe('melos-rpr.15: agreements that back publishing, master and licensing ro
     const [row] = await stored(owner, created.id);
     const by = { createdBy: owner.userId, updatedBy: owner.userId, createdAt: row.updatedAt };
     const fixed = { id: created.id, title: 'Silverline representation', updatedAt: row.updatedAt };
-    expect(row).toEqual({ ...input, ...by, ...fixed });
+    const unflagged = { isExclusive: 0, exclusivityScope: null };
+    expect(row).toEqual({ ...input, ...unflagged, ...by, ...fixed });
     expect(row.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
-    expect(created).toEqual({ ...row, counterpartyName: 'Silverline Songs' });
+    const dto = { isExclusive: false, counterpartyName: 'Silverline Songs' };
+    expect(created).toEqual({ ...row, ...dto });
     const patch = { expiresOn: null, notes: null };
     const updated = accepted(await service.updateAgreement(owner, created.id, patch));
     const [after] = await stored(owner, created.id);
     expect(after).toEqual({ ...row, ...patch, updatedAt: after.updatedAt });
-    expect(updated).toEqual({ ...after, counterpartyName: 'Silverline Songs' });
+    expect(updated).toEqual({ ...after, ...dto });
     const actor = { actorType: 'user', actorUserId: owner.userId, requestId: owner.requestId };
     const entry = { ...actor, entityType: 'agreement', entityId: created.id };
     const [before, now, audits] = [canonicalJson(row), canonicalJson(after), await audited(owner)];
@@ -171,5 +173,17 @@ describe('melos-rpr.15: agreements that back publishing, master and licensing ro
     expect(await list()).toEqual([alone, withRivera]);
     expect(await list({ agreementType: 'licensing' })).toEqual([alone]);
     expect(await list({ counterpartyPartyId: rivera })).toEqual([withRivera]);
+  });
+
+  it('RGT-INT-009: records an exclusive agreement and its scope, defaulting to not exclusive', async () => {
+    const plain = accepted(await service.createAgreement(owner, DEAL));
+    expect(plain).toMatchObject({ isExclusive: false, exclusivityScope: null });
+    const scope = { isExclusive: true, exclusivityScope: '  sync, worldwide ' };
+    const exclusive = accepted(await service.updateAgreement(owner, plain.id, scope));
+    expect(exclusive).toMatchObject({ isExclusive: true, exclusivityScope: 'sync, worldwide' });
+    expect((await stored(owner, plain.id))[0]).toMatchObject({ isExclusive: 1 });
+    const cleared = { isExclusive: false, exclusivityScope: ' ' };
+    const after = accepted(await service.updateAgreement(owner, plain.id, cleared));
+    expect(after).toMatchObject({ isExclusive: false, exclusivityScope: null });
   });
 });

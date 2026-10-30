@@ -96,7 +96,11 @@ const columns = (fields: RecordingPatch) => ({
     durationMs: fields.durationMs,
   },
   ...{ bpm: fields.bpm, musicalKey: fields.musicalKey, previewStartMs: fields.previewStartMs },
+  ...{ containsSamples: flag(fields.containsSamples), samplesCleared: flag(fields.samplesCleared) },
 });
+
+/** A boolean input as its 0/1 column; undefined keeps the column. */
+const flag = (value?: boolean) => (value === undefined ? undefined : value ? 1 : 0);
 
 /** A link set as stored and compared: trimmed, with its defaults, in input order. */
 const linksOf = (links: RecordingLinkInput[]) =>

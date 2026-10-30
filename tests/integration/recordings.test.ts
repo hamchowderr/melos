@@ -161,6 +161,26 @@ describe('melos-rpr.18: createRecording and updateRecording (CAT-002, CAT-004, C
     expect((await audits()).map((a) => a.after.compositionId)).toEqual([null, null, home, null]);
   });
 
+  it('CAT-INT-011: marks samples and their clearance, defaulting to none', async () => {
+    const id = await create({ title: 'Sampled Skies' });
+    const take = async () => {
+      const result = await service.updateRecording(owner, id, {});
+      if (!result.ok) throw new Error(`Refused with ${result.error.code}`);
+      return result.value.recordings.find((r) => r.id === id);
+    };
+    expect(await take()).toMatchObject({ containsSamples: false, samplesCleared: false });
+    const flagged = await service.updateRecording(owner, id, { containsSamples: true });
+    expect(flagged.ok).toBe(true);
+    expect(await take()).toMatchObject({ containsSamples: true, samplesCleared: false });
+    expect((await service.updateRecording(owner, id, { samplesCleared: true })).ok).toBe(true);
+    expect(await take()).toMatchObject({ containsSamples: true, samplesCleared: true });
+    const [, ...updates] = await auditOf(id);
+    expect(updates.map((u) => [u.before.samplesCleared, u.after.samplesCleared])).toEqual([
+      [0, 0],
+      [0, 1],
+    ]);
+  });
+
   it('refuses moving a pitched recording to a song its pitch also holds (§4.4 rule 3)', async () => {
     const database = await open(owner);
     // A composition-level cell for a new song, in the pitch that holds Midnight Drive's recording.

@@ -92,7 +92,10 @@ describe('TEN-004: workspace migrations create exactly the CONTRACT.md §4.2 and
     const fromContract = memoryDatabase();
     await fromContract.executeMultiple(contractSql(/^### [\d.]+ Workspace database\b/).join('\n'));
     contract = await describeSchema(fromContract);
-    expect(await applyWorkspaceMigrations(migrated)).toEqual({ applied: [1, 2, 3, 4], version: 4 });
+    expect(await applyWorkspaceMigrations(migrated)).toEqual({
+      applied: [1, 2, 3, 4, 5],
+      version: 5,
+    });
   });
 
   it('holds every §4.2 and §4.3 object and no other', async () => {
@@ -141,15 +144,16 @@ describe('TEN-004: workspace migrations create exactly the CONTRACT.md §4.2 and
     expect(await rows(migrated, 'PRAGMA foreign_key_check')).toEqual([]);
   });
 
-  it('records versions 1 to 4, and readSchemaVersion reads 4', async () => {
+  it('records versions 1 to 5, and readSchemaVersion reads 5', async () => {
     const recorded = await rows(migrated, 'SELECT version, name FROM schema_migrations');
     expect(recorded).toEqual([
       { version: 1, name: 'parties_catalog' },
       { version: 2, name: 'assets_rights_audit_import_search' },
       { version: 3, name: 'crm_pitches_messages_reports' },
       { version: 4, name: 'registrations' },
+      { version: 5, name: 'samples_exclusivity' },
     ]);
-    expect(await readSchemaVersion(migrated)).toBe(4);
+    expect(await readSchemaVersion(migrated)).toBe(5);
   });
 
   it.each<[string, string | RegExp, string]>([
@@ -435,7 +439,7 @@ describe('U-08: catalog_search works in a local libSQL file', () => {
     ensureLocalDatabaseDir(`file:./${file}`);
     const local = createClient({ url: `file:./${file}` });
     clients.push(local);
-    expect(await applyWorkspaceMigrations(local)).toEqual({ applied: [1, 2, 3, 4], version: 4 });
+    expect(await applyWorkspaceMigrations(local)).toEqual({ applied: [1, 2, 3, 4, 5], version: 5 });
     const row = ['composition', 'cmp_1', 'Ocean Blue', '', 'Northstar', 'Jordan Taylor', 'pop', ''];
     await local.execute({
       sql: 'INSERT INTO catalog_search (entity_type, entity_id, title, alt_titles, artist_names, contributor_names, terms, lyrics) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

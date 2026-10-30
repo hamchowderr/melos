@@ -18,6 +18,8 @@ export const agreements = sqliteTable('agreements', {
   updatedAt: text('updated_at').notNull(),
   createdBy: text('created_by'),
   updatedBy: text('updated_by'),
+  isExclusive: integer('is_exclusive').notNull().default(0),
+  exclusivityScope: text('exclusivity_scope'),
 });
 
 export const artistAliases = sqliteTable('artist_aliases', {
@@ -511,6 +513,8 @@ export const recordings = sqliteTable('recordings', {
   createdBy: text('created_by'),
   updatedBy: text('updated_by'),
   deletedAt: text('deleted_at'),
+  containsSamples: integer('contains_samples').notNull().default(0),
+  samplesCleared: integer('samples_cleared').notNull().default(0),
 });
 
 export const releaseAssets = sqliteTable(
