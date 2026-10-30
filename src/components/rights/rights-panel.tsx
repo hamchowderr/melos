@@ -19,6 +19,9 @@ type Props = {
   recordingTitles: Map<string, string>;
   /** The writer split editor, for a role with rights:update (§6.2). */
   writerEditor?: ReactNode;
+  /** The publishing editor, and each recording's master editor by id, for rights:update. */
+  publishingEditor?: ReactNode;
+  masterEditors?: Map<string, ReactNode>;
 };
 
 /** A share table with its §4.3 view total in the footer. */
@@ -83,7 +86,8 @@ const holderRows = (holders: RightsHolderDTO[]) =>
  * A song's rights (§2.3 RightsPanel, RGT-004, RGT-005): writers, publishing per territory and
  * masters per recording with their totals, licensing contacts and the readiness issues.
  */
-export function RightsPanel({ rights, recordingTitles, writerEditor }: Props) {
+export function RightsPanel(props: Props) {
+  const { rights, recordingTitles, writerEditor, publishingEditor, masterEditors } = props;
   const writers = rights.writers.map((writer) => ({
     key: writer.contributorId,
     name: writer.displayName,
@@ -118,6 +122,7 @@ export function RightsPanel({ rights, recordingTitles, writerEditor }: Props) {
                   />
                 </div>
               ))}
+              {publishingEditor}
             </>
           ) : null}
           {rights.masters.map(({ recordingId, totalBp, holders }) => {
@@ -126,6 +131,7 @@ export function RightsPanel({ rights, recordingTitles, writerEditor }: Props) {
               <div key={recordingId} className="flex flex-col gap-2">
                 <h3 className="font-medium">{label}</h3>
                 <ShareTable label={label} rows={holderRows(holders)} totalBp={totalBp} />
+                {masterEditors?.get(recordingId)}
               </div>
             );
           })}

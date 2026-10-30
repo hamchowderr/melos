@@ -5,6 +5,8 @@ import { DeleteSong } from '@/components/catalog/delete-song';
 import { MetadataPanel } from '@/components/catalog/metadata-panel';
 import { RecordingSection, recordingTitle } from '@/components/catalog/recording-section';
 import { ReleaseSection } from '@/components/catalog/release-section';
+import { HolderSplitEditor } from '@/components/rights/holder-split-editor';
+import { PublishingEditor } from '@/components/rights/publishing-editor';
 import { RightsPanel } from '@/components/rights/rights-panel';
 import { RightsSplitEditor } from '@/components/rights/rights-split-editor';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -14,6 +16,8 @@ import type { CatalogFocus } from '@/lib/dto/catalog';
 import { getMusicWorkspace } from '@/server/services/catalog/music-workspace';
 import { listParties } from '@/server/services/contacts/read';
 import { requirePermission } from '@/server/services/permissions';
+import { listAgreements } from '@/server/services/rights/agreements';
+import { getHolderSharesHashes } from '@/server/services/rights/holder-shares';
 import { getWriterSharesHash } from '@/server/services/rights/shares';
 
 /**
@@ -34,30 +38,68 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
   if (focus.entityType === 'recording' && composition) {
     redirect(`/catalog/compositions/${composition.id}`);
   }
-  // Edit shows only for rights:update (§6.2); the hash and people load only then.
-  const { tenant } = workspace;
   // Edit and Delete show only for catalog:update and catalog:delete (§6.2).
   const can = (action: 'update' | 'delete') =>
     requirePermission(workspace.tenant, { catalog: [action] }).ok;
-  const editable = song.ok && composition && requirePermission(tenant, { rights: ['update'] }).ok;
-  const [hash, people] = editable
+  // The editors show only for rights:update (§6.2); hashes, parties and agreements load only then.
+  const { tenant } = workspace;
+  const editable = song.ok && requirePermission(tenant, { rights: ['update'] }).ok;
+  const recordingIds = song.ok ? song.value.recordings.map(({ id }) => id) : [];
+  const [hash, hashes, everyone, agreements] = editable
     ? await Promise.all([
-        getWriterSharesHash(tenant, composition.id),
-        listParties(tenant, { kind: 'person' }),
+        composition ? getWriterSharesHash(tenant, composition.id) : null,
+        getHolderSharesHashes(tenant, { compositionId: composition?.id ?? null, recordingIds }),
+        listParties(tenant),
+        listAgreements(tenant),
       ])
     : [];
+  const option = ({ partyId, displayName }: { partyId: string; displayName: string }) => ({
+    value: partyId,
+    label: displayName,
+  });
+  const parties = everyone?.ok ? everyone.value.map(option) : [];
+  const people = everyone?.ok
+    ? everyone.value.filter((p) => p.partyKind === 'person').map(option)
+    : [];
+  const options = {
+    parties,
+    agreements: agreements?.ok
+      ? agreements.value.map(({ id, title }) => ({ value: id, label: title }))
+      : [],
+  };
   const writerEditor =
-    song.ok && composition && hash?.ok && people?.ok ? (
+    song.ok && composition && hash?.ok && everyone?.ok ? (
       <RightsSplitEditor
         compositionId={composition.id}
         beforeHash={hash.value}
         writers={song.value.rights.writers}
-        people={people.value.map(({ partyId, displayName }) => ({
-          value: partyId,
-          label: displayName,
-        }))}
+        people={people}
       />
     ) : undefined;
+  const publishingEditor =
+    song.ok && composition && hashes?.ok && everyone?.ok ? (
+      <PublishingEditor
+        {...options}
+        compositionId={composition.id}
+        publishing={song.value.rights.publishing}
+        hashes={hashes.value}
+      />
+    ) : undefined;
+  const masterEditors = new Map(
+    song.ok && hashes?.ok && everyone?.ok
+      ? song.value.rights.masters.map(({ recordingId, holders }) => [
+          recordingId,
+          <HolderSplitEditor
+            key={recordingId}
+            {...options}
+            target={{ side: 'master', recordingId }}
+            label="Edit master"
+            beforeHash={hashes.value.masters[recordingId] ?? hashes.value.empty}
+            holders={holders}
+          />,
+        ])
+      : [],
+  );
 
   return (
     <main>
@@ -88,6 +130,8 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
               rights={song.value.rights}
               recordingTitles={new Map(song.value.recordings.map((r) => [r.id, recordingTitle(r)]))}
               writerEditor={writerEditor}
+              publishingEditor={publishingEditor}
+              masterEditors={masterEditors}
             />
             <ReleaseSection releases={song.value.releases} recordings={song.value.recordings} />
           </>
