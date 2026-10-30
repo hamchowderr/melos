@@ -3,6 +3,7 @@ import {
   formatIsrc,
   formatIswc,
   formatPlaybackTime,
+  normalizeIpi,
   normalizeIsrc,
   normalizeIswc,
   normalizeUpcEan,
@@ -110,5 +111,35 @@ describe('normalizeUpcEan (§4.4, D-1)', () => {
   const shapes = ['', '12345670', '03600029145', '00036000291452', '03600029145A'];
   it.each([...shapes, '036000.291452'])('refuses %j by its shape', (input) =>
     expect(normalizeUpcEan(input)).toEqual(refused('INVALID_UPC_EAN', 'shape')),
+  );
+});
+
+describe('normalizeIpi (§4.4, P-47)', () => {
+  it.each([
+    ['00012345678', '00012345678'],
+    ['123456789', '00123456789'],
+    ['1234567890', '01234567890'],
+    [' 123.456.789 ', '00123456789'],
+    ['001-234-567-89', '00123456789'],
+  ])('stores the name number %j as %s', (input, value) =>
+    expect(normalizeIpi(input, 'IPI')).toEqual({ ok: true, value }),
+  );
+
+  it.each(['', '12345678', '123456789012', '12345678A', '１２３４５６７８９'])(
+    'refuses the name number %j by its shape',
+    (input) => expect(normalizeIpi(input, 'IPI')).toEqual(refused('INVALID_IPI', 'shape')),
+  );
+
+  it.each([
+    ['I-000000229-7', 'I-000000229-7'],
+    ['I0000002297', 'I-000000229-7'],
+    ['i-000000229 -7', 'I-000000229-7'],
+  ])('stores the base number %j as %s', (input, value) =>
+    expect(normalizeIpi(input, 'IPI_BASE')).toEqual({ ok: true, value }),
+  );
+
+  it.each(['', '0000002297', 'I-00000229-7', 'I-000000229-77', 'X-000000229-7'])(
+    'refuses the base number %j by its shape',
+    (input) => expect(normalizeIpi(input, 'IPI_BASE')).toEqual(refused('INVALID_IPI', 'shape')),
   );
 });
