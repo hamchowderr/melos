@@ -26,7 +26,12 @@ type Props = {
   /** Attest controls on other holders' shares, and the licensing contacts editor (RGT-005). */
   representable?: boolean;
   contactsEditor?: ReactNode;
+  /** The agreements an attestation can cite, and the form that records one (RGT-006). */
+  agreements?: { value: string; label: string }[];
+  agreementForm?: ReactNode;
 };
+
+type Agreements = Props['agreements'];
 
 /** A share table with its §4.3 view total in the footer. */
 function ShareTable({
@@ -70,27 +75,41 @@ function ShareTable({
   );
 }
 
-/** A publishing or master holder's badges: the side's self party, and an attested representation. */
-const holderBadges = ({ isSelf, representationAttested }: RightsHolderDTO) => (
-  <span className="inline-flex gap-1">
-    {isSelf ? <Badge variant="secondary">Self</Badge> : null}
-    {representationAttested ? <Badge variant="outline">Attested</Badge> : null}
-  </span>
-);
+/**
+ * A publishing or master holder's badges: the side's self party, and an attested representation
+ * with the agreement that backs it.
+ */
+const holderBadges = (holder: RightsHolderDTO, agreements: Agreements) => {
+  const backing = agreements?.find(({ value }) => value === holder.agreementId)?.label;
+  return (
+    <span className="inline-flex gap-1">
+      {holder.isSelf ? <Badge variant="secondary">Self</Badge> : null}
+      {holder.representationAttested ? <Badge variant="outline">Attested</Badge> : null}
+      {holder.representationAttested && backing ? (
+        <Badge variant="outline">{`Backed by ${backing}`}</Badge>
+      ) : null}
+    </span>
+  );
+};
 
 const holderRows = (
   holders: RightsHolderDTO[],
   interestType: 'publishing' | 'master',
   representable?: boolean,
+  agreements?: Agreements,
 ) =>
   holders.map((holder) => ({
     key: holder.interestId,
     name: holder.displayName,
     detail: (
       <span className="inline-flex flex-wrap items-center gap-2">
-        {holderBadges(holder)}
+        {holderBadges(holder, agreements)}
         {representable ? (
-          <RepresentationControls interestType={interestType} holder={holder} />
+          <RepresentationControls
+            interestType={interestType}
+            holder={holder}
+            agreements={agreements}
+          />
         ) : null}
       </span>
     ),
@@ -103,7 +122,7 @@ const holderRows = (
  */
 export function RightsPanel(props: Props) {
   const { rights, recordingTitles, writerEditor, publishingEditor, masterEditors } = props;
-  const { representable, contactsEditor } = props;
+  const { representable, contactsEditor, agreements, agreementForm } = props;
   const writers = rights.writers.map((writer) => ({
     key: writer.contributorId,
     name: writer.displayName,
@@ -133,7 +152,7 @@ export function RightsPanel(props: Props) {
                   <h3 className="font-medium">{`Publishing ${territory}`}</h3>
                   <ShareTable
                     label={`Publishing ${territory}`}
-                    rows={holderRows(holders, 'publishing', representable)}
+                    rows={holderRows(holders, 'publishing', representable, agreements)}
                     totalBp={totalBp}
                   />
                 </div>
@@ -148,7 +167,7 @@ export function RightsPanel(props: Props) {
                 <h3 className="font-medium">{label}</h3>
                 <ShareTable
                   label={label}
-                  rows={holderRows(holders, 'master', representable)}
+                  rows={holderRows(holders, 'master', representable, agreements)}
                   totalBp={totalBp}
                 />
                 {masterEditors?.get(recordingId)}
@@ -172,6 +191,7 @@ export function RightsPanel(props: Props) {
             )}
             {contactsEditor}
           </div>
+          {agreementForm}
           {rights.issues.length > 0 ? (
             <div className="flex flex-col gap-2">
               <h3 className="font-medium">Issues</h3>
