@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
 import { resolveWorkspacePage } from '@/app/workspace-page';
+import { ContactMethodsEditor } from '@/components/people/contact-methods-editor';
+import { DeleteParty } from '@/components/people/delete-party';
 import { PartyDetails } from '@/components/people/party-details';
 import { PartyForm } from '@/components/people/party-form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -22,7 +24,8 @@ export default async function PartyPage({ params }: Props) {
   const party = await getParty(workspace.tenant, partyId);
   if (!party.ok && party.error.code === 'NOT_FOUND') notFound();
   // Edit controls follow the §6.2 roles; the services check them again on save.
-  const editable = requirePermission(workspace.tenant, { contact: ['update'] }).ok;
+  const can = (action: 'update' | 'delete') =>
+    requirePermission(workspace.tenant, { contact: [action] }).ok;
 
   return (
     <main>
@@ -32,8 +35,14 @@ export default async function PartyPage({ params }: Props) {
           <>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="mr-auto text-lg font-semibold">{party.value.displayName}</h1>
-              {editable ? (
-                <PartyForm kind={party.value.partyKind} party={party.value} label="Edit" />
+              {can('update') ? (
+                <>
+                  <PartyForm kind={party.value.partyKind} party={party.value} label="Edit" />
+                  <ContactMethodsEditor party={party.value} />
+                </>
+              ) : null}
+              {can('delete') ? (
+                <DeleteParty partyId={party.value.partyId} displayName={party.value.displayName} />
               ) : null}
             </div>
             <PartyDetails party={party.value} />
