@@ -20,6 +20,7 @@ import { PublishingEditor } from '@/components/rights/publishing-editor';
 import { RightsPanel } from '@/components/rights/rights-panel';
 import { RightsSplitEditor } from '@/components/rights/rights-split-editor';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { PageHeader } from '@/components/workspace/page-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
 import { WorkspaceShell } from '@/components/workspace/workspace-shell';
 import type { CatalogFocus, RecordingDTO } from '@/lib/dto/catalog';
@@ -199,77 +200,85 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
 
   return (
     <WorkspaceShell workspaceName={workspace.workspaceName} current="catalog">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6">
-        {song.ok ? (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="mr-auto text-lg font-semibold">
-                {composition?.title ?? song.value.recordings[0].title}
-              </h1>
-              {composition && can('update') ? (
-                <MetadataPanel key={JSON.stringify(composition)} composition={composition} />
+      {song.ok ? (
+        <>
+          <PageHeader title={composition?.title ?? song.value.recordings[0].title}>
+            {composition && can('update') ? (
+              <MetadataPanel key={JSON.stringify(composition)} composition={composition} />
+            ) : null}
+            {composition && can('delete') ? (
+              <DeleteSong compositionId={composition.id} title={composition.title} />
+            ) : null}
+          </PageHeader>
+          {/* Recordings and rights on the left; the composition and releases beside them. */}
+          <div className="grid items-start gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+            <div className="flex min-w-0 flex-col gap-4">
+              {song.value.recordings.map((recording) => (
+                <RecordingSection
+                  key={recording.id}
+                  recording={recording}
+                  readiness={readiness.get(recording.id)}
+                  media={media(recording)}
+                  editor={
+                    can('update') ? (
+                      <div key={JSON.stringify(recording)} className="flex flex-wrap gap-2">
+                        <RecordingPanel
+                          compositionId={composition?.id ?? ''}
+                          songTitle={recording.title}
+                          recording={recording}
+                        />
+                        <RecordingLinksEditor
+                          recordingId={recording.id}
+                          title={recordingTitle(recording)}
+                          links={recording.links}
+                        />
+                        {artistEditor(recording)}
+                        <RecordingTermsEditor
+                          recordingId={recording.id}
+                          title={recordingTitle(recording)}
+                          terms={recording.terms}
+                        />
+                      </div>
+                    ) : null
+                  }
+                />
+              ))}
+              {composition && can('create') ? (
+                <RecordingPanel compositionId={composition.id} songTitle={composition.title} />
               ) : null}
-              {composition && can('delete') ? (
-                <DeleteSong compositionId={composition.id} title={composition.title} />
-              ) : null}
-            </div>
-            {composition ? <CompositionSection composition={composition} /> : null}
-            {song.value.recordings.map((recording) => (
-              <RecordingSection
-                key={recording.id}
-                recording={recording}
-                readiness={readiness.get(recording.id)}
-                media={media(recording)}
-                editor={
-                  can('update') ? (
-                    <div key={JSON.stringify(recording)} className="flex flex-wrap gap-2">
-                      <RecordingPanel
-                        compositionId={composition?.id ?? ''}
-                        songTitle={recording.title}
-                        recording={recording}
-                      />
-                      <RecordingLinksEditor
-                        recordingId={recording.id}
-                        title={recordingTitle(recording)}
-                        links={recording.links}
-                      />
-                      {artistEditor(recording)}
-                      <RecordingTermsEditor
-                        recordingId={recording.id}
-                        title={recordingTitle(recording)}
-                        terms={recording.terms}
-                      />
-                    </div>
-                  ) : null
+              {fillOwnership}
+              <RightsPanel
+                rights={song.value.rights}
+                recordingTitles={
+                  new Map(song.value.recordings.map((r) => [r.id, recordingTitle(r)]))
+                }
+                writerEditor={writerEditor}
+                publishingEditor={publishingEditor}
+                masterEditors={masterEditors}
+                representable={Boolean(editable)}
+                contactsEditor={contactsEditor}
+                agreements={options.agreements}
+                agreementForm={
+                  editable && everyone?.ok ? <AgreementForm parties={parties} /> : null
                 }
               />
-            ))}
-            {composition && can('create') ? (
-              <RecordingPanel compositionId={composition.id} songTitle={composition.title} />
-            ) : null}
-            {fillOwnership}
-            <RightsPanel
-              rights={song.value.rights}
-              recordingTitles={new Map(song.value.recordings.map((r) => [r.id, recordingTitle(r)]))}
-              writerEditor={writerEditor}
-              publishingEditor={publishingEditor}
-              masterEditors={masterEditors}
-              representable={Boolean(editable)}
-              contactsEditor={contactsEditor}
-              agreements={options.agreements}
-              agreementForm={editable && everyone?.ok ? <AgreementForm parties={parties} /> : null}
-            />
-            <ReleaseSection releases={song.value.releases} recordings={song.value.recordings} />
-            {releaseForm}
-          </>
-        ) : (
-          // The other refusal is FORBIDDEN: this request's role lacks a read it needs (§6.2).
+            </div>
+            <aside className="flex min-w-0 flex-col gap-4">
+              {composition ? <CompositionSection composition={composition} /> : null}
+              <ReleaseSection releases={song.value.releases} recordings={song.value.recordings} />
+              {releaseForm}
+            </aside>
+          </div>
+        </>
+      ) : (
+        <div className="p-4">
+          {/* The other refusal is FORBIDDEN: this request's role lacks a read it needs (§6.2). */}
           <Alert>
             <AlertTitle>You do not have access to this catalog</AlertTitle>
             <AlertDescription>Ask the workspace owner for access.</AlertDescription>
           </Alert>
-        )}
-      </div>
+        </div>
+      )}
     </WorkspaceShell>
   );
 }
