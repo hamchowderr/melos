@@ -106,6 +106,21 @@ export const compositionContributors = sqliteTable('composition_contributors', {
   updatedBy: text('updated_by'),
 });
 
+export const compositionRegistrations = sqliteTable('composition_registrations', {
+  id: text('id').primaryKey(),
+  compositionId: text('composition_id').notNull(),
+  registryKind: text('registry_kind').notNull(),
+  societyCode: text('society_code'),
+  status: text('status').notNull().default('registered'),
+  workCode: text('work_code'),
+  registeredOn: text('registered_on'),
+  notes: text('notes'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  createdBy: text('created_by'),
+  updatedBy: text('updated_by'),
+});
+
 export const compositionTerms = sqliteTable(
   'composition_terms',
   {
@@ -453,6 +468,20 @@ export const recordingLinks = sqliteTable('recording_links', {
   createdBy: text('created_by'),
 });
 
+export const recordingRegistrations = sqliteTable('recording_registrations', {
+  id: text('id').primaryKey(),
+  recordingId: text('recording_id').notNull(),
+  registryKind: text('registry_kind').notNull(),
+  status: text('status').notNull().default('registered'),
+  registrationCode: text('registration_code'),
+  registeredOn: text('registered_on'),
+  notes: text('notes'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  createdBy: text('created_by'),
+  updatedBy: text('updated_by'),
+});
+
 export const recordingTerms = sqliteTable(
   'recording_terms',
   {
@@ -560,6 +589,7 @@ export const WORKSPACE_TABLES = {
   composition_assets: compositionAssets,
   composition_contributor_roles: compositionContributorRoles,
   composition_contributors: compositionContributors,
+  composition_registrations: compositionRegistrations,
   composition_terms: compositionTerms,
   compositions,
   contact_methods: contactMethods,
@@ -588,6 +618,7 @@ export const WORKSPACE_TABLES = {
   recording_assets: recordingAssets,
   recording_contributors: recordingContributors,
   recording_links: recordingLinks,
+  recording_registrations: recordingRegistrations,
   recording_terms: recordingTerms,
   recordings,
   release_assets: releaseAssets,

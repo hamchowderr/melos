@@ -98,7 +98,7 @@ describe('DAT-001: foreign-key rules are generated from the migrated workspace s
 
   it('covers every workspace table that declares a foreign key', () => {
     const tables =
-      'agreements artist_aliases asset_credits composition_alt_titles composition_assets composition_contributor_roles composition_contributors composition_terms contact_methods contact_roles contacts external_references generated_report_items generated_reports import_issues import_runs licensing_contacts master_interests message_recipients messages organizations party_identifiers party_society_affiliations people pitch_events pitch_items pitches publishing_interests recording_artists recording_assets recording_contributors recording_links recording_terms recordings release_assets release_tracks releases workspace_self_parties';
+      'agreements artist_aliases asset_credits composition_alt_titles composition_assets composition_contributor_roles composition_contributors composition_registrations composition_terms contact_methods contact_roles contacts external_references generated_report_items generated_reports import_issues import_runs licensing_contacts master_interests message_recipients messages organizations party_identifiers party_society_affiliations people pitch_events pitch_items pitches publishing_interests recording_artists recording_assets recording_contributors recording_links recording_registrations recording_terms recordings release_assets release_tracks releases workspace_self_parties';
     expect(new Set(FOREIGN_KEY_RULES.workspace.map(({ table }) => table))).toEqual(
       new Set(tables.split(' ')),
     );

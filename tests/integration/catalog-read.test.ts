@@ -158,7 +158,7 @@ describe('melos-rpr.1: CatalogService reads songs and song details (CAT-002, CAT
       composition: {
         ...{ id: keys.cmp_MIDNIGHT, title: 'Midnight Drive', altTitles: [], iswc: 'T9000000010' },
         ...{ copyrightRegistrationNumber: null, copyrightDate: null, description: null },
-        hasLyrics: false,
+        ...{ hasLyrics: false, registrations: [] },
       },
       primaryRecordingId: keys.rec_MIDNIGHT,
       recordings: [
@@ -167,7 +167,7 @@ describe('melos-rpr.1: CatalogService reads songs and song details (CAT-002, CAT
           ...{ isrc: 'USDMO2600001', durationMs: null, bpm: null, musicalKey: null },
           ...{ previewStartMs: 42000, primaryLink, links: [primaryLink] },
           ...{ artists: [{ ...JORDAN, role: 'primary', billingOrder: 0 }] },
-          ...{ contributors: [], terms: [] },
+          ...{ contributors: [], terms: [], registrations: [] },
         },
       ],
       releases: [],
