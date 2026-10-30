@@ -119,3 +119,33 @@ export type PartyMatch = {
   displayName: string;
   matchedOn: ('name' | 'email')[];
 };
+
+export const ALIAS_TYPES = ['stage_name', 'band_name', 'pseudonym', 'aka'] as const;
+export const IDENTIFIER_TYPES = ['IPI', 'ISNI', 'SOCIETY_MEMBER_ID', 'OTHER'] as const;
+
+/** One alias in a party's whole alias set (CAT-008); `id` keeps an existing alias. */
+export type ArtistAliasInput = {
+  id?: string;
+  aliasName: string;
+  aliasType?: (typeof ALIAS_TYPES)[number];
+  isPrimary?: boolean;
+};
+
+/** One identifier in a party's whole set; `artistAliasId` names one of the party's own aliases. */
+export type PartyIdentifierInput = {
+  id?: string;
+  identifierType: (typeof IDENTIFIER_TYPES)[number];
+  identifierValue: string;
+  issuingBody?: string | null;
+  artistAliasId?: string | null;
+  isPrimary?: boolean;
+};
+
+/** One society affiliation in a party's whole set; dates are YYYY-MM-DD. */
+export type SocietyAffiliationInput = {
+  id?: string;
+  societyCode: string;
+  role?: 'writer' | 'publisher' | null;
+  startsOn?: string | null;
+  endsOn?: string | null;
+};
