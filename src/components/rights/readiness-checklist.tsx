@@ -1,18 +1,112 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 import { ReadinessBadges } from '@/components/rights/readiness-badges';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { buttonVariants } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { GridFrame } from '@/components/ui/grid-frame';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import type { ReadinessReportDTO } from '@/lib/dto/rights';
+import { words } from '@/lib/words';
 
-type Props = { recordings: ReadinessReportDTO['recordings']; onlyNotReady: boolean };
+type Recording = ReadinessReportDTO['recordings'][number];
+type Props = { recordings: Recording[]; onlyNotReady: boolean };
 
 /** A recording's song page (D-12): its composition's, or its own without one. */
-const songHref = ({ compositionId, recordingId }: Props['recordings'][number]) =>
+const songHref = ({ compositionId, recordingId }: Recording) =>
   compositionId ? `/catalog/compositions/${compositionId}` : `/catalog/recordings/${recordingId}`;
+
+const countOf = (recording: Recording, severity: 'blocking' | 'warning') =>
+  recording.issues.filter((issue) => issue.severity === severity).length;
+
+/** A count as a soft chip: red for blocking issues, amber for warnings, nothing when zero. */
+function CountChip({ count, severity }: { count: number; severity: 'blocking' | 'warning' }) {
+  if (count === 0) return <span className="text-muted-foreground">—</span>;
+  return (
+    <Badge
+      variant="secondary"
+      className={
+        severity === 'blocking'
+          ? 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300'
+          : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+      }
+    >
+      {count} {severity === 'blocking' ? 'blocking' : count === 1 ? 'warning' : 'warnings'}
+    </Badge>
+  );
+}
+
+/** An issue code as words, keeping identifier acronyms upper case. */
+function issueLabel(code: string) {
+  return words(code.toLowerCase()).replace(/\b(isrc|iswc|ipi|isni)\b/gi, (m) => m.toUpperCase());
+}
+
+/** One recording's issues in the side panel: each as words with its detail, and its code. */
+function IssuesPanel({ recording, onClose }: { recording: Recording | null; onClose: () => void }) {
+  return (
+    <Sheet open={recording !== null} onOpenChange={(open) => (open ? null : onClose())}>
+      <SheetContent>
+        {recording ? (
+          <>
+            <SheetHeader>
+              <SheetTitle>{recording.title}</SheetTitle>
+              <SheetDescription render={<div />}>
+                <ReadinessBadges {...recording} />
+              </SheetDescription>
+            </SheetHeader>
+            <ul aria-label={`${recording.title} issues`} className="flex flex-col gap-2 px-4">
+              {recording.issues.map((issue) => (
+                <li key={issue.code} className="rounded-lg bg-muted/50 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className={
+                        issue.severity === 'blocking'
+                          ? 'size-2 rounded-full bg-red-500'
+                          : 'size-2 rounded-full bg-amber-500'
+                      }
+                    />
+                    <span className="font-medium">{issueLabel(issue.code)}</span>
+                  </div>
+                  <p className="mt-0.5 text-muted-foreground">{issue.detail}</p>
+                  <p className="mt-1 font-mono text-[0.65rem] text-muted-foreground/70">
+                    {issue.code}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <SheetFooter>
+              <Link href={songHref(recording)} className={buttonVariants()}>
+                Open song
+              </Link>
+            </SheetFooter>
+          </>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 /** Blocking issues and warnings per recording (§2.3 ReadinessChecklist, §6.5), by title. */
 export function ReadinessChecklist({ recordings, onlyNotReady }: Props) {
+  const [open, setOpen] = useState<Recording | null>(null);
   if (recordings.length === 0) {
     return (
       <Empty className="border">
@@ -29,37 +123,54 @@ export function ReadinessChecklist({ recordings, onlyNotReady }: Props) {
   }
 
   return (
-    <ul aria-label="Recordings" className="flex flex-col gap-3">
-      {recordings.map((recording) => (
-        <li key={recording.recordingId}>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>
+    <>
+      <GridFrame className="overflow-x-auto">
+        <Table aria-label="Recordings">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Recording</TableHead>
+              <TableHead>Readiness</TableHead>
+              <TableHead>Blocking</TableHead>
+              <TableHead>Warnings</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {recordings.map((recording) => (
+              <TableRow
+                key={recording.recordingId}
+                className="cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none"
+                // A click anywhere but the title link, or Enter on the row, opens its issues.
+                tabIndex={0}
+                aria-label={`${recording.title} readiness`}
+                onClick={(event) => {
+                  if (!(event.target as HTMLElement).closest('a,button')) setOpen(recording);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && event.target === event.currentTarget) {
+                    setOpen(recording);
+                  }
+                }}
+              >
+                <TableCell className="whitespace-normal font-medium">
                   <Link href={songHref(recording)} className="underline-offset-4 hover:underline">
                     {recording.title}
                   </Link>
-                </h2>
-              </CardTitle>
-              <ReadinessBadges {...recording} />
-            </CardHeader>
-            {recording.issues.length > 0 ? (
-              <CardContent>
-                <ul aria-label={`${recording.title} issues`} className="flex flex-col gap-1">
-                  {recording.issues.map((issue) => (
-                    <li key={issue.code} className="flex flex-wrap items-center gap-2">
-                      <Badge variant={issue.severity === 'blocking' ? 'destructive' : 'outline'}>
-                        {issue.code}
-                      </Badge>
-                      <span className="text-muted-foreground">{issue.detail}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            ) : null}
-          </Card>
-        </li>
-      ))}
-    </ul>
+                </TableCell>
+                <TableCell>
+                  <ReadinessBadges {...recording} />
+                </TableCell>
+                <TableCell>
+                  <CountChip count={countOf(recording, 'blocking')} severity="blocking" />
+                </TableCell>
+                <TableCell>
+                  <CountChip count={countOf(recording, 'warning')} severity="warning" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </GridFrame>
+      <IssuesPanel recording={open} onClose={() => setOpen(null)} />
+    </>
   );
 }
