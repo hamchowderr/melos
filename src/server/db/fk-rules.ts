@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/libsql';
 import { migrate } from 'drizzle-orm/libsql/migrator';
 import {
   applyWorkspaceMigrations,
+  RUNTIME_MIGRATIONS,
   readWorkspaceMigrations,
   WORKSPACE_MIGRATIONS,
 } from './workspace-migrations.ts';
@@ -34,8 +35,8 @@ export interface ForeignKeyRule {
   onUpdate: ForeignKeyAction;
 }
 
-/** Rules per database. Phase 5 adds `runtime` (CONTRACT §4.4). */
-export type ForeignKeyDatabase = 'control' | 'workspace';
+/** Rules per database (CONTRACT §4.4): `runtime` is melos-agent-runtime's runner tables. */
+export type ForeignKeyDatabase = 'control' | 'workspace' | 'runtime';
 export type ForeignKeyRules = Readonly<Record<ForeignKeyDatabase, readonly ForeignKeyRule[]>>;
 
 /** Generated code interpolates these names into SQL and TypeScript, so anything else fails. */
@@ -135,16 +136,18 @@ export async function readMigrated<T>(
 export const migrateWorkspace = (folder: string) => (client: Client) =>
   applyWorkspaceMigrations(client, { migrations: readWorkspaceMigrations(folder) });
 
-/** Migrates each schema into its own in-memory database and renders the rules of both. */
+/** Migrates each schema into its own in-memory database and renders the rules of all three. */
 export async function generateForeignKeyRules(
   controlMigrations = CONTROL_MIGRATIONS,
   workspaceMigrations = WORKSPACE_MIGRATIONS,
+  runtimeMigrations = RUNTIME_MIGRATIONS,
 ): Promise<string> {
   const migrateControl = (client: Client) =>
     migrate(drizzle(client), { migrationsFolder: controlMigrations });
   return renderForeignKeyRules({
     control: await readMigrated(migrateControl, readForeignKeyRules),
     workspace: await readMigrated(migrateWorkspace(workspaceMigrations), readForeignKeyRules),
+    runtime: await readMigrated(migrateWorkspace(runtimeMigrations), readForeignKeyRules),
   });
 }
 

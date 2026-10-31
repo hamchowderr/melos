@@ -1,0 +1,32 @@
+-- melos-agent-runtime version 1: MelosAgentRunner state (docs/CONTRACT.md §4.1, §7.9). A thread id
+-- has exactly one owner. Mastra creates its own storage tables in the same database.
+CREATE TABLE agent_threads (
+  thread_id          TEXT PRIMARY KEY,
+  resource_id        TEXT NOT NULL,      -- <workspaceId>:<userId>
+  workspace_id       TEXT NOT NULL,
+  agent_id           TEXT NOT NULL,
+  active_run_id      TEXT,
+  run_instance_id    TEXT,
+  run_heartbeat_at   TEXT,
+  stop_requested_at  TEXT,
+  next_run_seq       INTEGER NOT NULL DEFAULT 1,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL,
+  CHECK ((active_run_id IS NULL) = (run_instance_id IS NULL))
+);
+--> statement-breakpoint
+CREATE INDEX idx_agent_threads_resource ON agent_threads(resource_id, updated_at DESC);
+--> statement-breakpoint
+CREATE INDEX idx_agent_threads_workspace ON agent_threads(workspace_id);
+--> statement-breakpoint
+CREATE TABLE agent_thread_runs (
+  thread_id      TEXT NOT NULL REFERENCES agent_threads(thread_id) ON DELETE CASCADE,
+  run_id         TEXT NOT NULL,
+  seq            INTEGER NOT NULL,
+  parent_run_id  TEXT,
+  status         TEXT NOT NULL CHECK (status IN ('finished','interrupted','error','stopped')),
+  events_json    TEXT NOT NULL,          -- compacted AG-UI events of the run
+  created_at     TEXT NOT NULL,
+  PRIMARY KEY (thread_id, run_id),
+  UNIQUE (thread_id, seq)
+);

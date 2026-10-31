@@ -307,3 +307,6 @@ export const controlIntegrityGuard = createIntegrityGuard(FOREIGN_KEY_RULES.cont
 
 /** IntegrityGuard for workspace writes through the generated workspace tables (DAT-001). */
 export const workspaceIntegrityGuard = createIntegrityGuard(FOREIGN_KEY_RULES.workspace);
+
+/** The guard for melos-agent-runtime's runner tables (MelosAgentRunner, §7.9). */
+export const runtimeIntegrityGuard = createIntegrityGuard(FOREIGN_KEY_RULES.runtime);

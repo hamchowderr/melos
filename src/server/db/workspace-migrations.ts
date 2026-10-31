@@ -5,6 +5,8 @@ import { EMBEDDED_WORKSPACE_MIGRATIONS } from './workspace-migrations.generated.
 
 /** The SQL folder, relative to the repository root. Deployed functions do not include it. */
 export const WORKSPACE_MIGRATIONS = './src/server/db/migrations/workspace';
+/** The melos-agent-runtime runner tables (§4.1), numbered and applied the same way. */
+export const RUNTIME_MIGRATIONS = './src/server/db/migrations/runtime';
 
 /** `NNNN_<name>.sql`: a four-digit version and a lowercase snake_case name. */
 const FILE_NAME = /^(\d{4})_([a-z0-9]+(?:_[a-z0-9]+)*)\.sql$/;
