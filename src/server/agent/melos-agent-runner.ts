@@ -8,13 +8,26 @@ import {
   finalizeRunEvents,
 } from '@copilotkit/runtime/v2';
 import { and, asc, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import { after } from 'next/server';
 import { type Observable, ReplaySubject } from 'rxjs';
+import { RUN_PENDING_EVENT } from '../../lib/agent/contract';
 import { getRuntimeDatabase, type RuntimeDatabase } from '../db/runtime-database';
 import { type AgentRunStatus, agentThreadRuns, agentThreads } from '../db/schema/runtime';
 import { runtimeIntegrityGuard } from '../services/integrity-guard';
 
 /** A heartbeat older than this marks a run dead, so another request may take the thread (P-32). */
 export const RUN_STALE_MS = 30_000;
+
+/**
+ * How often a running instance checks its row for a stop or a lost thread, and refreshes its
+ * heartbeat (§7.9). `connectBudgetMs` keeps a cross-instance connect under the route's 300 s
+ * maxDuration: past it, connect emits `melos.run_pending` and the chat connects again (P-41).
+ */
+export const RUNNER_TIMING = { pollMs: 1_000, heartbeatMs: 10_000, connectBudgetMs: 280_000 };
+export type RunnerTiming = typeof RUNNER_TIMING;
+export { RUN_PENDING_EVENT };
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** This server instance, recorded on the runs it takes (`run_instance_id`, §7.9). */
 const INSTANCE_ID = crypto.randomUUID();
@@ -59,6 +72,7 @@ export class MelosAgentRunner extends AgentRunner {
   constructor(
     private readonly tenant: RunnerTenant,
     private readonly database: () => Promise<RuntimeDatabase> = getRuntimeDatabase,
+    private readonly timing: RunnerTiming = RUNNER_TIMING,
   ) {
     super();
   }
@@ -158,7 +172,13 @@ export class MelosAgentRunner extends AgentRunner {
     const events = new ReplaySubject<BaseEvent>(Infinity);
     const key = this.key(threadId);
     const runId = input.runId;
-    const live: LiveRun = { runId, events, abort: () => agent.abortRun(), stopRequested: false };
+    let aborted = false;
+    const abort = () => {
+      if (aborted) return;
+      aborted = true;
+      agent.abortRun();
+    };
+    const live: LiveRun = { runId, events, abort, stopRequested: false };
     const produced: BaseEvent[] = [];
     const emit = (event: BaseEvent) => {
       produced.push(event);
@@ -172,12 +192,35 @@ export class MelosAgentRunner extends AgentRunner {
       const runs = await this.history(db, threadId);
       const parentRunId = runs.at(-1)?.runId ?? null;
       liveRuns.set(key, live);
+      const mine = and(eq(agentThreads.threadId, threadId), eq(agentThreads.activeRunId, runId));
+      // A zero-row heartbeat, or a row naming another run, means the thread was lost: abort and
+      // write nothing more (P-32). A stop from another instance arrives as stop_requested_at.
+      const heartbeat = setInterval(() => {
+        db.update(agentThreads)
+          .set({ runHeartbeatAt: iso() })
+          .where(mine)
+          .then((result) => result.rowsAffected === 0 && abort())
+          .catch(() => {});
+      }, this.timing.heartbeatMs);
+      const watch = setInterval(() => {
+        db.select({ stopAt: agentThreads.stopRequestedAt })
+          .from(agentThreads)
+          .where(mine)
+          .then(([row]) => {
+            if (row?.stopAt) live.stopRequested = true;
+            if (!row || row.stopAt) abort();
+          })
+          .catch(() => {});
+      }, this.timing.pollMs);
       let failure: string | undefined;
       try {
         await agent.runAgent(input, { onEvent: ({ event }) => emit(event) });
       } catch (error) {
         // As the in-memory runner does: the chat classifies the provider's text (run-error.ts).
         failure = error instanceof Error ? error.message : String(error);
+      } finally {
+        clearInterval(heartbeat);
+        clearInterval(watch);
       }
       const options = { stopRequested: live.stopRequested };
       const tail = finalizeRunEvents(
@@ -193,10 +236,16 @@ export class MelosAgentRunner extends AgentRunner {
       }
     };
 
-    execute().then(
+    const done = execute().then(
       () => events.complete(),
       (error: unknown) => events.error(error),
     );
+    // The run outlives a client disconnect: keep the invocation alive until it is stored (U-30).
+    try {
+      after(done);
+    } catch {
+      // Outside a Next.js request (tests, scripts) there is no invocation to extend.
+    }
     return events.asObservable();
   }
 
@@ -213,7 +262,7 @@ export class MelosAgentRunner extends AgentRunner {
         out.next(event);
       }
       const live = liveRuns.get(this.key(threadId));
-      if (!live) return out.complete();
+      if (!live) return this.awaitRemoteRun(db, threadId, emitted, out);
       live.events.subscribe({
         next: (event) => {
           const messageId = messageIdOf(event);
@@ -226,6 +275,51 @@ export class MelosAgentRunner extends AgentRunner {
     };
     replay().catch((error: unknown) => out.error(error));
     return out.asObservable();
+  }
+
+  /**
+   * A run active on another instance: poll for its stored row once per `pollMs` and emit it, or
+   * complete once its heartbeat goes stale. Near the route's maxDuration, emit `melos.run_pending`
+   * so the chat connects again (§7.9 live tail, P-41, U-23).
+   */
+  private async awaitRemoteRun(
+    db: RuntimeDatabase,
+    threadId: string,
+    emitted: Set<string>,
+    out: ReplaySubject<BaseEvent>,
+  ) {
+    const deadline = Date.now() + this.timing.connectBudgetMs;
+    const active = () =>
+      db
+        .select({ runId: agentThreads.activeRunId, heartbeat: agentThreads.runHeartbeatAt })
+        .from(agentThreads)
+        .where(this.owned(threadId));
+    const [first] = await active();
+    const runId = first?.runId;
+    const alive = (heartbeat: string | null | undefined) =>
+      heartbeat != null && heartbeat >= iso(Date.now() - RUN_STALE_MS);
+    if (!runId || !alive(first.heartbeat)) return out.complete();
+    for (;;) {
+      if (Date.now() + this.timing.pollMs > deadline) {
+        const value = { threadId, runId };
+        out.next({ type: EventType.CUSTOM, name: RUN_PENDING_EVENT, value } as BaseEvent);
+        return out.complete();
+      }
+      await sleep(this.timing.pollMs);
+      const [run] = await db
+        .select({ eventsJson: agentThreadRuns.eventsJson })
+        .from(agentThreadRuns)
+        .where(and(eq(agentThreadRuns.threadId, threadId), eq(agentThreadRuns.runId, runId)));
+      if (run) {
+        for (const event of JSON.parse(run.eventsJson) as BaseEvent[]) {
+          const messageId = messageIdOf(event);
+          if (!messageId || !emitted.has(messageId)) out.next(event);
+        }
+        return out.complete();
+      }
+      const [now] = await active();
+      if (now?.runId !== runId || !alive(now.heartbeat)) return out.complete();
+    }
   }
 
   async isRunning({ threadId }: AgentRunnerIsRunningRequest): Promise<boolean> {
@@ -245,9 +339,23 @@ export class MelosAgentRunner extends AgentRunner {
       .where(this.owned(threadId));
     if (!row?.activeRunId || (runId !== undefined && runId !== row.activeRunId)) return false;
     const live = liveRuns.get(this.key(threadId));
-    if (!live || live.runId !== row.activeRunId || live.stopRequested) return false;
-    live.stopRequested = true;
-    live.abort();
-    return true;
+    if (live?.runId === row.activeRunId) {
+      if (live.stopRequested) return false;
+      live.stopRequested = true;
+      live.abort();
+      return true;
+    }
+    // Running on another instance: it sees stop_requested_at within pollMs and aborts (U-24).
+    const requested = await db
+      .update(agentThreads)
+      .set({ stopRequestedAt: iso() })
+      .where(
+        and(
+          this.owned(threadId),
+          eq(agentThreads.activeRunId, row.activeRunId),
+          isNull(agentThreads.stopRequestedAt),
+        ),
+      );
+    return requested.rowsAffected > 0;
   }
 }

@@ -9,13 +9,14 @@ import {
   useRenderTool,
 } from '@copilotkit/react-core/v2';
 import '@copilotkit/react-core/v2/styles.css';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatRunErrorNotice } from '@/components/chat/chat-run-error';
 import { PingCard } from '@/components/chat/ping-card';
 import {
   PING_TOOL_NAME,
   pingInputSchema,
   pingResultSchema,
+  RUN_PENDING_EVENT,
   WORKSPACE_AGENT_ID,
 } from '@/lib/agent/contract';
 import { type ChatRunError, isChatRunErrorCode, toChatRunError } from '@/lib/agent/run-error';
@@ -70,6 +71,31 @@ function useChatRunError(agentId: string) {
   return { runError, onError, retry };
 }
 
+// A run still going on another server instance ends connect with melos.run_pending; connect
+// again after 2 seconds, at most 5 times in a row (docs/CONTRACT.md §7.9, P-41).
+function useRunPendingReconnect(agentId: string) {
+  const { agent } = useAgent({ agentId });
+  const { copilotkit } = useCopilotKit();
+  const attempts = useRef(0);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const subscription = agent.subscribe({
+      onCustomEvent: ({ event }) => {
+        if (event.name !== RUN_PENDING_EVENT || attempts.current >= 5) return;
+        attempts.current += 1;
+        timer = setTimeout(() => void copilotkit.connectAgent({ agent }), 2000);
+      },
+      onRunFinishedEvent: () => {
+        attempts.current = 0;
+      },
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.unsubscribe();
+    };
+  }, [agent, copilotkit]);
+}
+
 function parsePingResult(result: string) {
   try {
     const parsed = pingResultSchema.safeParse(JSON.parse(result));
@@ -81,6 +107,7 @@ function parsePingResult(result: string) {
 
 function ReadyChat() {
   const { runError, onError, retry } = useChatRunError(WORKSPACE_AGENT_ID);
+  useRunPendingReconnect(WORKSPACE_AGENT_ID);
 
   return (
     <CopilotChat
