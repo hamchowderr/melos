@@ -2,6 +2,7 @@ import { MastraAgent } from '@ag-ui/mastra';
 import { CopilotRuntime, createCopilotRuntimeHandler } from '@copilotkit/runtime/v2';
 import { mastra } from '@/mastra';
 import { createAgentRequestContext, memoryResourceId } from '@/mastra/request-context';
+import { MelosAgentRunner } from '@/server/agent/melos-agent-runner';
 import { allowServedRoutesOnly } from '@/server/agent/route-guard';
 import { tenantContextResolver } from '@/server/services/tenant-context';
 
@@ -24,12 +25,15 @@ async function handle(request: Request): Promise<Response> {
     return Response.json({ error: tenant.status }, { status });
   }
 
+  const resourceId = memoryResourceId(tenant.context);
   const runtime = new CopilotRuntime({
     agents: MastraAgent.getLocalAgents({
       mastra,
-      resourceId: memoryResourceId(tenant.context),
+      resourceId,
       requestContext: createAgentRequestContext(tenant.context),
     }),
+    // Thread ownership and persisted history (§7.9, TEN-009, TEN-010), never the in-memory runner.
+    runner: new MelosAgentRunner({ resourceId, workspaceId: tenant.context.workspaceId }),
   });
   const handler = createCopilotRuntimeHandler({
     runtime,
