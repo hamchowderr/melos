@@ -81,10 +81,15 @@ export async function activeOrganizationId(page: Page): Promise<string> {
   return session.activeOrganizationId;
 }
 
-/** Runs one statement on the server's control database (MELOS_CONTROL_DATABASE_URL in playwright.config.ts). */
+/**
+ * Runs one statement on the server's control database (MELOS_CONTROL_DATABASE_URL in
+ * playwright.config.ts). The dev server writes to the same file, so the statement waits up to five
+ * seconds for its lock instead of failing with SQLITE_BUSY (melos-af5).
+ */
 async function controlQuery(sql: string, args: string[]) {
   const client = createClient({ url: 'file:./data/e2e-control.db' });
   try {
+    await client.execute('PRAGMA busy_timeout = 5000');
     return (await client.execute({ sql, args })).rows;
   } finally {
     client.close();

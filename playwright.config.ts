@@ -33,7 +33,7 @@ export default defineConfig({
       // Builds with the same keyless env it runs with. Never run this while `next dev` is up.
       // Read specs use the seeded Northstar catalog (D-9); --replace deletes the seed a previous
       // run left, so every run starts from the fixture.
-      command: `npm run db:migrate && npx tsx scripts/seed-demo.ts --replace && npm run build && npx next start -p ${PORT}`,
+      command: `npm run db:migrate && npx tsx tests/e2e/enable-wal.ts && npx tsx scripts/seed-demo.ts --replace && npm run build && npx next start -p ${PORT}`,
       port: PORT,
       reuseExistingServer: false,
       timeout: 600_000,
