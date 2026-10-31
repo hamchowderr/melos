@@ -39,6 +39,6 @@ describe('agent request context', () => {
   });
 
   it('scopes memory to the workspace and the user', () => {
-    expect(memoryResourceId(tenant)).toBe('org_1:user_1');
+    expect(memoryResourceId(tenant)).toBe('ws_1:user_1');
   });
 });
