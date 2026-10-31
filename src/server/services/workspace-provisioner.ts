@@ -1,6 +1,7 @@
 import type { Client } from '@libsql/client';
 import { and, eq, getTableColumns, isNull, type SQL } from 'drizzle-orm';
 import { ulid } from 'ulid';
+import { deleteWorkspaceAgentMemory } from '../agent/agent-memory';
 import { controlDb } from '../db/client';
 import { controlAuditLog, workspaceRegistry } from '../db/schema/control';
 import { createWorkspaceHost, openWorkspaceDatabase } from '../db/workspace-hosts';
@@ -244,6 +245,9 @@ export async function deleteWorkspaceDatabase(
     if (!row) throw claimHeld();
     // A `deleting` row opens no new client; the cached one closes before its database goes.
     await closeWorkspaceDatabase(existing.id);
+    // Mastra threads, working memory and runner threads of the workspace (§7.3, phase 5).
+    step = 'delete_agent_memory';
+    await deleteWorkspaceAgentMemory(existing.id);
     if (host.kind === 'unconfigured') return row;
     step = 'delete_database';
     try {
