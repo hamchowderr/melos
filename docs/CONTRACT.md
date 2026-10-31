@@ -2427,7 +2427,7 @@ Owner decisions 2026-10-30 place CAT-010 to CAT-012, RGT-009 and RGT-010 in epic
 | U-17 | How the Airtable API represents percent fields (fraction or whole number) | Phase 10 |
 | U-18, U-19 | Unassigned | — |
 | U-20 | Field labels and layout Disco expects in track info or comments | Phase 9, before RPT-004 work |
-| U-21 | Whether tool `requestContextSchema` type-checks with the pinned `@ag-ui/mastra` `RequestContext<unknown>` | Phase 5 |
+| U-21 | Closed: a tool with `requestContextSchema` (zod 4 object) in an agent passed to `MastraAgent.getLocalAgents` type-checks with the pinned `@mastra/core` 1.66.0 and `@ag-ui/mastra` 1.1.3 (`tsc`, 2026-10-31, melos-jcf.5). Tools still read through `readTenantContext`, which also checks `workspaceRole` and returns `NO_TENANT` before any service call (§3.1). | — |
 | U-22 | Whether Mastra memory rejects a thread owned by another resource on the embedded path | Phase 5 |
 | U-23 | The CopilotKit client exposes the custom `melos.run_pending` event to the app, and a run finishing on another instance is replayed to a waiting `connect` | Phase 5, preview deploy |
 | U-24 | Cross-instance stop through `stop_requested_at` aborts the run within the polling interval | Phase 5, preview deploy |
