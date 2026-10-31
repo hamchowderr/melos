@@ -680,4 +680,14 @@ export const FOREIGN_KEY_RULES: ForeignKeyRules = {
       onUpdate: 'NO ACTION',
     },
   ],
+  runtime: [
+    {
+      table: 'agent_thread_runs',
+      columns: ['thread_id'],
+      parentTable: 'agent_threads',
+      parentColumns: ['thread_id'],
+      onDelete: 'CASCADE',
+      onUpdate: 'NO ACTION',
+    },
+  ],
 };
