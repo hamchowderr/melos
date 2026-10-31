@@ -1,12 +1,11 @@
-import { AbstractAgent, type BaseEvent, EventType, type RunAgentInput } from '@ag-ui/client';
 import { createClient } from '@libsql/client';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/libsql';
-import { firstValueFrom, Observable, toArray } from 'rxjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MelosAgentRunner } from '../../src/server/agent/melos-agent-runner';
 import { migrateRuntimeDatabase, type RuntimeDatabase } from '../../src/server/db/runtime-database';
 import * as runtimeSchema from '../../src/server/db/schema/runtime';
+import { all, FakeAgent, input, text } from './runner-support';
 
 const { agentThreadRuns, agentThreads } = runtimeSchema;
 const client = createClient({ url: ':memory:' });
@@ -18,65 +17,12 @@ beforeAll(async () => {
 });
 afterAll(() => client.close());
 
-/** An agent that says `text`, or waits until aborted when `hold` is set. */
-class FakeAgent extends AbstractAgent {
-  private release?: () => void;
-  constructor(
-    private readonly text: string,
-    private readonly hold = false,
-  ) {
-    super({ agentId: 'melos' });
-  }
-  run(input: RunAgentInput): Observable<BaseEvent> {
-    return new Observable<BaseEvent>((subscriber) => {
-      const { threadId, runId } = input;
-      subscriber.next({ type: EventType.RUN_STARTED, threadId, runId } as BaseEvent);
-      const messageId = `msg-${runId}`;
-      subscriber.next({
-        type: EventType.TEXT_MESSAGE_START,
-        messageId,
-        role: 'assistant',
-      } as BaseEvent);
-      subscriber.next({
-        type: EventType.TEXT_MESSAGE_CONTENT,
-        messageId,
-        delta: this.text,
-      } as BaseEvent);
-      subscriber.next({ type: EventType.TEXT_MESSAGE_END, messageId } as BaseEvent);
-      const end = () => {
-        subscriber.next({ type: EventType.RUN_FINISHED, threadId, runId } as BaseEvent);
-        subscriber.complete();
-      };
-      if (this.hold) this.release = end;
-      else end();
-    });
-  }
-  override abortRun() {
-    this.release?.();
-  }
-}
-
 const A = { resourceId: 'ws_a:user_1', workspaceId: 'ws_a' };
 const B = { resourceId: 'ws_b:user_1', workspaceId: 'ws_b' };
 const A2 = { resourceId: 'ws_a:user_2', workspaceId: 'ws_a' };
 const runner = (tenant: typeof A) => new MelosAgentRunner(tenant, async () => db);
-const input = (threadId: string, runId: string) =>
-  ({
-    threadId,
-    runId,
-    messages: [],
-    tools: [],
-    context: [],
-    state: {},
-    forwardedProps: {},
-  }) as RunAgentInput;
 const start = (tenant: typeof A, threadId: string, runId: string, agent = new FakeAgent('hi')) =>
   runner(tenant).run({ threadId, agent, input: input(threadId, runId) });
-const all = (events: Observable<BaseEvent>) => firstValueFrom(events.pipe(toArray()));
-const text = (events: BaseEvent[]) =>
-  events.flatMap((event) =>
-    'delta' in event && typeof event.delta === 'string' ? [event.delta] : [],
-  );
 const thread = async (threadId: string) =>
   (await db.select().from(agentThreads).where(eq(agentThreads.threadId, threadId)))[0];
 
