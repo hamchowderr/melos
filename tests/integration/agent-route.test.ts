@@ -26,6 +26,7 @@ describe('agent route: session -> tenant context -> Mastra tool (AIMock model)',
   const client = new TestClient();
   let userId = '';
   let workspaceId = '';
+  let workspaceDbId = '';
 
   it('rejects callers without a session', async () => {
     const response = await new TestClient().call(copilotRoute.GET, 'GET', '/api/copilotkit/info');
@@ -78,7 +79,9 @@ describe('agent route: session -> tenant context -> Mastra tool (AIMock model)',
     expect(events.find((event) => event.type === 'TOOL_CALL_START')?.toolCallName).toBe('ping');
 
     const toolResult = events.find((event) => event.type === 'TOOL_CALL_RESULT');
-    expect(JSON.parse(toolResult?.content ?? '{}')).toEqual({
+    const ping = JSON.parse(toolResult?.content ?? '{}') as { workspaceId: string };
+    workspaceDbId = ping.workspaceId;
+    expect(ping).toEqual({
       status: 'ok',
       organizationId: workspaceId,
       workspaceId: expect.stringMatching(/^ws_[0-9A-HJKMNP-TV-Z]{26}$/),
@@ -117,16 +120,59 @@ describe('agent route: session -> tenant context -> Mastra tool (AIMock model)',
     );
   });
 
-  it('stores memory under <organizationId>:<userId>', async () => {
+  it('stores memory under <workspaceId>:<userId> (TEN-007)', async () => {
     const memory = await mastra.getAgent('melos').getMemory();
     expect(memory).toBeDefined();
 
     const scoped = await memory?.listThreads({
-      filter: { resourceId: `${workspaceId}:${userId}` },
+      filter: { resourceId: `${workspaceDbId}:${userId}` },
     });
     expect(scoped?.threads.length).toBeGreaterThan(0);
 
-    const unscoped = await memory?.listThreads({ filter: { resourceId: userId } });
-    expect(unscoped?.threads).toHaveLength(0);
+    for (const resourceId of [userId, `${workspaceId}:${userId}`]) {
+      const other = await memory?.listThreads({ filter: { resourceId } });
+      expect(other?.threads).toHaveLength(0);
+    }
+  });
+
+  it('answers 404 for agent/suggest and runs nothing (TEN-012)', async () => {
+    const threadId = `thread-suggest-${stamp}`;
+    const before = mock.getRequests().length;
+    const response = await client.call(
+      copilotRoute.POST,
+      'POST',
+      '/api/copilotkit/agent/melos/suggest',
+      {
+        threadId,
+        runId: `run-suggest-${stamp}`,
+        messages: [{ id: 'msg-s', role: 'user', content: 'ping' }],
+        tools: [],
+        context: [],
+        state: {},
+        forwardedProps: {},
+      },
+    );
+    expect(response.status).toBe(404);
+    expect(mock.getRequests().length).toBe(before);
+    const memory = await mastra.getAgent('melos').getMemory();
+    expect(await memory?.getThreadById({ threadId })).toBeNull();
+  });
+
+  it('answers 404 for thread, memory and inspector routes (TEN-012)', async () => {
+    const paths: [string, string][] = [
+      ['GET', '/api/copilotkit/threads'],
+      ['GET', `/api/copilotkit/threads/thread-${stamp}/messages`],
+      ['GET', `/api/copilotkit/threads/thread-${stamp}/events`],
+      ['POST', '/api/copilotkit/threads/clear'],
+      ['GET', '/api/copilotkit/memories'],
+      ['GET', '/api/copilotkit/inspector-metadata'],
+      ['POST', '/api/copilotkit/transcribe'],
+      ['GET', '/api/copilotkit/cpk-debug-events'],
+    ];
+    for (const [method, path] of paths) {
+      const handler = method === 'GET' ? copilotRoute.GET : copilotRoute.POST;
+      const response = await client.call(handler, method, path, method === 'POST' ? {} : undefined);
+      expect([path, response.status]).toEqual([path, 404]);
+    }
   });
 });

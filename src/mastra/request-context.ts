@@ -43,7 +43,10 @@ export function readTenantContext(requestContext: ContextReader | undefined): Te
   return parsed.data;
 }
 
-/** Memory is scoped per workspace and user: `<organizationId>:<userId>` until TEN-007. */
+/**
+ * Memory is scoped per workspace and user: `<workspaceId>:<userId>` (§7.3, TEN-007). The route
+ * always passes it, because @ag-ui/mastra falls back to the thread id as the resource.
+ */
 export function memoryResourceId(tenant: TenantContext): string {
-  return `${tenant.organizationId}:${tenant.userId}`;
+  return `${tenant.workspaceId}:${tenant.userId}`;
 }
