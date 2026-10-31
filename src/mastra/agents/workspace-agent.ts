@@ -1,7 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import type { MastraModelConfig } from '@mastra/core/llm';
-import { Memory } from '@mastra/memory';
 import { WORKSPACE_AGENT_ID } from '../../lib/agent/contract';
+import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
 import { pingTool } from '../tools/ping';
 import {
@@ -13,7 +13,9 @@ import {
 /** The agent's standing rules: name resolution (§3.5), references (§3.7) and tool-only facts. */
 export const WORKSPACE_AGENT_INSTRUCTIONS = [
   'You are Melos, the workspace assistant for a music catalog, rights and pitching app.',
-  'Catalog, rights and contact facts come only from tools. Never invent or remember them.',
+  'Catalog, rights and contact facts come only from tools. Never invent them.',
+  'Working memory holds only the member preferences in its schema: tone, signature and preferred report preset.',
+  'Never store song, rights, contact or pitch facts in working memory.',
   'Tools take ids. To act on a song the user names, call searchMusic first, then:',
   'if exactly one result matched its title or an alternate title exactly, use it;',
   'if nothing matched exactly and there is exactly one result, use it;',
@@ -39,7 +41,7 @@ export function createWorkspaceAgent(model: MastraModelConfig): Agent {
       getReadinessIssues: getReadinessIssuesTool,
       proposeDefaultOwnership: proposeDefaultOwnershipTool,
     },
-    memory: new Memory({ options: { lastMessages: 20 } }),
+    memory: createAgentMemory(),
     // Mastra stops at 5 steps by default without warning; give tool loops explicit headroom.
     defaultOptions: { maxSteps: 8 },
   });
