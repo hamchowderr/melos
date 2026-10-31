@@ -114,7 +114,7 @@ export class TestClient {
   }
 }
 
-type AgUiEvent = { type: string; content?: string; toolCallName?: string; message?: string };
+export type AgUiEvent = { type: string; content?: string; toolCallName?: string; message?: string };
 
 /** Parses the AG-UI server-sent event stream returned by the CopilotKit runtime. */
 export async function readAgUiEvents(response: Response): Promise<AgUiEvent[]> {

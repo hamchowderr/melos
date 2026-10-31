@@ -1,0 +1,55 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "show me midnight drive", "hasToolResult": false },
+      "response": {
+        "toolCalls": [
+          { "name": "searchMusic", "arguments": "{\"query\":\"Midnight Drive\",\"limit\":10}" }
+        ]
+      }
+    },
+    {
+      "match": { "userMessage": "show me midnight drive", "toolResultContains": "\"matchType\"" },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "getMusicWorkspace",
+            "arguments": "{\"entityType\":\"composition\",\"entityId\":\"cmp_01KZ6VFGM03FXFCHY5DDZY6BQT\"}"
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "userMessage": "show me midnight drive",
+        "toolResultContains": "\"pitchCountsByStatus\""
+      },
+      "response": { "content": "Here is Midnight Drive." }
+    },
+    {
+      "match": { "userMessage": "who wrote this", "hasToolResult": false },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "getRightsSummary",
+            "arguments": "{\"entityType\":\"composition\",\"entityId\":\"cmp_01KZ6VFGM03FXFCHY5DDZY6BQT\"}"
+          }
+        ]
+      }
+    },
+    {
+      "match": { "userMessage": "who wrote this", "hasToolResult": true },
+      "response": { "content": "Here are the writers of Midnight Drive." }
+    },
+    {
+      "match": { "userMessage": "not ready for sync", "hasToolResult": false },
+      "response": {
+        "toolCalls": [{ "name": "getReadinessIssues", "arguments": "{\"onlyNotReady\":true}" }]
+      }
+    },
+    {
+      "match": { "userMessage": "not ready for sync", "hasToolResult": true },
+      "response": { "content": "These recordings are not ready for sync." }
+    }
+  ]
+}
