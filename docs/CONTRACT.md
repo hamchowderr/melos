@@ -2101,7 +2101,7 @@ Shared context shape sent from the app (BP §8.2, canonical names):
    - `approved: false`: nothing is written; `approval.declined` is audited; the tool returns a declined result.
    - `approved: true`: in one transaction the service re-reads the rows and recomputes `beforeHash` (and `contentHash`). A mismatch writes nothing to the domain tables, audits `approval.stale` and returns `STATE_CHANGED`, so the agent re-reads and proposes again (AUD-003). A match performs the mutation and writes `approval.granted` plus the mutation's audit rows in the same transaction.
 7. An interrupt nobody resolves leaves only `approval.requested`. The resume may arrive on a different instance (TEN-011, §7.9).
-8. Tool results render through `useRenderTool` from `@copilotkit/react-core/v2`, keyed by tool name, receiving `status` and `args` ([SRC-062](https://docs.copilotkit.ai/mastra/generative-ui/backend-tools)). How the render callback receives the tool result is U-03.
+8. Tool results render through `useRenderTool` from `@copilotkit/react-core/v2`, keyed by tool name, receiving `status` and `args` ([SRC-062](https://docs.copilotkit.ai/mastra/generative-ui/backend-tools)). The callback's `result` is the JSON text of the tool's full `ToolResult`, not its `toModelOutput` summary; renderers read it with `parseToolResult` in `src/lib/agent/tool-result.ts` (U-03, closed).
 
 **Canonical JSON (P-43).** `inputHash` and `beforeHash` above, the §7.6 current hash and `applied_row_sha256`, and the `audit_log` before and after values (§6.6) use the text `canonicalJson` in `src/server/services/audit-writer.ts` writes. Object keys are sorted by UTF-16 code unit at every depth, array order is kept, and no whitespace is written. A `toJSON` method is applied first, so a Date becomes its ISO string. Strings, finite numbers, booleans and null are written as `JSON.stringify` writes them. An undefined, function or symbol is left out of an object and written as null in an array; any other object is written from its own enumerable string keys, each time it appears. `canonicalJson` throws a `TypeError` for NaN, Infinity or -Infinity, a bigint, a boxed primitive (never unwrapped), a cycle, and a top-level value with no JSON text.
 
@@ -2411,7 +2411,7 @@ Owner decisions 2026-10-30 place CAT-010 to CAT-012, RGT-009 and RGT-010 in epic
 |---|---|---|
 | U-01 | Closed: `context.agent.suspend` and `context.agent.resumeData` ([SRC-042]) | — |
 | U-02 | Closed by documentation: `useInterrupt` with `resolve(payload, interruptId)` ([SRC-057]); proven end to end by WRITE-VS-001 | Phase 7 |
-| U-03 | How the `useRenderTool` render callback receives the tool result | Phase 6 |
+| U-03 | Closed 2026-11-01: on `status` complete, `result` is the JSON text of the tool's full `ToolResult` (`status` ok with the DTO, or the refusal), not the `toModelOutput` summary; proven by `tests/e2e/chat-tools.spec.ts` (melos-2xl.1), where the song grid shows an ISWC the model never sees | Phase 6 |
 | U-04 | Frontend API that populates AG-UI `input.context` for Mastra | Phase 6 |
 | U-05 | Closed: custom roles override the predefined permissions; defaults are merged from `better-auth/plugins/organization/access` ([SRC-021], [SRC-102]) | — |
 | U-06 | Closed: Better Auth 1.7.4 has no supported header-free permission check; services use `requirePermission` (ADR-028, [SRC-102]) | — |

@@ -14,3 +14,20 @@ export const toolResultSchema = <T>() =>
     z.object({ status: z.literal('ok'), value: z.custom<T>() }),
     z.object({ status: z.literal('error'), error: z.looseObject({ code: z.string() }) }),
   ]);
+
+/**
+ * A tool result as the chat renderer receives it (U-03): the JSON text of the tool's full
+ * `ToolResult`, not the `toModelOutput` summary. Null when it is not a ToolResult.
+ */
+export function parseToolResult<T>(raw: unknown): ToolResult<T> | null {
+  let value: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  const parsed = toolResultSchema<T>().safeParse(value);
+  return parsed.success ? (parsed.data as ToolResult<T>) : null;
+}

@@ -27,7 +27,7 @@ import type { SongListItem } from '@/lib/dto/catalog';
 import { formatIsrc, formatIswc } from '@/lib/identifiers';
 
 /** A song's page (D-12): its composition's, or its only recording's when it has no composition. */
-const songHref = ({ compositionId, recordings }: SongListItem) =>
+export const songHref = ({ compositionId, recordings }: SongListItem) =>
   compositionId
     ? `/catalog/compositions/${compositionId}`
     : `/catalog/recordings/${recordings[0].recordingId}`;
