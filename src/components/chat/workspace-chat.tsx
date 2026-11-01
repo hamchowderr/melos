@@ -10,6 +10,7 @@ import {
 import '@copilotkit/react-core/v2/styles.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatRunErrorNotice } from '@/components/chat/chat-run-error';
+import { FocusProvider } from '@/components/chat/focus-context';
 import { useMelosToolRenderers } from '@/components/chat/tool-renderers';
 import { RUN_PENDING_EVENT, WORKSPACE_AGENT_ID } from '@/lib/agent/contract';
 import { type ChatRunError, isChatRunErrorCode, toChatRunError } from '@/lib/agent/run-error';
@@ -129,7 +130,11 @@ function Chat() {
   if (!ready) {
     return <div className="p-4 text-sm text-muted-foreground">Connecting to the agent...</div>;
   }
-  return <ReadyChat />;
+  return (
+    <FocusProvider>
+      <ReadyChat />
+    </FocusProvider>
+  );
 }
 
 export function WorkspaceChat() {
