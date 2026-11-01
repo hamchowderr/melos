@@ -6,15 +6,18 @@ import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { PingCard } from '@/components/chat/ping-card';
 import { SongResults } from '@/components/chat/song-results';
 import { ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
+import { RightsPanel } from '@/components/rights/rights-panel';
 import {
   catalogFocusSchema,
   GET_MUSIC_WORKSPACE_TOOL_NAME,
+  GET_RIGHTS_SUMMARY_TOOL_NAME,
   SEARCH_MUSIC_TOOL_NAME,
   searchMusicInputSchema,
 } from '@/lib/agent/catalog-tools';
 import { PING_TOOL_NAME, pingInputSchema, pingResultSchema } from '@/lib/agent/contract';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
+import type { RightsSummaryDTO } from '@/lib/dto/rights';
 
 type RenderProps = { status: string; result?: unknown };
 
@@ -38,6 +41,14 @@ function parsePingResult(result: unknown) {
     return null;
   }
 }
+
+/** The DTO names no recording titles, so several masters are told apart by their order. */
+const masterLabels = (rights: RightsSummaryDTO) =>
+  new Map(
+    rights.masters.length > 1
+      ? rights.masters.map(({ recordingId }, index) => [recordingId, `recording ${index + 1}`])
+      : [],
+  );
 
 /** Registers the chat renderer of every agent tool, keyed by tool name (§7.4, U-03). */
 export function useMelosToolRenderers() {
@@ -69,6 +80,16 @@ export function useMelosToolRenderers() {
       parameters: catalogFocusSchema,
       render: renderResult<MusicWorkspaceDTO>('Opening the song...', (workspace) => (
         <MusicWorkspaceCard workspace={workspace} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_RIGHTS_SUMMARY_TOOL_NAME,
+      parameters: catalogFocusSchema,
+      render: renderResult<RightsSummaryDTO>('Reading the rights...', (rights) => (
+        <RightsPanel rights={rights} recordingTitles={masterLabels(rights)} />
       )),
     },
     [],

@@ -4,7 +4,9 @@ import { words } from '@/lib/words';
 
 /** An issue code as words, keeping identifier acronyms upper case. */
 export function issueLabel(code: string) {
-  return words(code.toLowerCase()).replace(/\b(isrc|iswc|ipi|isni)\b/gi, (m) => m.toUpperCase());
+  return words(code.toLowerCase()).replace(/\b(isrc|iswc|ipi|isni|pro|mlc|hfa|upc|ean)\b/gi, (m) =>
+    m.toUpperCase(),
+  );
 }
 
 /** One readiness issue as a soft card: a severity dot, its label and detail, then its code. */
