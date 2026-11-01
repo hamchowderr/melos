@@ -1,0 +1,308 @@
+{
+  "fixtures": [
+    {
+      "message": "agui search",
+      "toolName": "searchMusic",
+      "args": {
+        "query": "Harbor Lights"
+      },
+      "result": {
+        "status": "ok",
+        "value": [
+          {
+            "compositionId": "cmp_AGUI1",
+            "primaryRecordingId": "rec_AGUI1",
+            "recordingIds": ["rec_AGUI1"],
+            "title": "Harbor Lights",
+            "altTitles": [],
+            "primaryArtistNames": ["Mock Artist"],
+            "iswc": "T9000000990",
+            "matchType": "exact_title",
+            "recordings": [
+              {
+                "recordingId": "rec_AGUI1",
+                "title": "Harbor Lights",
+                "versionTitle": null,
+                "isrc": "USDMO2600099",
+                "oneStopReady": false,
+                "syncReady": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "message": "agui song card",
+      "toolName": "getMusicWorkspace",
+      "args": {
+        "entityType": "composition",
+        "entityId": "cmp_AGUI1"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "focus": {
+            "entityType": "composition",
+            "entityId": "cmp_AGUI1"
+          },
+          "composition": {
+            "id": "cmp_AGUI1",
+            "title": "Harbor Lights",
+            "altTitles": [],
+            "iswc": "T9000000990",
+            "copyrightRegistrationNumber": null,
+            "copyrightDate": null,
+            "description": null,
+            "hasLyrics": false
+          },
+          "primaryRecordingId": "rec_AGUI1",
+          "recordings": [
+            {
+              "id": "rec_AGUI1",
+              "title": "Harbor Lights",
+              "versionTitle": null,
+              "isrc": "USDMO2600099",
+              "durationMs": 200000,
+              "bpm": null,
+              "musicalKey": null,
+              "previewStartMs": null,
+              "containsSamples": false,
+              "samplesCleared": false,
+              "primaryLink": null,
+              "links": [],
+              "artists": [
+                {
+                  "partyId": "pty_AGUI",
+                  "artistAliasId": null,
+                  "displayName": "Mock Artist",
+                  "role": "primary",
+                  "billingOrder": 1
+                }
+              ],
+              "contributors": [],
+              "terms": [],
+              "registrations": []
+            }
+          ],
+          "releases": [],
+          "rights": {
+            "compositionId": "cmp_AGUI1",
+            "writers": [
+              {
+                "contributorId": "ctb_AGUI",
+                "partyId": "pty_AGUI",
+                "displayName": "Mock Writer",
+                "roles": ["songwriter"],
+                "shareBp": 10000
+              }
+            ],
+            "writerTotalBp": 10000,
+            "publishing": [],
+            "masters": [],
+            "licensingContacts": [],
+            "issues": []
+          },
+          "readiness": [
+            {
+              "recordingId": "rec_AGUI1",
+              "oneStopReady": false,
+              "syncReady": true,
+              "issues": []
+            }
+          ],
+          "pitchSummary": {
+            "itemCount": 2,
+            "countsByStatus": {
+              "sent": 2
+            },
+            "lastActivityAt": null
+          },
+          "importedReportTemplateId": null
+        }
+      }
+    },
+    {
+      "message": "agui rights",
+      "toolName": "getRightsSummary",
+      "args": {
+        "entityType": "composition",
+        "entityId": "cmp_AGUI1"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "compositionId": "cmp_AGUI1",
+          "writers": [
+            {
+              "contributorId": "ctb_A",
+              "partyId": "pty_A",
+              "displayName": "Mock Writer",
+              "roles": ["songwriter", "composer"],
+              "shareBp": 6000
+            },
+            {
+              "contributorId": "ctb_B",
+              "partyId": "pty_B",
+              "displayName": "Second Writer",
+              "roles": ["lyricist"],
+              "shareBp": 4000
+            }
+          ],
+          "writerTotalBp": 10000,
+          "publishing": [
+            {
+              "territory": "WORLD",
+              "totalBp": 7500,
+              "holders": [
+                {
+                  "interestId": "pub_A",
+                  "partyId": "pty_pub_A",
+                  "displayName": "Mock Publishing",
+                  "shareBp": 7500,
+                  "isSelf": true,
+                  "representationAttested": false,
+                  "agreementId": null
+                }
+              ]
+            }
+          ],
+          "masters": [
+            {
+              "recordingId": "rec_AGUI1",
+              "totalBp": 10000,
+              "holders": [
+                {
+                  "interestId": "mst_A",
+                  "partyId": "pty_mst_A",
+                  "displayName": "Mock Records",
+                  "shareBp": 10000,
+                  "isSelf": true,
+                  "representationAttested": false,
+                  "agreementId": null
+                }
+              ]
+            }
+          ],
+          "licensingContacts": [
+            {
+              "partyId": "pty_mst_A",
+              "displayName": "Mock Records",
+              "implicit": true
+            }
+          ],
+          "issues": [
+            {
+              "code": "PUBLISHING_TOTAL_INCOMPLETE",
+              "severity": "blocking",
+              "recordingId": "rec_AGUI1",
+              "compositionId": "cmp_AGUI1",
+              "detail": "Publishing WORLD 7500 bp."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "message": "agui readiness",
+      "toolName": "getReadinessIssues",
+      "args": {
+        "onlyNotReady": true
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "generatedAt": "2026-11-01T00:00:00.000Z",
+          "recordings": [
+            {
+              "recordingId": "rec_AGUI1",
+              "compositionId": "cmp_AGUI1",
+              "title": "Harbor Lights",
+              "oneStopReady": false,
+              "syncReady": false,
+              "issues": [
+                {
+                  "code": "MISSING_ISRC",
+                  "severity": "blocking",
+                  "recordingId": "rec_AGUI1",
+                  "compositionId": "cmp_AGUI1",
+                  "detail": "The recording has no ISRC."
+                },
+                {
+                  "code": "NOT_REGISTERED_PRO",
+                  "severity": "warning",
+                  "recordingId": "rec_AGUI1",
+                  "compositionId": "cmp_AGUI1",
+                  "detail": "The composition is not registered with a PRO."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "message": "agui proposal",
+      "toolName": "proposeDefaultOwnership",
+      "args": {
+        "compositionId": "cmp_AGUI1"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "selfParties": {
+            "writer": {
+              "partyId": "pty_W",
+              "displayName": "Mock Writer",
+              "partyKind": "person"
+            },
+            "publishing": {
+              "partyId": "pty_P",
+              "displayName": "Mock Publishing",
+              "partyKind": "organization"
+            },
+            "master": null
+          },
+          "writerShares": [
+            {
+              "partyId": "pty_W",
+              "roles": ["songwriter"],
+              "shareBp": 10000
+            }
+          ],
+          "publishingShares": {
+            "territory": "WORLD",
+            "shares": [
+              {
+                "partyId": "pty_P",
+                "shareBp": 10000
+              }
+            ]
+          },
+          "masterShares": null,
+          "blockedReasons": [
+            {
+              "side": "master",
+              "code": "no_self_party"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "message": "agui not found",
+      "toolName": "getMusicWorkspace",
+      "args": {
+        "entityType": "composition",
+        "entityId": "cmp_GONE"
+      },
+      "result": {
+        "status": "error",
+        "error": {
+          "code": "NOT_FOUND",
+          "field": "entityId"
+        }
+      }
+    }
+  ]
+}

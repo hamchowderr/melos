@@ -122,7 +122,8 @@ function ReadyChat() {
   );
 }
 
-function Chat() {
+/** The chat surface inside a CopilotKitProvider: renderers, focus context and the message list. */
+export function Chat() {
   const ready = useAgentReady(WORKSPACE_AGENT_ID);
 
   useMelosToolRenderers();
