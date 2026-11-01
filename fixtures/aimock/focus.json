@@ -1,0 +1,27 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "who wrote it",
+        "systemMessage": "The focused entity is composition cmp_01KZ6VFGM03FXFCHY5DDZY6BQT",
+        "hasToolResult": false
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "getRightsSummary",
+            "arguments": "{\"entityType\":\"composition\",\"entityId\":\"cmp_01KZ6VFGM03FXFCHY5DDZY6BQT\"}"
+          }
+        ]
+      }
+    },
+    {
+      "match": { "userMessage": "who wrote it", "hasToolResult": true },
+      "response": { "content": "Here are the writers of the focused song." }
+    },
+    {
+      "match": { "userMessage": "who wrote it", "hasToolResult": false },
+      "response": { "content": "Which song do you mean?" }
+    }
+  ]
+}

@@ -141,3 +141,27 @@ test('melos-2xl.5: proposeDefaultOwnership renders the proposal and saves nothin
     '0.00%',
   );
 });
+
+// fixtures/aimock/focus.json: "who wrote it" calls getRightsSummary only when the system
+// message names Midnight Drive as the focused entity; otherwise the model asks which song.
+test('melos-2xl.6: the song card sets the focused entity that "it" resolves to (U-04)', async ({
+  page,
+}) => {
+  await signInAsJordan(page);
+  await ask(page, 'who wrote it');
+  await expect(page.getByText('Which song do you mean?')).toBeVisible({ timeout: 60_000 });
+
+  await ask(page, 'show me midnight drive');
+  await expect(page.getByRole('region', { name: 'Song', exact: true })).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(page.getByText('Here is Midnight Drive.')).toBeVisible({ timeout: 60_000 });
+
+  await ask(page, 'who wrote it');
+  const rights = page.getByRole('region', { name: 'Rights' });
+  await expect(rights).toBeVisible({ timeout: 60_000 });
+  await expect(
+    rights.getByRole('table', { name: 'Writers' }).getByRole('row', { name: /Jordan Taylor/ }),
+  ).toContainText('100.00%');
+  await expect(page.getByText('Here are the writers of the focused song.')).toBeVisible();
+});

@@ -1,6 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import type { MastraModelConfig } from '@mastra/core/llm';
 import { WORKSPACE_AGENT_ID } from '../../lib/agent/contract';
+import { focusInstruction } from '../focus';
 import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
 import { pingTool } from '../tools/ping';
@@ -31,7 +32,9 @@ export function createWorkspaceAgent(model: MastraModelConfig): Agent {
   return new Agent({
     id: WORKSPACE_AGENT_ID,
     name: 'Melos',
-    instructions: WORKSPACE_AGENT_INSTRUCTIONS,
+    // The focused entity (U-04) reaches the model only through this line.
+    instructions: ({ requestContext }) =>
+      [WORKSPACE_AGENT_INSTRUCTIONS, focusInstruction(requestContext)].filter(Boolean).join(' '),
     model,
     tools: {
       ping: pingTool,

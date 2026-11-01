@@ -3,6 +3,7 @@
 import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
 import type { z } from 'zod';
+import { FocusOn } from '@/components/chat/focus-context';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
@@ -21,7 +22,12 @@ import {
   SEARCH_MUSIC_TOOL_NAME,
   searchMusicInputSchema,
 } from '@/lib/agent/catalog-tools';
-import { PING_TOOL_NAME, pingInputSchema, pingResultSchema } from '@/lib/agent/contract';
+import {
+  type FocusedEntity,
+  PING_TOOL_NAME,
+  pingInputSchema,
+  pingResultSchema,
+} from '@/lib/agent/contract';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
 import type {
@@ -61,6 +67,14 @@ const masterLabels = (rights: RightsSummaryDTO) =>
       : [],
   );
 
+/** A rights summary's entity: its composition, or a lone recording's master. */
+const rightsFocus = (rights: RightsSummaryDTO): FocusedEntity | null =>
+  rights.compositionId
+    ? { entityType: 'composition', entityId: rights.compositionId }
+    : rights.masters[0]
+      ? { entityType: 'recording', entityId: rights.masters[0].recordingId }
+      : null;
+
 /** Registers the chat renderer of every agent tool, keyed by tool name (§7.4, U-03). */
 export function useMelosToolRenderers() {
   useRenderTool(
@@ -90,7 +104,9 @@ export function useMelosToolRenderers() {
       name: GET_MUSIC_WORKSPACE_TOOL_NAME,
       parameters: catalogFocusSchema,
       render: renderResult<MusicWorkspaceDTO>('Opening the song...', (workspace) => (
-        <MusicWorkspaceCard workspace={workspace} />
+        <FocusOn entity={workspace.focus}>
+          <MusicWorkspaceCard workspace={workspace} />
+        </FocusOn>
       )),
     },
     [],
@@ -100,7 +116,9 @@ export function useMelosToolRenderers() {
       name: GET_RIGHTS_SUMMARY_TOOL_NAME,
       parameters: catalogFocusSchema,
       render: renderResult<RightsSummaryDTO>('Reading the rights...', (rights) => (
-        <RightsPanel rights={rights} recordingTitles={masterLabels(rights)} />
+        <FocusOn entity={rightsFocus(rights)}>
+          <RightsPanel rights={rights} recordingTitles={masterLabels(rights)} />
+        </FocusOn>
       )),
     },
     [],
