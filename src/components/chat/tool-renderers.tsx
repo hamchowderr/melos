@@ -2,33 +2,37 @@
 
 import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
+import type { z } from 'zod';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { PingCard } from '@/components/chat/ping-card';
 import { SongResults } from '@/components/chat/song-results';
-import { ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
+import { ToolCard, ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
+import { ReadinessChecklist } from '@/components/rights/readiness-checklist';
 import { RightsPanel } from '@/components/rights/rights-panel';
 import {
   catalogFocusSchema,
   GET_MUSIC_WORKSPACE_TOOL_NAME,
+  GET_READINESS_ISSUES_TOOL_NAME,
   GET_RIGHTS_SUMMARY_TOOL_NAME,
+  readinessIssuesInputSchema,
   SEARCH_MUSIC_TOOL_NAME,
   searchMusicInputSchema,
 } from '@/lib/agent/catalog-tools';
 import { PING_TOOL_NAME, pingInputSchema, pingResultSchema } from '@/lib/agent/contract';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
-import type { RightsSummaryDTO } from '@/lib/dto/rights';
+import type { ReadinessReportDTO, RightsSummaryDTO } from '@/lib/dto/rights';
 
-type RenderProps = { status: string; result?: unknown };
+type RenderProps<A> = { status: string; args?: Partial<A>; result?: unknown };
 
 /** One structured renderer per tool (§3.1): pending, refusal, or the component for the DTO. */
 const renderResult =
-  <T,>(pending: string, render: (value: T) => ReactElement) =>
-  (props: RenderProps) => {
+  <T, A = unknown>(pending: string, render: (value: T, args: Partial<A>) => ReactElement) =>
+  (props: RenderProps<A>) => {
     if (props.status !== 'complete') return <ToolPending label={pending} />;
     const result = parseToolResult<T>(props.result);
     if (result?.status !== 'ok') return <ToolErrorNotice error={result?.error ?? null} />;
-    return render(result.value);
+    return render(result.value, props.args ?? {});
   };
 
 function parsePingResult(result: unknown) {
@@ -91,6 +95,26 @@ export function useMelosToolRenderers() {
       render: renderResult<RightsSummaryDTO>('Reading the rights...', (rights) => (
         <RightsPanel rights={rights} recordingTitles={masterLabels(rights)} />
       )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_READINESS_ISSUES_TOOL_NAME,
+      parameters: readinessIssuesInputSchema,
+      render: renderResult<ReadinessReportDTO, z.infer<typeof readinessIssuesInputSchema>>(
+        'Checking readiness...',
+        (report, args) => (
+          <ToolCard title="Rights readiness">
+            <div className="px-3 pb-3">
+              <ReadinessChecklist
+                recordings={report.recordings}
+                onlyNotReady={args.onlyNotReady ?? true}
+              />
+            </div>
+          </ToolCard>
+        ),
+      ),
     },
     [],
   );

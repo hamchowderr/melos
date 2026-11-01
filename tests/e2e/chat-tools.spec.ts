@@ -69,3 +69,27 @@ test('melos-2xl.3: getRightsSummary renders the read-only rights panel', async (
   await expect(page.getByText('Here are the writers of Midnight Drive.')).toBeVisible();
   await page.screenshot({ path: 'test-results/chat-rights.png' });
 });
+
+// fixtures/aimock/read-sequences.json: getReadinessIssues with onlyNotReady.
+test('melos-2xl.4: getReadinessIssues renders the readiness checklist with its panel', async ({
+  page,
+}) => {
+  await signInAsJordan(page);
+  await ask(page, 'not ready for sync');
+
+  const card = page.getByRole('region', { name: 'Rights readiness' });
+  await expect(card).toBeVisible({ timeout: 60_000 });
+  const recordings = card.getByRole('table', { name: 'Recordings' });
+  // EXPECTED.md §6 DEMO-003, by title.
+  await expect(recordings.locator('tbody tr td:first-child')).toHaveText([
+    'Neon Static',
+    'Ocean Blue',
+  ]);
+  await recordings.getByRole('row', { name: 'Ocean Blue readiness' }).press('Enter');
+  await expect(
+    page
+      .getByRole('dialog', { name: 'Ocean Blue' })
+      .getByRole('list', { name: 'Ocean Blue issues' }),
+  ).toContainText('MISSING_ISRC');
+  await expect(page.getByText('These recordings are not ready for sync.')).toBeVisible();
+});
