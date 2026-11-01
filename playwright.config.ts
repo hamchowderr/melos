@@ -48,6 +48,8 @@ export default defineConfig({
         MELOS_WORKSPACE_DATA_DIR: 'data/e2e-workspaces',
         MELOS_LLM_BASE_URL: `http://127.0.0.1:${AIMOCK_PORT}/v1`,
         MELOS_DEMO_PASSWORD: DEMO_JORDAN.password,
+        // Enables /dev/agui, the AGUIMock renderer harness (TST-AI-003).
+        MELOS_E2E_HARNESS: '1',
       },
     },
   ],
