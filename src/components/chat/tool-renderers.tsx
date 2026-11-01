@@ -4,6 +4,7 @@ import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
 import type { z } from 'zod';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
+import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
 import { SongResults } from '@/components/chat/song-results';
 import { ToolCard, ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
@@ -11,9 +12,11 @@ import { ReadinessChecklist } from '@/components/rights/readiness-checklist';
 import { RightsPanel } from '@/components/rights/rights-panel';
 import {
   catalogFocusSchema,
+  defaultOwnershipInputSchema,
   GET_MUSIC_WORKSPACE_TOOL_NAME,
   GET_READINESS_ISSUES_TOOL_NAME,
   GET_RIGHTS_SUMMARY_TOOL_NAME,
+  PROPOSE_DEFAULT_OWNERSHIP_TOOL_NAME,
   readinessIssuesInputSchema,
   SEARCH_MUSIC_TOOL_NAME,
   searchMusicInputSchema,
@@ -21,7 +24,11 @@ import {
 import { PING_TOOL_NAME, pingInputSchema, pingResultSchema } from '@/lib/agent/contract';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
-import type { ReadinessReportDTO, RightsSummaryDTO } from '@/lib/dto/rights';
+import type {
+  DefaultOwnershipProposal,
+  ReadinessReportDTO,
+  RightsSummaryDTO,
+} from '@/lib/dto/rights';
 
 type RenderProps<A> = { status: string; args?: Partial<A>; result?: unknown };
 
@@ -114,6 +121,17 @@ export function useMelosToolRenderers() {
             </div>
           </ToolCard>
         ),
+      ),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: PROPOSE_DEFAULT_OWNERSHIP_TOOL_NAME,
+      parameters: defaultOwnershipInputSchema,
+      render: renderResult<DefaultOwnershipProposal>(
+        'Working out your ownership...',
+        (proposal) => <OwnershipProposal proposal={proposal} />,
       ),
     },
     [],
