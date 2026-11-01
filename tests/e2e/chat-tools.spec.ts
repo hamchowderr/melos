@@ -51,3 +51,21 @@ test('READ-VS-001: "show me midnight drive" renders its song card with tenant da
   );
   await page.screenshot({ path: 'test-results/chat-song-card.png' });
 });
+
+// fixtures/aimock/read-sequences.json: getRightsSummary on Midnight Drive's composition.
+test('melos-2xl.3: getRightsSummary renders the read-only rights panel', async ({ page }) => {
+  await signInAsJordan(page);
+  await ask(page, 'who wrote this');
+
+  const rights = page.getByRole('region', { name: 'Rights' });
+  await expect(rights).toBeVisible({ timeout: 60_000 });
+  const writers = rights.getByRole('table', { name: 'Writers' });
+  await expect(writers.getByRole('row', { name: /Jordan Taylor/ })).toContainText('100.00%');
+  await expect(rights.getByRole('table', { name: 'Master' }).getByTestId('share-total')).toHaveText(
+    '100.00%',
+  );
+  // Read only: the chat shows no editors.
+  await expect(rights.getByRole('button')).toHaveCount(0);
+  await expect(page.getByText('Here are the writers of Midnight Drive.')).toBeVisible();
+  await page.screenshot({ path: 'test-results/chat-rights.png' });
+});
