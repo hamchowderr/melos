@@ -1,0 +1,19 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "propose my default ownership", "hasToolResult": false },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "proposeDefaultOwnership",
+            "arguments": "{\"compositionId\":\"cmp_OWN\"}"
+          }
+        ]
+      }
+    },
+    {
+      "match": { "userMessage": "propose my default ownership", "hasToolResult": true },
+      "response": { "content": "Here is the ownership I would fill in. Nothing is saved yet." }
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { signInAsJordan } from './support';
+import { insertWorkspaceRows, signInAsJordan, signUpWithWorkspace } from './support';
 
 async function ask(page: Page, prompt: string) {
   const input = page.getByRole('textbox').first();
@@ -92,4 +92,52 @@ test('melos-2xl.4: getReadinessIssues renders the readiness checklist with its p
       .getByRole('list', { name: 'Ocean Blue issues' }),
   ).toContainText('MISSING_ISRC');
   await expect(page.getByText('These recordings are not ready for sync.')).toBeVisible();
+});
+
+// fixtures/aimock/ownership-proposal.json: proposeDefaultOwnership on an empty song.
+test('melos-2xl.5: proposeDefaultOwnership renders the proposal and saves nothing', async ({
+  page,
+}) => {
+  await signUpWithWorkspace(page, 'Proposal');
+  const at = new Date().toISOString();
+  const stamps = { created_at: at, updated_at: at };
+  const self = (side: string, party_id: string, party_kind: string) => ({
+    ...{ side, party_id, party_kind, updated_at: at },
+  });
+  await insertWorkspaceRows(page, {
+    parties: [
+      { id: 'pty_RILEY', party_kind: 'person', display_name: 'Riley Stone', ...stamps },
+      {
+        id: 'pty_HARBOR',
+        party_kind: 'organization',
+        display_name: 'Harbor Lane Music',
+        ...stamps,
+      },
+    ],
+    workspace_self_parties: [
+      self('writer', 'pty_RILEY', 'person'),
+      self('publishing', 'pty_HARBOR', 'organization'),
+      self('master', 'pty_HARBOR', 'organization'),
+    ],
+    compositions: [{ id: 'cmp_OWN', title: 'Own Song', ...stamps }],
+    recordings: [{ id: 'rec_OWN', composition_id: 'cmp_OWN', title: 'Own Song', ...stamps }],
+  });
+  await page.goto('/');
+  await ask(page, 'propose my default ownership');
+
+  const card = page.getByRole('region', { name: 'Proposed ownership' });
+  await expect(card).toBeVisible({ timeout: 60_000 });
+  const shares = card.getByRole('list', { name: 'Proposed shares' }).getByRole('listitem');
+  await expect(shares).toHaveText([
+    /^Writer\s*Riley Stone · songwriter\s*100\.00%$/,
+    /^Publishing\s*Harbor Lane Music · World\s*100\.00%$/,
+    /^Master\s*Harbor Lane Music\s*100\.00%$/,
+  ]);
+  await expect(card).toContainText('Nothing is saved');
+
+  // Proposing writes nothing: the song still has no writers.
+  await page.goto('/catalog/compositions/cmp_OWN');
+  await expect(page.getByRole('table', { name: 'Writers' }).getByTestId('share-total')).toHaveText(
+    '0.00%',
+  );
 });
