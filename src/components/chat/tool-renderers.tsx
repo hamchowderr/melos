@@ -2,13 +2,19 @@
 
 import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
+import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { PingCard } from '@/components/chat/ping-card';
 import { SongResults } from '@/components/chat/song-results';
 import { ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
-import { SEARCH_MUSIC_TOOL_NAME, searchMusicInputSchema } from '@/lib/agent/catalog-tools';
+import {
+  catalogFocusSchema,
+  GET_MUSIC_WORKSPACE_TOOL_NAME,
+  SEARCH_MUSIC_TOOL_NAME,
+  searchMusicInputSchema,
+} from '@/lib/agent/catalog-tools';
 import { PING_TOOL_NAME, pingInputSchema, pingResultSchema } from '@/lib/agent/contract';
 import { parseToolResult } from '@/lib/agent/tool-result';
-import type { MusicSearchResult } from '@/lib/dto/catalog';
+import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
 
 type RenderProps = { status: string; result?: unknown };
 
@@ -53,6 +59,16 @@ export function useMelosToolRenderers() {
       parameters: searchMusicInputSchema,
       render: renderResult<MusicSearchResult[]>('Searching songs...', (results) => (
         <SongResults results={results} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_MUSIC_WORKSPACE_TOOL_NAME,
+      parameters: catalogFocusSchema,
+      render: renderResult<MusicWorkspaceDTO>('Opening the song...', (workspace) => (
+        <MusicWorkspaceCard workspace={workspace} />
       )),
     },
     [],

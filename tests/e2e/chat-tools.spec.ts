@@ -28,3 +28,26 @@ test('melos-2xl.1: searchMusic renders its song grid from the full result (U-03)
   await expect(page.getByText('Here is Midnight Drive.')).toBeVisible({ timeout: 60_000 });
   await page.screenshot({ path: 'test-results/chat-song-grid.png' });
 });
+
+// READ-VS-001 (SA Gate C): searchMusic, then getMusicWorkspace, renders MusicWorkspaceCard.
+test('READ-VS-001: "show me midnight drive" renders its song card with tenant data', async ({
+  page,
+}) => {
+  await signInAsJordan(page);
+  await ask(page, 'show me midnight drive');
+
+  const card = page.getByRole('region', { name: 'Song', exact: true });
+  await expect(card).toBeVisible({ timeout: 60_000 });
+  await expect(card).toContainText('Midnight Drive');
+  await expect(card).toContainText('Jordan Taylor');
+  await expect(card).toContainText('T-900.000.001-0');
+  const recording = card.getByRole('list', { name: 'Recordings' }).getByRole('listitem');
+  await expect(recording).toHaveCount(1);
+  await expect(recording).toContainText('US-DMO-26-00001');
+  await expect(recording.getByTestId('readiness')).toContainText('One Stop Ready');
+  await expect(card.getByRole('link', { name: 'Open song' })).toHaveAttribute(
+    'href',
+    /^\/catalog\/compositions\//,
+  );
+  await page.screenshot({ path: 'test-results/chat-song-card.png' });
+});
