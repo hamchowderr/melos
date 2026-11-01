@@ -28,6 +28,19 @@ export const WORKSPACE_AGENT_INSTRUCTIONS = [
   'When the user asks you to ping, test or check the connection, call the ping tool, then confirm in one short sentence.',
 ].join(' ');
 
+/**
+ * The agent's tools, keyed by canonical tool name (§3.3). AIMock fixtures may call only these, and
+ * each one has a chat renderer (TST-AI-004, tests/unit/agent-fixtures.test.ts).
+ */
+export const WORKSPACE_AGENT_TOOLS = {
+  ping: pingTool,
+  searchMusic: searchMusicTool,
+  getMusicWorkspace: getMusicWorkspaceTool,
+  getRightsSummary: getRightsSummaryTool,
+  getReadinessIssues: getReadinessIssuesTool,
+  proposeDefaultOwnership: proposeDefaultOwnershipTool,
+};
+
 export function createWorkspaceAgent(model: MastraModelConfig): Agent {
   return new Agent({
     id: WORKSPACE_AGENT_ID,
@@ -36,14 +49,7 @@ export function createWorkspaceAgent(model: MastraModelConfig): Agent {
     instructions: ({ requestContext }) =>
       [WORKSPACE_AGENT_INSTRUCTIONS, focusInstruction(requestContext)].filter(Boolean).join(' '),
     model,
-    tools: {
-      ping: pingTool,
-      searchMusic: searchMusicTool,
-      getMusicWorkspace: getMusicWorkspaceTool,
-      getRightsSummary: getRightsSummaryTool,
-      getReadinessIssues: getReadinessIssuesTool,
-      proposeDefaultOwnership: proposeDefaultOwnershipTool,
-    },
+    tools: WORKSPACE_AGENT_TOOLS,
     memory: createAgentMemory(),
     // Mastra stops at 5 steps by default without warning; give tool loops explicit headroom.
     defaultOptions: { maxSteps: 8 },
