@@ -6,19 +6,12 @@ import {
   CopilotKitProvider,
   useAgent,
   useCopilotKit,
-  useRenderTool,
 } from '@copilotkit/react-core/v2';
 import '@copilotkit/react-core/v2/styles.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatRunErrorNotice } from '@/components/chat/chat-run-error';
-import { PingCard } from '@/components/chat/ping-card';
-import {
-  PING_TOOL_NAME,
-  pingInputSchema,
-  pingResultSchema,
-  RUN_PENDING_EVENT,
-  WORKSPACE_AGENT_ID,
-} from '@/lib/agent/contract';
+import { useMelosToolRenderers } from '@/components/chat/tool-renderers';
+import { RUN_PENDING_EVENT, WORKSPACE_AGENT_ID } from '@/lib/agent/contract';
 import { type ChatRunError, isChatRunErrorCode, toChatRunError } from '@/lib/agent/run-error';
 
 // CopilotChat throws if the agent is not registered yet; registration follows the
@@ -96,15 +89,6 @@ function useRunPendingReconnect(agentId: string) {
   }, [agent, copilotkit]);
 }
 
-function parsePingResult(result: string) {
-  try {
-    const parsed = pingResultSchema.safeParse(JSON.parse(result));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
-}
-
 function ReadyChat() {
   const { runError, onError, retry } = useChatRunError(WORKSPACE_AGENT_ID);
   useRunPendingReconnect(WORKSPACE_AGENT_ID);
@@ -140,26 +124,7 @@ function ReadyChat() {
 function Chat() {
   const ready = useAgentReady(WORKSPACE_AGENT_ID);
 
-  useRenderTool(
-    {
-      name: PING_TOOL_NAME,
-      parameters: pingInputSchema,
-      render: (props) => {
-        if (props.status !== 'complete') {
-          return <div className="p-4 text-sm text-muted-foreground">Pinging workspace...</div>;
-        }
-        const result = parsePingResult(props.result);
-        return result ? (
-          <PingCard result={result} />
-        ) : (
-          <div role="alert" className="text-sm text-destructive">
-            Unexpected ping result.
-          </div>
-        );
-      },
-    },
-    [],
-  );
+  useMelosToolRenderers();
 
   if (!ready) {
     return <div className="p-4 text-sm text-muted-foreground">Connecting to the agent...</div>;
