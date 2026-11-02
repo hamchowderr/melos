@@ -1,7 +1,10 @@
 {
   "fixtures": [
     {
-      "match": { "userMessage": "change alex split on ocean blue", "hasToolResult": false },
+      "match": {
+        "userMessage": "change alex split on ocean blue",
+        "hasToolResult": false
+      },
       "response": {
         "toolCalls": [
           {
@@ -30,7 +33,9 @@
         "userMessage": "change alex split on ocean blue",
         "toolResultContains": "DECLINED"
       },
-      "response": { "content": "Nothing changed: the split stays as it was." }
+      "response": {
+        "content": "Nothing changed: the split stays as it was."
+      }
     },
     {
       "match": {
@@ -46,7 +51,32 @@
         "userMessage": "change alex split on ocean blue",
         "toolResultContains": "\"updated\""
       },
-      "response": { "content": "Done: Alex Ramirez now holds 40% of Ocean Blue." }
+      "response": {
+        "content": "Done: Alex Ramirez now holds 40% of Ocean Blue."
+      }
+    },
+    {
+      "match": {
+        "userMessage": "who owns ocean blue",
+        "hasToolResult": false
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "getRightsSummary",
+            "arguments": "{\"entityType\":\"composition\",\"entityId\":\"cmp_01KZ6VHB70P86KNP74MTYDF2XS\"}"
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "userMessage": "who owns ocean blue",
+        "hasToolResult": true
+      },
+      "response": {
+        "content": "That song is not in this workspace."
+      }
     }
   ]
 }
