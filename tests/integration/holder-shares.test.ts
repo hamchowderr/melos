@@ -168,3 +168,41 @@ describe('melos-rpr.28: updatePublishingShares and updateMasterShares (RGT-002, 
     );
   });
 });
+
+describe('melos-qlw.4: holder set previews (§7.4 step 1)', () => {
+  it('previews a publishing set with names and the hash the editor loads, writing nothing', async () => {
+    const audits = (await auditsOf(OCEAN)).length;
+    const shares = [{ partyId: SILVERLINE, shareBp: 6000 }];
+    const preview = await service.previewPublishingShares(owner, {
+      ...{ compositionId: OCEAN, territory: 'WORLD', shares },
+    });
+    if (!preview.ok) throw new Error(`Refused with ${preview.error.code}`);
+    const hashes = await service.getHolderSharesHashes(owner, {
+      ...{ compositionId: OCEAN, recordingIds: [] },
+    });
+    expect(hashes.ok && preview.value.beforeHash).toBe(hashes.ok && hashes.value.publishing.WORLD);
+    expect(preview.value.after).toEqual([
+      { id: SILVERLINE, label: expect.any(String), shareBp: 6000 },
+    ]);
+    expect(preview.value.before.length).toBeGreaterThan(0);
+    expect(await auditsOf(OCEAN)).toHaveLength(audits);
+  });
+
+  it('refuses as the write would', async () => {
+    const shares = [{ partyId: SILVERLINE, shareBp: 6000 }];
+    const viewer = withRole(owner, 'viewer');
+    expect(await service.previewMasterShares(viewer, { recordingId: NEON, shares })).toEqual(
+      refused({ code: 'FORBIDDEN' }),
+    );
+    expect(
+      await service.previewPublishingShares(owner, {
+        compositionId: OCEAN,
+        territory: 'XX1',
+        shares,
+      }),
+    ).toEqual(refused({ code: 'VALIDATION', field: 'territory', reason: 'unknown_territory' }));
+    expect(await service.previewMasterShares(owner, { recordingId: 'rec_NONE', shares })).toEqual(
+      refused({ code: 'NOT_FOUND' }),
+    );
+  });
+});
