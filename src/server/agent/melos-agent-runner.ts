@@ -7,13 +7,14 @@ import {
   type AgentRunnerStopRequest,
   finalizeRunEvents,
 } from '@copilotkit/runtime/v2';
-import { and, asc, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, isNotNull, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
 import { after } from 'next/server';
 import { type Observable, ReplaySubject } from 'rxjs';
 import { RUN_PENDING_EVENT } from '../../lib/agent/contract';
 import { getRuntimeDatabase, type RuntimeDatabase } from '../db/runtime-database';
 import { type AgentRunStatus, agentThreadRuns, agentThreads } from '../db/schema/runtime';
 import { runtimeIntegrityGuard } from '../services/integrity-guard';
+import { suspendedToolCalls } from './suspended-tool-calls';
 
 /** A heartbeat older than this marks a run dead, so another request may take the thread (P-32). */
 export const RUN_STALE_MS = 30_000;
@@ -152,9 +153,31 @@ export class MelosAgentRunner extends AgentRunner {
         .where(and(this.owned(threadId), eq(agentThreads.activeRunId, runId)))
         .returning({ next: agentThreads.nextRunSeq });
       if (!row) return;
+      const seq = row.next - 1;
+      // The chat resumes an interrupt under the interrupted run's id (§7.4): the resume extends
+      // that run's row and moves it to this seq, so a waiting connect sees it finish again.
+      const thisRun = and(
+        eq(agentThreadRuns.threadId, threadId),
+        eq(agentThreadRuns.runId, runId),
+      ) as SQL;
+      const [earlier] = await tx
+        .select({ eventsJson: agentThreadRuns.eventsJson })
+        .from(agentThreadRuns)
+        .where(thisRun);
+      if (earlier) {
+        const all = [...(JSON.parse(earlier.eventsJson) as BaseEvent[]), ...events];
+        const eventsJson = JSON.stringify(compactEvents(all));
+        await runtimeIntegrityGuard.update(
+          tx,
+          agentThreadRuns,
+          { seq, status, eventsJson },
+          thisRun,
+        );
+        return;
+      }
       const eventsJson = JSON.stringify(compactEvents(events));
       await runtimeIntegrityGuard.insert(tx, agentThreadRuns, [
-        { threadId, runId, seq: row.next - 1, parentRunId, status, eventsJson, createdAt: iso() },
+        { threadId, runId, seq, parentRunId, status, eventsJson, createdAt: iso() },
       ]);
     });
   }
@@ -181,6 +204,10 @@ export class MelosAgentRunner extends AgentRunner {
     const live: LiveRun = { runId, events, abort, stopRequested: false };
     const produced: BaseEvent[] = [];
     const emit = (event: BaseEvent) => {
+      for (const call of suspendedToolCalls(event, produced)) {
+        produced.push(call);
+        events.next(call);
+      }
       produced.push(event);
       events.next(event);
     };
@@ -291,7 +318,11 @@ export class MelosAgentRunner extends AgentRunner {
     const deadline = Date.now() + this.timing.connectBudgetMs;
     const active = () =>
       db
-        .select({ runId: agentThreads.activeRunId, heartbeat: agentThreads.runHeartbeatAt })
+        .select({
+          runId: agentThreads.activeRunId,
+          heartbeat: agentThreads.runHeartbeatAt,
+          seq: agentThreads.nextRunSeq,
+        })
         .from(agentThreads)
         .where(this.owned(threadId));
     const [first] = await active();
@@ -309,7 +340,14 @@ export class MelosAgentRunner extends AgentRunner {
       const [run] = await db
         .select({ eventsJson: agentThreadRuns.eventsJson })
         .from(agentThreadRuns)
-        .where(and(eq(agentThreadRuns.threadId, threadId), eq(agentThreadRuns.runId, runId)));
+        .where(
+          and(
+            eq(agentThreadRuns.threadId, threadId),
+            eq(agentThreadRuns.runId, runId),
+            // A resume shares the interrupted run's id: wait for the row this run stores.
+            gte(agentThreadRuns.seq, first.seq),
+          ),
+        );
       if (run) {
         for (const event of JSON.parse(run.eventsJson) as BaseEvent[]) {
           const messageId = messageIdOf(event);
