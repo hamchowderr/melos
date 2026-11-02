@@ -29,6 +29,10 @@ import {
   pingResultSchema,
 } from '@/lib/agent/contract';
 import {
+  masterSharesInputSchema,
+  publishingSharesInputSchema,
+  UPDATE_MASTER_SHARES_TOOL_NAME,
+  UPDATE_PUBLISHING_SHARES_TOOL_NAME,
   UPDATE_WRITER_SHARES_TOOL_NAME,
   writerSharesInputSchema,
 } from '@/lib/agent/rights-write-tools';
@@ -158,16 +162,36 @@ export function useMelosToolRenderers() {
     },
     [],
   );
+  // While a write is suspended it has no result; ConfirmationCard asks (melos-qlw.3).
+  const approvedRights = renderResult<RightsSummaryDTO>(
+    'Waiting for your approval...',
+    (rights) => (
+      <FocusOn entity={rightsFocus(rights)}>
+        <RightsPanel rights={rights} recordingTitles={masterLabels(rights)} />
+      </FocusOn>
+    ),
+  );
   useRenderTool(
     {
       name: UPDATE_WRITER_SHARES_TOOL_NAME,
       parameters: writerSharesInputSchema,
-      // While suspended the call has no result; ConfirmationCard asks (melos-qlw.3).
-      render: renderResult<RightsSummaryDTO>('Waiting for your approval...', (rights) => (
-        <FocusOn entity={rightsFocus(rights)}>
-          <RightsPanel rights={rights} recordingTitles={masterLabels(rights)} />
-        </FocusOn>
-      )),
+      render: approvedRights,
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: UPDATE_PUBLISHING_SHARES_TOOL_NAME,
+      parameters: publishingSharesInputSchema,
+      render: approvedRights,
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: UPDATE_MASTER_SHARES_TOOL_NAME,
+      parameters: masterSharesInputSchema,
+      render: approvedRights,
     },
     [],
   );
