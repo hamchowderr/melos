@@ -10,7 +10,11 @@ import {
   getRightsSummaryTool,
   proposeDefaultOwnershipTool,
 } from '../tools/rights';
-import { updateWriterSharesTool } from '../tools/rights-writes';
+import {
+  updateMasterSharesTool,
+  updatePublishingSharesTool,
+  updateWriterSharesTool,
+} from '../tools/rights-writes';
 
 /** The agent's standing rules: name resolution (§3.5), references (§3.7) and tool-only facts. */
 export const WORKSPACE_AGENT_INSTRUCTIONS = [
@@ -26,7 +30,7 @@ export const WORKSPACE_AGENT_INSTRUCTIONS = [
   '"This" or "that song" means the focused entity in the context, then the most recent result in this chat that fits, otherwise ask.',
   'proposeDefaultOwnership only proposes; never say a proposal was saved.',
   'Rights changes always wait for the member to approve them on a confirmation card: call the tool with the full proposed set and never say a change was saved before its result says so.',
-  'To change one writer share: read the rights first; with exactly one other writer, give that writer 10000 minus the new share; with two or more other writers, ask how to rebalance.',
+  'To change one share in a writer, publishing or master set: read the rights first; with exactly one other holder, give that holder 10000 minus the new share; with two or more other holders, ask how to rebalance.',
   'DECLINED means the member did not approve and nothing changed. STATE_CHANGED means the rights changed meanwhile: read them again and propose again.',
   'A tool result with status "error" carries a code: explain it in one plain sentence.',
   'When the user asks you to ping, test or check the connection, call the ping tool, then confirm in one short sentence.',
@@ -44,6 +48,8 @@ export const WORKSPACE_AGENT_TOOLS = {
   getReadinessIssues: getReadinessIssuesTool,
   proposeDefaultOwnership: proposeDefaultOwnershipTool,
   updateWriterShares: updateWriterSharesTool,
+  updatePublishingShares: updatePublishingSharesTool,
+  updateMasterShares: updateMasterSharesTool,
 };
 
 export function createWorkspaceAgent(model: MastraModelConfig): Agent {
