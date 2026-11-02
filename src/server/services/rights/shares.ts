@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { monotonicFactory } from 'ulid';
+import type { ApprovalRow } from '../../../lib/agent/approval';
 import type { WorkspacePermissions } from '../../../lib/auth/permissions';
 import {
   type RightsSummaryDTO,
@@ -21,7 +22,7 @@ import { requirePermission } from '../permissions';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
 import { getWorkspaceDatabase, sanitized } from '../workspace-connections';
-import { runWorkspaceWrite, type WorkspaceTransaction } from '../workspace-write';
+import { runWorkspaceWrite, type WorkspaceTransaction, type WriteOrigin } from '../workspace-write';
 import { getRightsSummary } from './read';
 
 const UPDATE: WorkspacePermissions = { rights: ['update'] };
@@ -114,6 +115,77 @@ export async function getWriterSharesHash(
 }
 
 /**
+ * The rows a writer set names, after the composition and every party resolve: a composition or
+ * party with no live row is NOT_FOUND and an organization is VALIDATION person_required.
+ */
+async function checkWriterSet(tx: Reader, { compositionId, shares }: WriterSharesInput) {
+  const live = and(eq(compositions.id, compositionId), isNull(compositions.deletedAt));
+  const [song] = await tx.select({ title: compositions.title }).from(compositions).where(live);
+  if (!song) return failure('NOT_FOUND');
+  const ids = shares.map((share) => share.partyId);
+  const named = ids.length
+    ? await tx
+        .select({ id: parties.id, partyKind: parties.partyKind, name: parties.displayName })
+        .from(parties)
+        .where(and(inArray(parties.id, ids), isNull(parties.deletedAt)))
+    : [];
+  if (named.length < ids.length) return failure('NOT_FOUND');
+  if (named.some((party) => party.partyKind !== 'person')) return refuse('person_required');
+  return success({ title: song.title, names: new Map(named.map(({ id, name }) => [id, name])) });
+}
+
+/**
+ * What an approval of `input` shows and re-checks (§7.4 step 1), writing nothing: the current and
+ * proposed writer rows with names, roles and shares, and the current set's `beforeHash`. Refuses as
+ * updateWriterShares would, so a call the write would refuse never asks for approval.
+ */
+export async function previewWriterShares(
+  tenant: TenantContext,
+  input: WriterSharesInput,
+): Promise<
+  ServiceResult<{ title: string; before: ApprovalRow[]; after: ApprovalRow[]; beforeHash: string }>
+> {
+  if (!requirePermission(tenant, UPDATE).ok) return failure('FORBIDDEN');
+  const refused = invalid(input.shares);
+  if (refused) return refused;
+  return sanitized(tenant.workspaceId, async () => {
+    const db = await getWorkspaceDatabase(tenant.workspaceId);
+    const checked = await checkWriterSet(db, input);
+    if (!checked.ok) return checked;
+    const held = await writerSetOf(db, input.compositionId);
+    const heldNames = held.length
+      ? await db
+          .select({ id: parties.id, name: parties.displayName })
+          .from(parties)
+          .where(
+            inArray(
+              parties.id,
+              held.map(({ partyId }) => partyId),
+            ),
+          )
+      : [];
+    const names = new Map([
+      ...heldNames.map(({ id, name }) => [id, name] as const),
+      ...checked.value.names,
+    ]);
+    const row = ({
+      partyId,
+      roles: held,
+      shareBp,
+    }: Omit<WriterShareInput, 'roles'> & { roles: string[] }) => ({
+      ...{ id: partyId, label: names.get(partyId) ?? partyId },
+      ...{ detail: held.join(', '), shareBp },
+    });
+    return success({
+      title: checked.value.title,
+      before: held.map(row),
+      after: input.shares.map(row),
+      beforeHash: await writerSharesHash(db, input.compositionId),
+    });
+  });
+}
+
+/**
  * Replaces a composition's writer shares with `input.shares` (RGT-001, §4.4) in one audited write.
  * rights:update (§6.2) and VALIDATION come first, before the database opens: each party once, 1 to
  * 4 known roles, each share 0 to 10000 bp and a total of at most 10000 (D-3; a lower total is
@@ -125,73 +197,69 @@ export async function getWriterSharesHash(
 export async function updateWriterShares(
   tenant: TenantContext,
   input: WriterSharesInput,
+  origin?: WriteOrigin,
 ): Promise<ServiceResult<RightsSummaryDTO>> {
   if (!requirePermission(tenant, UPDATE).ok) return failure('FORBIDDEN');
   const refused = invalid(input.shares);
   if (refused) return refused;
   const { compositionId, shares } = input;
-  const written = await runWorkspaceWrite(tenant, UPDATE, async (tx, audit) => {
-    const live = and(eq(compositions.id, compositionId), isNull(compositions.deletedAt));
-    if (!(await tx.select({ id: compositions.id }).from(compositions).where(live)).length)
-      return failure('NOT_FOUND');
-    if (input.expectedBeforeHash !== undefined) {
-      const current = await writerSharesHash(tx, compositionId);
-      if (current !== input.expectedBeforeHash) return failure('STATE_CHANGED');
-    }
-    const ids = shares.map((share) => share.partyId);
-    const named = ids.length
-      ? await tx
-          .select({ id: parties.id, partyKind: parties.partyKind })
-          .from(parties)
-          .where(and(inArray(parties.id, ids), isNull(parties.deletedAt)))
-      : [];
-    if (named.length < ids.length) return failure('NOT_FOUND');
-    if (named.some((party) => party.partyKind !== 'person')) return refuse('person_required');
-    const before = await writerSetOf(tx, compositionId);
-    const plan = planByNaturalKey(
-      before.map(({ id, partyId }) => ({ id, key: partyId })),
-      shares,
-      (share) => share.partyId,
-    );
-    const [next, at, by] = [monotonicFactory(), new Date().toISOString(), tenant.userId];
-    if (plan.gone.length) await guard.delete(tx, writers, inArray(writers.id, plan.gone));
-    for (const { id, row } of plan.kept)
-      await guard.update(
-        tx,
-        writers,
-        { writerShareBp: row.shareBp, updatedAt: at, updatedBy: by },
-        eq(writers.id, id),
+  const written = await runWorkspaceWrite(
+    tenant,
+    UPDATE,
+    async (tx, audit) => {
+      const checked = await checkWriterSet(tx, input);
+      if (!checked.ok) return checked;
+      if (input.expectedBeforeHash !== undefined) {
+        const current = await writerSharesHash(tx, compositionId);
+        if (current !== input.expectedBeforeHash) return failure('STATE_CHANGED');
+      }
+      const before = await writerSetOf(tx, compositionId);
+      const plan = planByNaturalKey(
+        before.map(({ id, partyId }) => ({ id, key: partyId })),
+        shares,
+        (share) => share.partyId,
       );
-    const added = plan.added.map((row) => ({ id: `ctr_${next()}`, row }));
-    if (added.length)
-      await guard.insert(
+      const [next, at, by] = [monotonicFactory(), new Date().toISOString(), tenant.userId];
+      if (plan.gone.length) await guard.delete(tx, writers, inArray(writers.id, plan.gone));
+      for (const { id, row } of plan.kept)
+        await guard.update(
+          tx,
+          writers,
+          { writerShareBp: row.shareBp, updatedAt: at, updatedBy: by },
+          eq(writers.id, id),
+        );
+      const added = plan.added.map((row) => ({ id: `ctr_${next()}`, row }));
+      if (added.length)
+        await guard.insert(
+          tx,
+          writers,
+          added.map(({ id, row }) => ({
+            ...{ id, compositionId, partyId: row.partyId, writerShareBp: row.shareBp },
+            ...{ createdAt: at, updatedAt: at, createdBy: by, updatedBy: by },
+          })),
+        );
+      const all = [...plan.kept, ...added];
+      await guard.delete(
         tx,
-        writers,
-        added.map(({ id, row }) => ({
-          ...{ id, compositionId, partyId: row.partyId, writerShareBp: row.shareBp },
-          ...{ createdAt: at, updatedAt: at, createdBy: by, updatedBy: by },
-        })),
+        roles,
+        inArray(
+          roles.contributorId,
+          all.map(({ id }) => id),
+        ),
       );
-    const all = [...plan.kept, ...added];
-    await guard.delete(
-      tx,
-      roles,
-      inArray(
-        roles.contributorId,
-        all.map(({ id }) => id),
-      ),
-    );
-    const roleRows = all.flatMap(({ id, row }) =>
-      row.roles.map((role) => ({ contributorId: id, role })),
-    );
-    if (roleRows.length) await guard.insert(tx, roles, roleRows);
-    await reindexSong(tx, compositionId);
-    await audit.write({
-      ...{ action: 'writer_shares.replace', entityType: 'composition', entityId: compositionId },
-      ...{ before: { shares: before }, after: { shares: await writerSetOf(tx, compositionId) } },
-    });
-    return success(compositionId);
-  });
+      const roleRows = all.flatMap(({ id, row }) =>
+        row.roles.map((role) => ({ contributorId: id, role })),
+      );
+      if (roleRows.length) await guard.insert(tx, roles, roleRows);
+      await reindexSong(tx, compositionId);
+      await audit.write({
+        ...{ action: 'writer_shares.replace', entityType: 'composition', entityId: compositionId },
+        ...{ before: { shares: before }, after: { shares: await writerSetOf(tx, compositionId) } },
+      });
+      return success(compositionId);
+    },
+    origin,
+  );
   return written.ok
     ? getRightsSummary(tenant, { entityType: 'composition', entityId: written.value })
     : written;

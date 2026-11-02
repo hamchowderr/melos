@@ -140,3 +140,41 @@ describe('melos-rpr.21: updateWriterShares (RGT-001, RGT-004, DEMO-008)', () => 
     await consistent();
   });
 });
+
+describe('melos-qlw.2: previewWriterShares (§7.4 step 1)', () => {
+  it('shows the current and proposed writers with the current beforeHash and writes nothing', async () => {
+    const audits = (await auditsOf()).length;
+    const before = await oceanWriters();
+    const preview = await service.previewWriterShares(owner, {
+      compositionId: OCEAN,
+      shares: [share(JORDAN, 6000), share(ALEX, 4000)],
+    });
+    if (!preview.ok) throw new Error(`Refused with ${preview.error.code}`);
+    expect(preview.value.title).toBe('Ocean Blue');
+    expect(preview.value.beforeHash).toBe(await hash());
+    expect(preview.value.after).toEqual([
+      { id: JORDAN, label: 'Jordan Taylor', detail: 'songwriter', shareBp: 6000 },
+      { id: ALEX, label: 'Alex Ramirez', detail: 'songwriter', shareBp: 4000 },
+    ]);
+    expect(preview.value.before.map(({ id }) => id).sort()).toEqual(
+      before.map(({ partyId }) => partyId).sort(),
+    );
+    expect(await oceanWriters()).toEqual(before);
+    expect(await auditsOf()).toHaveLength(audits);
+  });
+
+  it('refuses as the write would: FORBIDDEN, VALIDATION and NOT_FOUND', async () => {
+    const shares = [share(JORDAN, 6000), share(ALEX, 4000)];
+    const viewer = withRole(owner, 'viewer');
+    expect(await service.previewWriterShares(viewer, { compositionId: OCEAN, shares })).toEqual(
+      refused({ code: 'FORBIDDEN' }),
+    );
+    const over = [share(JORDAN, 6000), share(ALEX, 6000)];
+    expect(
+      await service.previewWriterShares(owner, { compositionId: OCEAN, shares: over }),
+    ).toEqual(invalid('total_over_10000'));
+    expect(await service.previewWriterShares(owner, { compositionId: 'cmp_NONE', shares })).toEqual(
+      refused({ code: 'NOT_FOUND' }),
+    );
+  });
+});
