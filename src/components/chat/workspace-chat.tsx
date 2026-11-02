@@ -9,6 +9,7 @@ import {
 } from '@copilotkit/react-core/v2';
 import '@copilotkit/react-core/v2/styles.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useApprovalInterrupts } from '@/components/chat/approval-interrupt';
 import { ChatRunErrorNotice } from '@/components/chat/chat-run-error';
 import { FocusProvider } from '@/components/chat/focus-context';
 import { useMelosToolRenderers } from '@/components/chat/tool-renderers';
@@ -127,6 +128,7 @@ export function Chat() {
   const ready = useAgentReady(WORKSPACE_AGENT_ID);
 
   useMelosToolRenderers();
+  useApprovalInterrupts();
 
   if (!ready) {
     return <div className="p-4 text-sm text-muted-foreground">Connecting to the agent...</div>;

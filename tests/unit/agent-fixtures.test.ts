@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { loadFixtureFile, validateFixtures } from '@copilotkit/aimock';
 import { describe, expect, it, vi } from 'vitest';
 import type { ZodType } from 'zod';
+import { approvalRequestSchema } from '../../src/lib/agent/approval';
 import { WORKSPACE_AGENT_TOOLS } from '../../src/mastra/agents/workspace-agent';
 
 const rendered = vi.hoisted(() => [] as string[]);
@@ -51,11 +52,16 @@ describe('AIMock fixtures (TST-AI-004)', () => {
   });
 
   it('AGUIMock fixtures call only canonical tools with valid arguments', () => {
-    const { fixtures } = JSON.parse(
-      readFileSync(join(ROOT, 'fixtures', 'agui', 'renderers.json'), 'utf8'),
-    ) as { fixtures: { message: string; toolName: string; args: unknown }[] };
-    for (const { message, toolName, args } of fixtures) {
-      expectCanonicalCall(`agui "${message}"`, toolName, args);
+    for (const file of ['renderers.json', 'confirmation.json']) {
+      const { fixtures } = JSON.parse(
+        readFileSync(join(ROOT, 'fixtures', 'agui', file), 'utf8'),
+      ) as { fixtures: { message: string; toolName: string; args: unknown; request?: unknown }[] };
+      for (const { message, toolName, args, request } of fixtures) {
+        expectCanonicalCall(`agui "${message}"`, toolName, args);
+        // A suspension's payload is the ApprovalRequest the ConfirmationCard parses (§3.4).
+        if (request !== undefined)
+          expect(approvalRequestSchema.parse(request).toolName).toBe(toolName);
+      }
     }
   });
 });
