@@ -226,3 +226,59 @@ describe('RGT-005: updateLicensingContacts', () => {
     expect((await audits()).length).toBe(earlier + 1);
   });
 });
+
+describe('melos-qlw.5: previews and beforeHash re-checks (§7.4)', () => {
+  it('previews an attestation with its hash; a stale expectedBeforeHash is STATE_CHANGED', async () => {
+    const input = {
+      interestType: 'publishing' as const,
+      interestId: OCEAN_NIGHTSHIFT,
+      attested: true,
+    };
+    const before = (await audits()).length;
+    const preview = await accepted(service.previewRepresentation(owner, input));
+    expect(preview.target).toEqual({ entityType: 'composition', entityId: keys.cmp_OCEAN });
+    expect(preview.after[0]).toMatchObject({
+      id: OCEAN_NIGHTSHIFT,
+      detail: expect.stringContaining('Publishing'),
+    });
+    expect(await audits()).toHaveLength(before);
+    const stale = { ...input, expectedBeforeHash: 'f'.repeat(64) };
+    expect(await service.attestRepresentation(owner, stale)).toEqual(
+      refused({ code: 'STATE_CHANGED' }),
+    );
+    expect(await audits()).toHaveLength(before);
+    expect(
+      (
+        await service.attestRepresentation(owner, {
+          ...input,
+          expectedBeforeHash: preview.beforeHash,
+        })
+      ).ok,
+    ).toBe(true);
+  });
+
+  it('previews licensing contacts; refuses as the write would', async () => {
+    const recordingId = keys.rec_OCEAN;
+    const contacts = [{ partyId: keys.pty_CARTER_SYNC }];
+    const preview = await accepted(
+      service.previewLicensingContacts(owner, { recordingId, contacts }),
+    );
+    expect(preview.after).toEqual([{ id: keys.pty_CARTER_SYNC, label: expect.any(String) }]);
+    const stale = { recordingId, contacts, expectedBeforeHash: 'f'.repeat(64) };
+    expect(await service.updateLicensingContacts(owner, stale)).toEqual(
+      refused({ code: 'STATE_CHANGED' }),
+    );
+    expect(
+      await service.previewLicensingContacts(withRole(owner, 'viewer'), { recordingId, contacts }),
+    ).toEqual(FORBIDDEN);
+    expect(await service.previewLicensingContacts(owner, { contacts })).toEqual(
+      invalid('target', 'exactly_one'),
+    );
+    expect(
+      await service.previewLicensingContacts(owner, {
+        recordingId,
+        contacts: [{ partyId: 'pty_NONE' }],
+      }),
+    ).toEqual(NOT_FOUND);
+  });
+});
