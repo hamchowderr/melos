@@ -1,0 +1,50 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "gate e missing song",
+        "hasToolResult": false
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "updateWriterShares",
+            "arguments": "{\"compositionId\":\"cmp_MISSING\",\"shares\":[{\"partyId\":\"pty_01KZ45Y2Z0DBP6RW0QS8TZEBZZ\",\"roles\":[\"songwriter\"],\"shareBp\":6000},{\"partyId\":\"pty_01KZ45Y4XGBPYNG8V581J15TRC\",\"roles\":[\"songwriter\"],\"shareBp\":4000}]}"
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "userMessage": "gate e missing song",
+        "hasToolResult": true
+      },
+      "response": {
+        "content": "That song is not in this workspace."
+      }
+    },
+    {
+      "match": {
+        "userMessage": "gate e viewer split",
+        "hasToolResult": false
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "updateWriterShares",
+            "arguments": "{\"compositionId\":\"cmp_01KZ6VHB70P86KNP74MTYDF2XS\",\"shares\":[{\"partyId\":\"pty_01KZ45Y2Z0DBP6RW0QS8TZEBZZ\",\"roles\":[\"songwriter\"],\"shareBp\":6000},{\"partyId\":\"pty_01KZ45Y4XGBPYNG8V581J15TRC\",\"roles\":[\"songwriter\"],\"shareBp\":4000}]}"
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "userMessage": "gate e viewer split",
+        "hasToolResult": true
+      },
+      "response": {
+        "content": "Your role cannot change rights."
+      }
+    }
+  ]
+}
