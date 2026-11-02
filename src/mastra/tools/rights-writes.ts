@@ -1,11 +1,21 @@
 import { createTool } from '@mastra/core/tools';
 import { approvalDecisionSchema, approvalRequestSchema } from '../../lib/agent/approval';
 import {
+  masterSharesInputSchema,
+  publishingSharesInputSchema,
+  UPDATE_MASTER_SHARES_TOOL_NAME,
+  UPDATE_PUBLISHING_SHARES_TOOL_NAME,
   UPDATE_WRITER_SHARES_TOOL_NAME,
   writerSharesInputSchema,
 } from '../../lib/agent/rights-write-tools';
 import { toolResultSchema } from '../../lib/agent/tool-result';
 import type { RightsSummaryDTO } from '../../lib/dto/rights';
+import {
+  previewMasterShares,
+  previewPublishingShares,
+  updateMasterShares,
+  updatePublishingShares,
+} from '../../server/services/rights/holder-shares';
 import { previewWriterShares, updateWriterShares } from '../../server/services/rights/shares';
 import { approvedWrite } from './approval';
 import { modelOutput } from './run-tool';
@@ -55,4 +65,78 @@ export const updateWriterSharesTool = createTool({
       updateWriterShares(tenant, { ...input, expectedBeforeHash }, origin),
   }),
   toModelOutput: modelOutput(summarizeWriterShares),
+});
+
+/** The §3.6 summary of an approved holder write: the changed sets' totals and holders. */
+export const summarizeHolderShares = (dto: RightsSummaryDTO) => ({
+  updated: 'holderShares' as const,
+  compositionId: dto.compositionId,
+  publishing: dto.publishing.map(({ territory, totalBp }) => ({ territory, totalBp })),
+  masters: dto.masters.map(({ recordingId, totalBp }) => ({ recordingId, totalBp })),
+});
+
+const splitOf = (rows: { label: string; shareBp?: number | null }[]) =>
+  rows.map((row) => `${row.label} ${percent(row.shareBp)}`).join(', ') || 'no holders';
+
+/** updatePublishingShares (§3.3): one territory's full publisher set, always approved first. */
+export const updatePublishingSharesTool = createTool({
+  id: UPDATE_PUBLISHING_SHARES_TOOL_NAME,
+  description:
+    "Replace one territory's publishing split on a composition with the full set of publishers and shares. Always asks the member to approve first. Shares are basis points.",
+  inputSchema: publishingSharesInputSchema,
+  outputSchema: toolResultSchema<RightsSummaryDTO>(),
+  suspendSchema: approvalRequestSchema,
+  resumeSchema: approvalDecisionSchema,
+  execute: approvedWrite({
+    toolName: UPDATE_PUBLISHING_SHARES_TOOL_NAME,
+    kind: 'rights_change',
+    permissions: { rights: ['update'] },
+    preview: async (tenant, { compositionId, territory, shares }) => {
+      const held = shares.map(({ publisherPartyId: partyId, ...rest }) => ({ partyId, ...rest }));
+      const preview = await previewPublishingShares(tenant, {
+        compositionId,
+        territory,
+        shares: held,
+      });
+      if (!preview.ok) return preview;
+      const summary = `Change the ${territory} publishing split: ${splitOf(preview.value.after)}.`;
+      const target = { entityType: 'composition', entityId: compositionId };
+      return { ok: true, value: { ...preview.value, summary, target } };
+    },
+    apply: (tenant, { compositionId, territory, shares }, expectedBeforeHash, origin) => {
+      const held = shares.map(({ publisherPartyId: partyId, ...rest }) => ({ partyId, ...rest }));
+      const input = { compositionId, territory, shares: held, expectedBeforeHash };
+      return updatePublishingShares(tenant, input, origin);
+    },
+  }),
+  toModelOutput: modelOutput(summarizeHolderShares),
+});
+
+/** updateMasterShares (§3.3): one recording's full owner set, always approved first. */
+export const updateMasterSharesTool = createTool({
+  id: UPDATE_MASTER_SHARES_TOOL_NAME,
+  description:
+    "Replace a recording's master split with the full set of owners and shares. Always asks the member to approve first. Shares are basis points.",
+  inputSchema: masterSharesInputSchema,
+  outputSchema: toolResultSchema<RightsSummaryDTO>(),
+  suspendSchema: approvalRequestSchema,
+  resumeSchema: approvalDecisionSchema,
+  execute: approvedWrite({
+    toolName: UPDATE_MASTER_SHARES_TOOL_NAME,
+    kind: 'rights_change',
+    permissions: { rights: ['update'] },
+    preview: async (tenant, { recordingId, shares }) => {
+      const held = shares.map(({ ownerPartyId: partyId, ...rest }) => ({ partyId, ...rest }));
+      const preview = await previewMasterShares(tenant, { recordingId, shares: held });
+      if (!preview.ok) return preview;
+      const summary = `Change the master split: ${splitOf(preview.value.after)}.`;
+      const target = { entityType: 'recording', entityId: recordingId };
+      return { ok: true, value: { ...preview.value, summary, target } };
+    },
+    apply: (tenant, { recordingId, shares }, expectedBeforeHash, origin) => {
+      const held = shares.map(({ ownerPartyId: partyId, ...rest }) => ({ partyId, ...rest }));
+      return updateMasterShares(tenant, { recordingId, shares: held, expectedBeforeHash }, origin);
+    },
+  }),
+  toModelOutput: modelOutput(summarizeHolderShares),
 });
