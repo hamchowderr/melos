@@ -1,5 +1,5 @@
-import type { z } from 'zod';
 import {
+  type ApprovalDecision,
   type ApprovalKind,
   type ApprovalRequest,
   type ApprovalRow,
@@ -105,9 +105,12 @@ export function approvedWrite<I, T>(write: ApprovedWrite<I, T>) {
       return refusal('DECLINED', { reason: pending.value.status });
     const { request, target } = pending.value;
     const decision = approvalDecisionSchema.safeParse(agent.resumeData);
-    const answer = decision.success ? decision.data : { approved: false, inputHash: '' };
+    // A malformed answer counts as a decline for no input, so it is audited as input_mismatch.
+    const answer: ApprovalDecision = decision.success
+      ? decision.data
+      : { approved: false, inputHash: '' };
     const declined = async (reason: 'declined' | 'input_mismatch') => {
-      const { comment } = answer as z.infer<typeof approvalDecisionSchema>;
+      const { comment } = answer;
       const outcome = { action: 'approval.declined' as const, reason, inputHash: answer.inputHash };
       const recorded = await recordApprovalOutcome(tenant, permissions, callId, target, {
         ...outcome,
