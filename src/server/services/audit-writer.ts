@@ -1,4 +1,4 @@
-import { ulid } from 'ulid';
+import { monotonicFactory } from 'ulid';
 import { auditLog } from '../db/schema/workspace.generated';
 import { type GuardTransaction, workspaceIntegrityGuard } from './integrity-guard';
 
@@ -87,6 +87,9 @@ function canonical(value: unknown, path: Set<object>): string | undefined {
   return Array.isArray(plain) ? `[${members.join(',')}]` : `{${members.join(',')}}`;
 }
 
+/** Audit ids sort in write order, also within one millisecond, so `ORDER BY id` replays a call. */
+const nextAuditId = monotonicFactory();
+
 /**
  * The AuditWriter of one workspace transaction: each entry is one `aud_<ulid>` row, inserted through
  * the workspace IntegrityGuard with the actor, the request id, the time, and before and after as
@@ -103,7 +106,7 @@ export function createAuditWriter(
     async write({ action, entityType, entityId, before, after }) {
       await workspaceIntegrityGuard.insert(tx, auditLog, [
         {
-          id: `aud_${ulid()}`,
+          id: `aud_${nextAuditId()}`,
           actorType: actor.type,
           actorUserId: actor.userId,
           agentRunId: actor.agentRunId ?? null,
