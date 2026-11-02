@@ -28,6 +28,8 @@ const ERROR_TEXT: Record<string, string> = {
   NO_TENANT: 'No active workspace was found for this chat. Reload the page and try again.',
   VALIDATION: 'The request was not valid.',
   FORBIDDEN: 'Your role cannot see this.',
+  DECLINED: 'Not approved, so nothing was changed.',
+  STATE_CHANGED: 'This changed while it waited for approval, so nothing was saved.',
 };
 
 /** A refusal or an unreadable result, in one plain sentence. */

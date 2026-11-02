@@ -1,0 +1,52 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "change alex split on ocean blue", "hasToolResult": false },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "getRightsSummary",
+            "arguments": "{\"entityType\":\"composition\",\"entityId\":\"cmp_01KZ6VHB70P86KNP74MTYDF2XS\"}"
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "userMessage": "change alex split on ocean blue",
+        "toolResultContains": "\"publishing\""
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "updateWriterShares",
+            "arguments": "{\"compositionId\":\"cmp_01KZ6VHB70P86KNP74MTYDF2XS\",\"shares\":[{\"partyId\":\"pty_01KZ45Y2Z0DBP6RW0QS8TZEBZZ\",\"roles\":[\"songwriter\"],\"shareBp\":6000},{\"partyId\":\"pty_01KZ45Y4XGBPYNG8V581J15TRC\",\"roles\":[\"songwriter\"],\"shareBp\":4000}]}"
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "userMessage": "change alex split on ocean blue",
+        "toolResultContains": "DECLINED"
+      },
+      "response": { "content": "Nothing changed: the split stays as it was." }
+    },
+    {
+      "match": {
+        "userMessage": "change alex split on ocean blue",
+        "toolResultContains": "STATE_CHANGED"
+      },
+      "response": {
+        "content": "The writers changed while you were deciding, so nothing was saved."
+      }
+    },
+    {
+      "match": {
+        "userMessage": "change alex split on ocean blue",
+        "toolResultContains": "\"updated\""
+      },
+      "response": { "content": "Done: Alex Ramirez now holds 40% of Ocean Blue." }
+    }
+  ]
+}

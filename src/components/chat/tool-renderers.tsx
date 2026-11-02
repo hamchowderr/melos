@@ -28,6 +28,10 @@ import {
   pingInputSchema,
   pingResultSchema,
 } from '@/lib/agent/contract';
+import {
+  UPDATE_WRITER_SHARES_TOOL_NAME,
+  writerSharesInputSchema,
+} from '@/lib/agent/rights-write-tools';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
 import type {
@@ -151,6 +155,19 @@ export function useMelosToolRenderers() {
         'Working out your ownership...',
         (proposal) => <OwnershipProposal proposal={proposal} />,
       ),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: UPDATE_WRITER_SHARES_TOOL_NAME,
+      parameters: writerSharesInputSchema,
+      // While suspended the call has no result; ConfirmationCard asks (melos-qlw.3).
+      render: renderResult<RightsSummaryDTO>('Waiting for your approval...', (rights) => (
+        <FocusOn entity={rightsFocus(rights)}>
+          <RightsPanel rights={rights} recordingTitles={masterLabels(rights)} />
+        </FocusOn>
+      )),
     },
     [],
   );
