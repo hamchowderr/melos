@@ -29,8 +29,12 @@ import {
   pingResultSchema,
 } from '@/lib/agent/contract';
 import {
+  ATTEST_REPRESENTATION_TOOL_NAME,
+  licensingContactsInputSchema,
   masterSharesInputSchema,
   publishingSharesInputSchema,
+  representationInputSchema,
+  UPDATE_LICENSING_CONTACTS_TOOL_NAME,
   UPDATE_MASTER_SHARES_TOOL_NAME,
   UPDATE_PUBLISHING_SHARES_TOOL_NAME,
   UPDATE_WRITER_SHARES_TOOL_NAME,
@@ -191,6 +195,22 @@ export function useMelosToolRenderers() {
     {
       name: UPDATE_MASTER_SHARES_TOOL_NAME,
       parameters: masterSharesInputSchema,
+      render: approvedRights,
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: ATTEST_REPRESENTATION_TOOL_NAME,
+      parameters: representationInputSchema,
+      render: approvedRights,
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: UPDATE_LICENSING_CONTACTS_TOOL_NAME,
+      parameters: licensingContactsInputSchema,
       render: approvedRights,
     },
     [],
