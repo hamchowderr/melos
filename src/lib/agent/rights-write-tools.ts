@@ -41,3 +41,34 @@ export const masterSharesInputSchema = z.object({
     .array(z.object({ ownerPartyId: z.string().min(1), shareBp, agreementId }))
     .describe('The full master set after the change, each owner once.'),
 });
+
+export const ATTEST_REPRESENTATION_TOOL_NAME = 'attestRepresentation';
+export const UPDATE_LICENSING_CONTACTS_TOOL_NAME = 'updateLicensingContacts';
+
+export const representationInputSchema = z.object({
+  interestType: z.enum(['publishing', 'master']),
+  interestId: z
+    .string()
+    .min(1)
+    .describe('The publishing or master interest id from getRightsSummary.'),
+  agreementId,
+  attested: z.boolean().describe('true attests that the workspace represents it; false clears it.'),
+});
+
+export const licensingContactsInputSchema = z
+  .object({
+    recordingId: z.string().min(1).optional(),
+    compositionId: z.string().min(1).optional(),
+    contacts: z
+      .array(
+        z.object({
+          partyId: z.string().min(1),
+          agreementId,
+          notes: z.string().max(2000).nullable().optional(),
+        }),
+      )
+      .describe('The full contact set after the change, each party once.'),
+  })
+  .refine((input) => !input.recordingId !== !input.compositionId, {
+    message: 'exactly one of recordingId and compositionId',
+  });
