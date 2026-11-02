@@ -1,0 +1,93 @@
+{
+  "fixtures": [
+    {
+      "message": "agui approve",
+      "toolName": "updateWriterShares",
+      "args": {
+        "compositionId": "cmp_AGUI1",
+        "shares": [
+          {
+            "partyId": "pty_AGUI",
+            "roles": ["songwriter", "composer"],
+            "shareBp": 6000
+          },
+          {
+            "partyId": "pty_AGUI2",
+            "roles": ["lyricist"],
+            "shareBp": 4000
+          }
+        ]
+      },
+      "request": {
+        "kind": "rights_change",
+        "toolName": "updateWriterShares",
+        "summary": "Change the writer split on Harbor Lights: Mock Writer 60%, Second Writer 40%.",
+        "before": [
+          {
+            "id": "pty_AGUI",
+            "label": "Mock Writer",
+            "detail": "songwriter, composer",
+            "shareBp": 5000
+          },
+          {
+            "id": "pty_AGUI2",
+            "label": "Second Writer",
+            "detail": "lyricist",
+            "shareBp": 5000
+          }
+        ],
+        "after": [
+          {
+            "id": "pty_AGUI",
+            "label": "Mock Writer",
+            "detail": "songwriter, composer",
+            "shareBp": 6000
+          },
+          {
+            "id": "pty_AGUI2",
+            "label": "Second Writer",
+            "detail": "lyricist",
+            "shareBp": 4000
+          }
+        ],
+        "inputHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "beforeHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "reasons": []
+      },
+      "approvedResult": {
+        "status": "ok",
+        "value": {
+          "compositionId": "cmp_AGUI1",
+          "writers": [
+            {
+              "contributorId": "ctb_A",
+              "partyId": "pty_A",
+              "displayName": "Mock Writer",
+              "roles": ["songwriter", "composer"],
+              "shareBp": 6000
+            },
+            {
+              "contributorId": "ctb_B",
+              "partyId": "pty_B",
+              "displayName": "Second Writer",
+              "roles": ["lyricist"],
+              "shareBp": 4000
+            }
+          ],
+          "writerTotalBp": 10000,
+          "publishing": [],
+          "masters": [],
+          "licensingContacts": [],
+          "issues": []
+        }
+      },
+      "declinedResult": {
+        "status": "error",
+        "error": {
+          "code": "DECLINED",
+          "reason": "declined"
+        }
+      }
+    }
+  ]
+}
