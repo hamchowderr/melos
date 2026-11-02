@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { and, asc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { monotonicFactory } from 'ulid';
+import type { ApprovalRow } from '../../../lib/agent/approval';
 import type { WorkspacePermissions } from '../../../lib/auth/permissions';
 import type {
   HolderShareInput,
@@ -21,13 +22,16 @@ import { requirePermission } from '../permissions';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
 import { getWorkspaceDatabase, sanitized } from '../workspace-connections';
-import { runWorkspaceWrite, type WorkspaceTransaction } from '../workspace-write';
+import { runWorkspaceWrite, type WorkspaceTransaction, type WriteOrigin } from '../workspace-write';
 import { getRightsSummary } from './read';
 import { planByNaturalKey } from './shares';
 
 const UPDATE: WorkspacePermissions = { rights: ['update'] };
 const MAX_BP = 10_000;
 const TERRITORY = /^(WORLD|[A-Z]{2})$/;
+
+/** A transaction or the database itself: the set loaders only read. */
+type Reader = Pick<WorkspaceTransaction, 'select'>;
 
 const refuse = (field: string, reason: string) => failure({ code: 'VALIDATION', field, reason });
 
@@ -44,7 +48,7 @@ function invalid(shares: HolderShareInput[]): ServiceResult<never> | null {
 }
 
 /** Whether every named party has a live row. */
-async function liveParties(tx: WorkspaceTransaction, shares: HolderShareInput[]) {
+async function liveParties(tx: Reader, shares: HolderShareInput[]) {
   const ids = shares.map(({ partyId }) => partyId);
   if (!ids.length) return true;
   const live = and(inArray(parties.id, ids), isNull(parties.deletedAt));
@@ -117,10 +121,92 @@ export async function getHolderSharesHashes(
   });
 }
 
+type Preview = { before: ApprovalRow[]; after: ApprovalRow[]; beforeHash: string };
+
+/**
+ * What an approval of a holder set replace shows and re-checks (§7.4 step 1), writing nothing: the
+ * current and proposed holders by name with their shares, and the current set's `beforeHash`.
+ * Refuses as the write would, so a call the write would refuse never asks for approval.
+ */
+async function previewHolders(
+  tenant: TenantContext,
+  shares: HolderShareInput[],
+  load: (db: Reader) => Promise<ServiceResult<Held[]>>,
+): Promise<ServiceResult<Preview>> {
+  if (!requirePermission(tenant, UPDATE).ok) return failure('FORBIDDEN');
+  const refused = invalid(shares);
+  if (refused) return refused;
+  return sanitized(tenant.workspaceId, async () => {
+    const db = await getWorkspaceDatabase(tenant.workspaceId);
+    const loaded = await load(db);
+    if (!loaded.ok) return loaded;
+    const ids = [...new Set([...loaded.value, ...shares].map(({ partyId }) => partyId))];
+    const named = ids.length
+      ? await db
+          .select({ id: parties.id, name: parties.displayName })
+          .from(parties)
+          .where(inArray(parties.id, ids))
+      : [];
+    const names = new Map(named.map(({ id, name }) => [id, name]));
+    const row = ({ partyId, shareBp }: { partyId: string; shareBp: number }) => ({
+      ...{ id: partyId, label: names.get(partyId) ?? partyId, shareBp },
+    });
+    return success({
+      before: loaded.value.map(row),
+      after: shares.map(row),
+      beforeHash: holderSetHash(loaded.value),
+    });
+  });
+}
+
+/** previewHolders for one territory's publishing set (RGT-002, RGT-007). */
+export function previewPublishingShares(tenant: TenantContext, input: PublishingSharesInput) {
+  if (!TERRITORY.test(input.territory))
+    return Promise.resolve(refuse('territory', 'unknown_territory'));
+  return previewHolders(tenant, input.shares, (db) => loadPublishingSet(db, input));
+}
+
+/** previewHolders for one recording's master set (RGT-003). */
+export function previewMasterShares(tenant: TenantContext, input: MasterSharesInput) {
+  return previewHolders(tenant, input.shares, (db) => loadMasterSet(db, input));
+}
+
 const stamps = (tenant: TenantContext) => {
   const at = new Date().toISOString();
   return { at, by: tenant.userId, next: monotonicFactory() };
 };
+
+/**
+ * A publishing set's current rows, by party, once the composition and parties resolve: a missing
+ * live row is NOT_FOUND, and a WORLD set beside country sets is VALIDATION (P-05).
+ */
+async function loadPublishingSet(
+  tx: Reader,
+  { compositionId, territory, shares }: PublishingSharesInput,
+): Promise<ServiceResult<Held[]>> {
+  const live = and(eq(compositions.id, compositionId), isNull(compositions.deletedAt));
+  if (!(await tx.select({ id: compositions.id }).from(compositions).where(live)).length)
+    return failure('NOT_FOUND');
+  if (!(await liveParties(tx, shares))) return failure('NOT_FOUND');
+  const song = eq(publishers.compositionId, compositionId);
+  const other =
+    territory === 'WORLD' ? ne(publishers.territory, 'WORLD') : eq(publishers.territory, 'WORLD');
+  const [mixed] = await tx.select({ id: publishers.id }).from(publishers).where(and(song, other));
+  if (mixed && shares.length) return refuse('territory', 'mixes_world_and_countries');
+  const { id, shareBp, agreementId, representationAttestedAt } = publishers;
+  const before: Held[] = await tx
+    .select({
+      id,
+      partyId: publishers.publisherPartyId,
+      shareBp,
+      agreementId,
+      representationAttestedAt,
+    })
+    .from(publishers)
+    .where(and(song, eq(publishers.territory, territory)))
+    .orderBy(asc(publishers.publisherPartyId));
+  return success(before);
+}
 
 /**
  * Replaces one territory's publishing shares on a composition (RGT-002, RGT-007) in one audited
@@ -132,86 +218,94 @@ const stamps = (tenant: TenantContext) => {
 export async function updatePublishingShares(
   tenant: TenantContext,
   input: PublishingSharesInput,
+  origin?: WriteOrigin,
 ): Promise<ServiceResult<RightsSummaryDTO>> {
   if (!requirePermission(tenant, UPDATE).ok) return failure('FORBIDDEN');
   if (!TERRITORY.test(input.territory)) return refuse('territory', 'unknown_territory');
   const refused = invalid(input.shares);
   if (refused) return refused;
   const { compositionId, territory, shares } = input;
-  const written = await runWorkspaceWrite(tenant, UPDATE, async (tx, audit) => {
-    const live = and(eq(compositions.id, compositionId), isNull(compositions.deletedAt));
-    if (!(await tx.select({ id: compositions.id }).from(compositions).where(live)).length)
-      return failure('NOT_FOUND');
-    if (!(await liveParties(tx, shares))) return failure('NOT_FOUND');
-    const song = eq(publishers.compositionId, compositionId);
-    const other =
-      territory === 'WORLD' ? ne(publishers.territory, 'WORLD') : eq(publishers.territory, 'WORLD');
-    const [mixed] = await tx.select({ id: publishers.id }).from(publishers).where(and(song, other));
-    if (mixed && shares.length) return refuse('territory', 'mixes_world_and_countries');
-    const { id, shareBp, agreementId, representationAttestedAt } = publishers;
-    const before: Held[] = await tx
-      .select({
-        id,
-        partyId: publishers.publisherPartyId,
-        shareBp,
-        agreementId,
-        representationAttestedAt,
-      })
-      .from(publishers)
-      .where(and(song, eq(publishers.territory, territory)))
-      .orderBy(asc(publishers.publisherPartyId));
-    if (
-      input.expectedBeforeHash !== undefined &&
-      holderSetHash(before) !== input.expectedBeforeHash
-    )
-      return failure('STATE_CHANGED');
-    const plan = planByNaturalKey(
-      before.map((row) => ({ id: row.id, key: row.partyId })),
-      shares,
-      (share) => share.partyId,
-    );
-    const { at, by, next } = stamps(tenant);
-    if (plan.gone.length) await guard.delete(tx, publishers, inArray(publishers.id, plan.gone));
-    for (const { id: kept, row } of plan.kept)
-      await guard.update(
-        tx,
-        publishers,
-        {
-          shareBp: row.shareBp,
-          agreementId: row.agreementId ?? null,
-          updatedAt: at,
-          updatedBy: by,
+  const written = await runWorkspaceWrite(
+    tenant,
+    UPDATE,
+    async (tx, audit) => {
+      const loaded = await loadPublishingSet(tx, input);
+      if (!loaded.ok) return loaded;
+      const before = loaded.value;
+      const song = eq(publishers.compositionId, compositionId);
+      if (
+        input.expectedBeforeHash !== undefined &&
+        holderSetHash(before) !== input.expectedBeforeHash
+      )
+        return failure('STATE_CHANGED');
+      const plan = planByNaturalKey(
+        before.map((row) => ({ id: row.id, key: row.partyId })),
+        shares,
+        (share) => share.partyId,
+      );
+      const { at, by, next } = stamps(tenant);
+      if (plan.gone.length) await guard.delete(tx, publishers, inArray(publishers.id, plan.gone));
+      for (const { id: kept, row } of plan.kept)
+        await guard.update(
+          tx,
+          publishers,
+          {
+            shareBp: row.shareBp,
+            agreementId: row.agreementId ?? null,
+            updatedAt: at,
+            updatedBy: by,
+          },
+          eq(publishers.id, kept),
+        );
+      if (plan.added.length)
+        await guard.insert(
+          tx,
+          publishers,
+          plan.added.map((row) => ({
+            ...{ id: next(), compositionId, publisherPartyId: row.partyId, territory },
+            ...{ shareBp: row.shareBp, agreementId: row.agreementId ?? null },
+            ...{ createdAt: at, updatedAt: at, createdBy: by, updatedBy: by },
+          })),
+        );
+      const after = await tx
+        .select()
+        .from(publishers)
+        .where(and(song, eq(publishers.territory, territory)))
+        .orderBy(asc(publishers.publisherPartyId));
+      await audit.write({
+        ...{
+          action: 'publishing_shares.replace',
+          entityType: 'composition',
+          entityId: compositionId,
         },
-        eq(publishers.id, kept),
-      );
-    if (plan.added.length)
-      await guard.insert(
-        tx,
-        publishers,
-        plan.added.map((row) => ({
-          ...{ id: next(), compositionId, publisherPartyId: row.partyId, territory },
-          ...{ shareBp: row.shareBp, agreementId: row.agreementId ?? null },
-          ...{ createdAt: at, updatedAt: at, createdBy: by, updatedBy: by },
-        })),
-      );
-    const after = await tx
-      .select()
-      .from(publishers)
-      .where(and(song, eq(publishers.territory, territory)))
-      .orderBy(asc(publishers.publisherPartyId));
-    await audit.write({
-      ...{
-        action: 'publishing_shares.replace',
-        entityType: 'composition',
-        entityId: compositionId,
-      },
-      ...{ before: { territory, shares: before }, after: { territory, shares: after } },
-    });
-    return success(compositionId);
-  });
+        ...{ before: { territory, shares: before }, after: { territory, shares: after } },
+      });
+      return success(compositionId);
+    },
+    origin,
+  );
   return written.ok
     ? getRightsSummary(tenant, { entityType: 'composition', entityId: written.value })
     : written;
+}
+
+/** A master set's current rows, by party, once the recording and parties resolve (NOT_FOUND). */
+async function loadMasterSet(
+  tx: Reader,
+  { recordingId, shares }: MasterSharesInput,
+): Promise<ServiceResult<Held[]>> {
+  const live = and(eq(recordings.id, recordingId), isNull(recordings.deletedAt));
+  if (!(await tx.select({ id: recordings.id }).from(recordings).where(live)).length)
+    return failure('NOT_FOUND');
+  if (!(await liveParties(tx, shares))) return failure('NOT_FOUND');
+  const take = eq(masters.recordingId, recordingId);
+  const { id, shareBp, agreementId, representationAttestedAt } = masters;
+  const before: Held[] = await tx
+    .select({ id, partyId: masters.ownerPartyId, shareBp, agreementId, representationAttestedAt })
+    .from(masters)
+    .where(take)
+    .orderBy(asc(masters.ownerPartyId));
+  return success(before);
 }
 
 /**
@@ -223,64 +317,63 @@ export async function updatePublishingShares(
 export async function updateMasterShares(
   tenant: TenantContext,
   input: MasterSharesInput,
+  origin?: WriteOrigin,
 ): Promise<ServiceResult<RightsSummaryDTO>> {
   if (!requirePermission(tenant, UPDATE).ok) return failure('FORBIDDEN');
   const refused = invalid(input.shares);
   if (refused) return refused;
   const { recordingId, shares } = input;
-  const written = await runWorkspaceWrite(tenant, UPDATE, async (tx, audit) => {
-    const live = and(eq(recordings.id, recordingId), isNull(recordings.deletedAt));
-    if (!(await tx.select({ id: recordings.id }).from(recordings).where(live)).length)
-      return failure('NOT_FOUND');
-    if (!(await liveParties(tx, shares))) return failure('NOT_FOUND');
-    const take = eq(masters.recordingId, recordingId);
-    const { id, shareBp, agreementId, representationAttestedAt } = masters;
-    const before: Held[] = await tx
-      .select({ id, partyId: masters.ownerPartyId, shareBp, agreementId, representationAttestedAt })
-      .from(masters)
-      .where(take)
-      .orderBy(asc(masters.ownerPartyId));
-    if (
-      input.expectedBeforeHash !== undefined &&
-      holderSetHash(before) !== input.expectedBeforeHash
-    )
-      return failure('STATE_CHANGED');
-    const plan = planByNaturalKey(
-      before.map((row) => ({ id: row.id, key: row.partyId })),
-      shares,
-      (share) => share.partyId,
-    );
-    const { at, by, next } = stamps(tenant);
-    if (plan.gone.length) await guard.delete(tx, masters, inArray(masters.id, plan.gone));
-    for (const { id: kept, row } of plan.kept)
-      await guard.update(
-        tx,
-        masters,
-        {
-          shareBp: row.shareBp,
-          agreementId: row.agreementId ?? null,
-          updatedAt: at,
-          updatedBy: by,
-        },
-        eq(masters.id, kept),
+  const written = await runWorkspaceWrite(
+    tenant,
+    UPDATE,
+    async (tx, audit) => {
+      const loaded = await loadMasterSet(tx, input);
+      if (!loaded.ok) return loaded;
+      const before = loaded.value;
+      const take = eq(masters.recordingId, recordingId);
+      if (
+        input.expectedBeforeHash !== undefined &&
+        holderSetHash(before) !== input.expectedBeforeHash
+      )
+        return failure('STATE_CHANGED');
+      const plan = planByNaturalKey(
+        before.map((row) => ({ id: row.id, key: row.partyId })),
+        shares,
+        (share) => share.partyId,
       );
-    if (plan.added.length)
-      await guard.insert(
-        tx,
-        masters,
-        plan.added.map((row) => ({
-          ...{ id: next(), recordingId, ownerPartyId: row.partyId },
-          ...{ shareBp: row.shareBp, agreementId: row.agreementId ?? null },
-          ...{ createdAt: at, updatedAt: at, createdBy: by, updatedBy: by },
-        })),
-      );
-    const after = await tx.select().from(masters).where(take).orderBy(asc(masters.ownerPartyId));
-    await audit.write({
-      ...{ action: 'master_shares.replace', entityType: 'recording', entityId: recordingId },
-      ...{ before: { shares: before }, after: { shares: after } },
-    });
-    return success(recordingId);
-  });
+      const { at, by, next } = stamps(tenant);
+      if (plan.gone.length) await guard.delete(tx, masters, inArray(masters.id, plan.gone));
+      for (const { id: kept, row } of plan.kept)
+        await guard.update(
+          tx,
+          masters,
+          {
+            shareBp: row.shareBp,
+            agreementId: row.agreementId ?? null,
+            updatedAt: at,
+            updatedBy: by,
+          },
+          eq(masters.id, kept),
+        );
+      if (plan.added.length)
+        await guard.insert(
+          tx,
+          masters,
+          plan.added.map((row) => ({
+            ...{ id: next(), recordingId, ownerPartyId: row.partyId },
+            ...{ shareBp: row.shareBp, agreementId: row.agreementId ?? null },
+            ...{ createdAt: at, updatedAt: at, createdBy: by, updatedBy: by },
+          })),
+        );
+      const after = await tx.select().from(masters).where(take).orderBy(asc(masters.ownerPartyId));
+      await audit.write({
+        ...{ action: 'master_shares.replace', entityType: 'recording', entityId: recordingId },
+        ...{ before: { shares: before }, after: { shares: after } },
+      });
+      return success(recordingId);
+    },
+    origin,
+  );
   return written.ok
     ? getRightsSummary(tenant, { entityType: 'recording', entityId: written.value })
     : written;
