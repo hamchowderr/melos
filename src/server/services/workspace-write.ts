@@ -1,6 +1,8 @@
+import { and, eq, inArray } from 'drizzle-orm';
 import type { WorkspacePermissions } from '../../lib/auth/permissions';
 import { retryLocked } from '../db/migration-runner';
-import { type Actor, type AuditWriter, createAuditWriter } from './audit-writer';
+import { auditLog } from '../db/schema/workspace.generated';
+import { type Actor, type AuditEntry, type AuditWriter, createAuditWriter } from './audit-writer';
 import { IntegrityError } from './integrity-guard';
 import { requirePermission } from './permissions';
 import { failure, type ServiceError, type ServiceResult } from './service-result';
@@ -15,6 +17,29 @@ export type WorkspaceWrite<T> = (
   tx: WorkspaceTransaction,
   audit: AuditWriter,
 ) => Promise<ServiceResult<T>>;
+
+/**
+ * An approved agent write (§7.4 step 6): the tool call whose approval it carries, and the
+ * `approval.granted` entry that commits with the mutation, or not at all.
+ */
+export type WriteOrigin = Omit<Actor, 'userId'> & {
+  granted?: Omit<AuditEntry, 'action' | 'before'>;
+};
+
+const OUTCOMES = ['approval.granted', 'approval.declined', 'approval.stale'];
+
+/** The action of a tool call's approval outcome row, when one is written (AUD-002, AUD-003). */
+export async function approvalOutcomeOf(
+  tx: Pick<WorkspaceTransaction, 'select'>,
+  toolCallId: string,
+): Promise<string | undefined> {
+  const [row] = await tx
+    .select({ action: auditLog.action })
+    .from(auditLog)
+    .where(and(eq(auditLog.approvalToolCallId, toolCallId), inArray(auditLog.action, OUTCOMES)))
+    .limit(1);
+  return row?.action;
+}
 
 /** Carries a refusal the body returned out of the transaction, so the transaction rolls back. */
 class Refusal extends Error {
@@ -34,22 +59,28 @@ class Refusal extends Error {
  * `tx.rollback()`, which throws. A transaction a lock refuses (SQLITE_BUSY, SQLITE_LOCKED) has rolled
  * back and runs again after a jittered wait, as MigrationRunner's writes do (ADR-033), so `core` may
  * run more than once and must touch only `tx` and `audit`. `origin` names an agent run or import
- * acting for the tenant's user.
+ * acting for the tenant's user. With `granted` and an `approvalToolCallId`, a call whose approval
+ * already has an outcome refuses with STATE_CHANGED, and a success writes `approval.granted` last.
  */
 export async function runWorkspaceWrite<T>(
   tenant: TenantContext,
   permissions: WorkspacePermissions,
   core: WorkspaceWrite<T>,
-  origin: Omit<Actor, 'userId'> = { type: 'user' },
+  { granted, ...origin }: WriteOrigin = { type: 'user' },
 ): Promise<ServiceResult<T>> {
   if (!requirePermission(tenant, permissions).ok) return failure('FORBIDDEN');
   const actor = { ...origin, userId: tenant.userId };
+  const toolCallId = granted && origin.approvalToolCallId;
   return sanitized(tenant.workspaceId, async () => {
     const database = await getWorkspaceDatabase(tenant.workspaceId);
     const attempt = () =>
       database.transaction(async (tx) => {
-        const result = await core(tx, createAuditWriter(tx, actor, tenant.requestId));
+        const audit = createAuditWriter(tx, actor, tenant.requestId);
+        if (toolCallId && (await approvalOutcomeOf(tx, toolCallId)))
+          throw new Refusal({ code: 'STATE_CHANGED' });
+        const result = await core(tx, audit);
         if (!result.ok) throw new Refusal(result.error);
+        if (granted) await audit.write({ ...granted, action: 'approval.granted', before: null });
         return result;
       });
     try {
