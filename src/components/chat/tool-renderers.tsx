@@ -3,6 +3,8 @@
 import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
 import type { z } from 'zod';
+import { ContactCard } from '@/components/chat/contact-card';
+import { ContactGrid } from '@/components/chat/contact-grid';
 import { FocusOn } from '@/components/chat/focus-context';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
@@ -30,6 +32,12 @@ import {
   pingResultSchema,
 } from '@/lib/agent/contract';
 import {
+  GET_CONTACT_TOOL_NAME,
+  getContactInputSchema,
+  SEARCH_CONTACTS_TOOL_NAME,
+  searchContactsInputSchema,
+} from '@/lib/agent/crm-tools';
+import {
   ATTEST_REPRESENTATION_TOOL_NAME,
   licensingContactsInputSchema,
   masterSharesInputSchema,
@@ -43,6 +51,7 @@ import {
 } from '@/lib/agent/rights-write-tools';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
+import type { ContactDetailDTO, ContactSummary } from '@/lib/dto/contacts';
 import type {
   DefaultOwnershipProposal,
   ReadinessReportDTO,
@@ -165,6 +174,26 @@ export function useMelosToolRenderers() {
         'Working out your ownership...',
         (proposal) => <OwnershipProposal proposal={proposal} />,
       ),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: SEARCH_CONTACTS_TOOL_NAME,
+      parameters: searchContactsInputSchema,
+      render: renderResult<ContactSummary[]>('Searching contacts...', (contacts) => (
+        <ContactGrid contacts={contacts} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_CONTACT_TOOL_NAME,
+      parameters: getContactInputSchema,
+      render: renderResult<ContactDetailDTO>('Opening the contact...', (contact) => (
+        <ContactCard contact={contact} />
+      )),
     },
     [],
   );
