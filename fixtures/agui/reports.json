@@ -1,0 +1,77 @@
+{
+  "fixtures": [
+    {
+      "message": "agui templates",
+      "toolName": "listReportTemplates",
+      "args": {},
+      "result": {
+        "status": "ok",
+        "value": [
+          {
+            "templateId": "tpl_AGUI_FULL",
+            "name": "Full",
+            "reportType": "song_sheet",
+            "presetKey": "full",
+            "isSystem": true,
+            "sections": [
+              { "id": "core", "enabled": true },
+              { "id": "rights", "enabled": true },
+              { "id": "creators", "enabled": true },
+              { "id": "composition", "enabled": true },
+              { "id": "recording", "enabled": true },
+              { "id": "metadata", "enabled": true },
+              { "id": "listen", "enabled": true },
+              { "id": "licensing", "enabled": true },
+              { "id": "lyrics", "enabled": true }
+            ]
+          },
+          {
+            "templateId": "tpl_AGUI_SANS",
+            "name": "Sans lyrics",
+            "reportType": "song_sheet",
+            "presetKey": "sans_lyrics",
+            "isSystem": true,
+            "sections": [
+              { "id": "core", "enabled": true },
+              { "id": "rights", "enabled": true },
+              { "id": "creators", "enabled": true },
+              { "id": "composition", "enabled": true },
+              { "id": "recording", "enabled": true },
+              { "id": "metadata", "enabled": true },
+              { "id": "listen", "enabled": true },
+              { "id": "licensing", "enabled": true },
+              { "id": "lyrics", "enabled": false }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "message": "agui report",
+      "toolName": "previewReport",
+      "args": {
+        "preset": "sans_lyrics",
+        "items": [{ "compositionId": "cmp_AGUI1" }]
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "templateId": "tpl_AGUI_SANS",
+          "items": [{ "recordingId": "rec_AGUI1", "compositionId": "cmp_AGUI1" }],
+          "sections": [
+            { "id": "core", "enabled": true },
+            { "id": "rights", "enabled": true },
+            { "id": "creators", "enabled": true },
+            { "id": "composition", "enabled": true },
+            { "id": "recording", "enabled": true },
+            { "id": "metadata", "enabled": true },
+            { "id": "listen", "enabled": true },
+            { "id": "licensing", "enabled": true },
+            { "id": "lyrics", "enabled": false }
+          ],
+          "text": "Harbor Lights\nMock Artist\n\nWriters: Mock Writer 100%\n\nLink: https://example.com/harbor"
+        }
+      }
+    }
+  ]
+}
