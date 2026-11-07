@@ -17,7 +17,7 @@ export function WorkspaceTypePicker({
 }: Props) {
   return (
     <fieldset
-      className="flex flex-col gap-2"
+      className="flex flex-col gap-0.5"
       disabled={disabled}
       data-testid="workspace-type-picker"
     >
@@ -28,8 +28,8 @@ export function WorkspaceTypePicker({
           <label
             key={type}
             className={cn(
-              'flex cursor-pointer items-start gap-3 rounded-lg bg-muted/50 px-3 py-2.5 transition-colors',
-              'hover:bg-muted has-[:checked]:bg-primary/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50',
+              'group flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 transition-colors',
+              'hover:bg-muted/60 has-[:checked]:bg-muted has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50',
               'has-[:disabled]:cursor-default has-[:disabled]:opacity-70',
             )}
           >
@@ -43,7 +43,9 @@ export function WorkspaceTypePicker({
             />
             <span className="flex flex-col">
               <span className="font-medium text-sm">{info.label}</span>
-              <span className="text-muted-foreground text-xs">{info.description}</span>
+              <span className="text-muted-foreground text-xs group-has-[:checked]:text-foreground/70">
+                {info.description}
+              </span>
             </span>
           </label>
         );

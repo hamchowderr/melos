@@ -46,18 +46,18 @@ export function OnboardingChecklist({ checklist }: { checklist: OnboardingCheckl
           Dismiss
         </Button>
       </div>
-      <ol className="grid gap-1.5 sm:grid-cols-2">
+      <ol className="grid gap-x-3 sm:grid-cols-2">
         {checklist.items.map((item) => (
           <li key={item.key} data-done={item.done || undefined}>
             <Link
               href={item.href}
-              className="flex items-center gap-2 rounded-lg bg-background px-3 py-2 text-sm transition-colors hover:bg-accent"
+              className="-mx-1 flex items-center gap-2 rounded-md px-1 py-1.5 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               <span
                 aria-hidden
                 className={cn(
                   'flex size-4 shrink-0 items-center justify-center rounded-full',
-                  item.done ? 'bg-primary text-primary-foreground' : 'bg-muted',
+                  item.done ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/15',
                 )}
               >
                 {item.done ? <Check className="size-3" /> : null}

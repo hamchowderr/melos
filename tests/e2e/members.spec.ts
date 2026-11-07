@@ -90,7 +90,7 @@ test('AUTH-E2E-002: an owner sees a pending invitation and cancels it', async ({
   const invitations = page.getByRole('list', { name: 'Pending Invitations' });
   const row = invitations.getByRole('listitem').filter({ hasText: email });
   await expect(row).toContainText(`invited by ${owner.email}, expires `);
-  await expect(row).toContainText('admin');
+  await expect(row).toContainText('Admin');
   await row.getByRole('button', { name: `Cancel invitation to ${email}` }).click();
   await expect(page.getByRole('status')).toHaveText(`Canceled the invitation to ${email}.`);
   await expect(row).toHaveCount(0);

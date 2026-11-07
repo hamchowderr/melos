@@ -23,7 +23,7 @@ function Section({
 /** FollowUpQueue (§3.3): the due cells as PitchCard rows, in P-31 priority order. */
 export function FollowUpQueue({ cells }: { cells: TodayWorkspaceDTO['followUpsDue'] }) {
   return (
-    <Section label={`Follow-ups due (${cells.length})`} empty={cells.length === 0}>
+    <Section label={`Follow-Ups Due (${cells.length})`} empty={cells.length === 0}>
       <ul aria-label="Follow-up queue" className="flex flex-col">
         {cells.map((cell) => (
           <PitchCard key={cell.pitchItemId} cell={cell} show="both" />

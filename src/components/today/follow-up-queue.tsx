@@ -22,7 +22,7 @@ export function FollowUpQueue({ cells }: { cells: PitchSummary[] }) {
   return (
     <section aria-labelledby="follow-ups" className="flex flex-col gap-1.5">
       <h2 id="follow-ups" className="text-sm font-medium">
-        Follow-ups due <span className="font-normal text-muted-foreground">{cells.length}</span>
+        Follow-Ups Due <span className="font-normal text-muted-foreground">{cells.length}</span>
       </h2>
       <GridFrame>
         <Table aria-label="Follow-up queue">
