@@ -6,7 +6,7 @@ import { ToolCard } from '@/components/chat/tool-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { MessageDraftDTO } from '@/lib/dto/outreach';
+import type { MessageDraftDTO, SendResultDTO } from '@/lib/dto/outreach';
 
 const addresses = (list: MessageDraftDTO['to']) => list.map(({ address }) => address).join(', ');
 
@@ -72,6 +72,20 @@ export function MessageDraftCard({ draft: initial }: { draft: MessageDraftDTO })
           ) : null}
         </aside>
       </div>
+    </ToolCard>
+  );
+}
+
+/** sendMessage's result after ConfirmationCard (§3.3, OUT-002): sent, or why it failed. */
+export function SendResultCard({ result }: { result: SendResultDTO }) {
+  const sent = result.status === 'sent';
+  return (
+    <ToolCard title="Email">
+      <p className="px-4 pb-3" data-send-status={result.status}>
+        {sent
+          ? `Sent${result.provider === 'sandbox' ? ' (sandbox, no real email)' : ''} on ${result.sentAt?.slice(0, 10) ?? ''}.`
+          : `Not sent: ${result.failureReason ?? 'unknown error'}.`}
+      </p>
     </ToolCard>
   );
 }

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { monotonicFactory } from 'ulid';
+import type { ApprovalRow } from '../../../lib/agent/approval';
 import type { WorkspacePermissions } from '../../../lib/auth/permissions';
 import type { SendResultDTO } from '../../../lib/dto/outreach';
 import { controlDb } from '../../db/client';
@@ -16,6 +17,7 @@ import {
 import { canonicalJson } from '../audit-writer';
 import { workspaceIntegrityGuard as guard } from '../integrity-guard';
 import { oneStopReadyCells, type SentFacts } from '../metrics/north-star';
+import { requirePermission } from '../permissions';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
 import { getWorkspaceDatabase, sanitized } from '../workspace-connections';
@@ -44,6 +46,66 @@ const resultOf = (message: Message): SendResultDTO => ({
   ...{ providerMessageId: message.providerMessageId, sentAt: message.sentAt },
   failureReason: message.failureReason,
 });
+
+/** The message for outreach:send, read outside a write (§7.4 step 1). */
+async function readMessage(tenant: TenantContext, messageId: string) {
+  if (!requirePermission(tenant, SEND).ok) return failure('FORBIDDEN');
+  const message = await sanitized(tenant.workspaceId, async () =>
+    loadMessage(await getWorkspaceDatabase(tenant.workspaceId), messageId),
+  );
+  return message?.direction === 'outbound' ? success(message) : failure('NOT_FOUND');
+}
+
+/** A sent or failed message's stored SendResultDTO, so a repeat sendMessage asks nothing. */
+export async function storedSendResult(
+  tenant: TenantContext,
+  messageId: string,
+): Promise<ServiceResult<SendResultDTO | null>> {
+  const message = await readMessage(tenant, messageId);
+  if (!message.ok) return message;
+  const { status } = message.value;
+  return success(status === 'sent' || status === 'failed' ? resultOf(message.value) : null);
+}
+
+/**
+ * What a send shows before it asks (§7.4 step 1, OUT-002): the draft, its recipients and the
+ * beforeHash and contentHash the approval binds. A message that is not a draft is VALIDATION
+ * `not_draft`, and one with no `to` recipient VALIDATION `to` required. Writes nothing.
+ */
+export async function previewSend(
+  tenant: TenantContext,
+  messageId: string,
+): Promise<
+  ServiceResult<{
+    target: { entityType: 'message'; entityId: string };
+    before: ApprovalRow[];
+    after: ApprovalRow[];
+    beforeHash: string;
+    contentHash: string;
+    to: string[];
+  }>
+> {
+  const read = await readMessage(tenant, messageId);
+  if (!read.ok) return read;
+  const message = read.value;
+  if (message.status !== 'draft')
+    return failure({ code: 'VALIDATION', field: 'messageId', reason: 'not_draft' });
+  const to = message.recipients.filter((row) => row.recipientType === 'to');
+  if (!to.length) return failure({ code: 'VALIDATION', field: 'to', reason: 'required' });
+  const subject = message.subject ?? '(no subject)';
+  return success({
+    target: { entityType: 'message', entityId: message.id },
+    before: [{ id: message.id, label: subject, detail: 'Draft, not sent' }],
+    after: message.recipients.map((row) => ({
+      id: `${row.recipientType}:${row.addressSnapshot}`,
+      label: row.addressSnapshot,
+      detail: row.recipientType,
+    })),
+    beforeHash: sendBeforeHashOf(message),
+    contentHash: contentHashOf(message),
+    to: to.map((row) => row.addressSnapshot),
+  });
+}
 
 /** The address a send comes from: the transport's verified sender, else the member's own. */
 async function senderOf(tenant: TenantContext, transport: EmailTransport) {
