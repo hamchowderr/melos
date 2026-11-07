@@ -303,6 +303,91 @@
           "field": "entityId"
         }
       }
+    },
+    {
+      "message": "agui contacts",
+      "toolName": "searchContacts",
+      "args": {
+        "query": "Mock"
+      },
+      "result": {
+        "status": "ok",
+        "value": [
+          {
+            "contactId": "con_AGUI1",
+            "partyId": "pty_AGUI_SUP",
+            "displayName": "Mock Supervisor",
+            "organizationPartyId": "pty_AGUI_CO",
+            "organizationName": "Mock Sync Co",
+            "roles": ["music_supervisor"],
+            "primaryEmail": "supervisor@mock.example",
+            "openItemCount": 1
+          }
+        ]
+      }
+    },
+    {
+      "message": "agui contact card",
+      "toolName": "getContact",
+      "args": {
+        "contactId": "con_AGUI1"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "contactId": "con_AGUI1",
+          "partyId": "pty_AGUI_SUP",
+          "displayName": "Mock Supervisor",
+          "organizationPartyId": "pty_AGUI_CO",
+          "organizationName": "Mock Sync Co",
+          "roles": ["music_supervisor"],
+          "primaryEmail": "supervisor@mock.example",
+          "openItemCount": 1,
+          "relationshipNotes": null,
+          "active": true,
+          "methods": [
+            {
+              "id": "cm_AGUI1",
+              "methodType": "email",
+              "label": null,
+              "value": "supervisor@mock.example",
+              "isPrimary": true
+            }
+          ],
+          "pitchItems": [
+            {
+              "pitchId": "pit_AGUI1",
+              "pitchItemId": "pti_AGUI1",
+              "contactId": "con_AGUI1",
+              "contactName": "Mock Supervisor",
+              "contactRoles": ["music_supervisor"],
+              "itemType": "composition",
+              "itemId": "cmp_AGUI1",
+              "itemTitle": "Harbor Lights",
+              "currentStatus": "awaiting_reply",
+              "nextFollowUpAt": "2026-09-10T17:00:00.000Z",
+              "followUpDue": true,
+              "lastContactedAt": "2026-09-03T17:00:00.000Z",
+              "lastOutboundMessageId": "msg_AGUI1",
+              "priorityRank": 1
+            }
+          ],
+          "recentMessages": [
+            {
+              "messageId": "msg_AGUI1",
+              "pitchId": "pit_AGUI1",
+              "direction": "outbound",
+              "purpose": "initial",
+              "status": "sent",
+              "subject": "Harbor Lights for your show",
+              "inReplyToMessageId": null,
+              "sentAt": "2026-09-03T17:00:00.000Z",
+              "receivedAt": null,
+              "createdAt": "2026-09-03T16:00:00.000Z"
+            }
+          ]
+        }
+      }
     }
   ]
 }

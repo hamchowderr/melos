@@ -4,7 +4,9 @@ import { WORKSPACE_AGENT_ID } from '../../lib/agent/contract';
 import { focusInstruction } from '../focus';
 import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
+import { getContactTool, searchContactsTool } from '../tools/contacts';
 import { pingTool } from '../tools/ping';
+import { generateReportTool, listReportTemplatesTool, previewReportTool } from '../tools/reports';
 import {
   attestRepresentationTool,
   updateLicensingContactsTool,
@@ -32,7 +34,9 @@ export const WORKSPACE_AGENT_INSTRUCTIONS = [
   'otherwise list the candidates and ask which one the user means.',
   'When a tool needs a recording, use the song primaryRecordingId; if it is null, ask which recording.',
   '"This" or "that song" means the focused entity in the context, then the most recent result in this chat that fits, otherwise ask.',
+  'To act on a person the user names, call searchContacts first and resolve one contact the same way; ask when several match.',
   'proposeDefaultOwnership only proposes; never say a proposal was saved.',
+  'Reports: you see only their length, so never quote or summarize report text; the member reads it in the card.',
   'Rights changes (shares, representation, licensing contacts) always wait for the member to approve them on a confirmation card: call the tool with the full proposed set and never say a change was saved before its result says so.',
   'To change one share in a writer, publishing or master set: read the rights first; with exactly one other holder, give that holder 10000 minus the new share; with two or more other holders, ask how to rebalance.',
   'DECLINED means the member did not approve and nothing changed. STATE_CHANGED means the rights changed meanwhile: read them again and propose again.',
@@ -51,6 +55,11 @@ export const WORKSPACE_AGENT_TOOLS = {
   getRightsSummary: getRightsSummaryTool,
   getReadinessIssues: getReadinessIssuesTool,
   proposeDefaultOwnership: proposeDefaultOwnershipTool,
+  searchContacts: searchContactsTool,
+  getContact: getContactTool,
+  listReportTemplates: listReportTemplatesTool,
+  previewReport: previewReportTool,
+  generateReport: generateReportTool,
   updateWriterShares: updateWriterSharesTool,
   updatePublishingShares: updatePublishingSharesTool,
   updateMasterShares: updateMasterSharesTool,

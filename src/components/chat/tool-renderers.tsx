@@ -3,10 +3,13 @@
 import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
 import type { z } from 'zod';
+import { ContactCard } from '@/components/chat/contact-card';
+import { ContactGrid } from '@/components/chat/contact-grid';
 import { FocusOn } from '@/components/chat/focus-context';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
+import { useReportToolRenderers } from '@/components/chat/report-renderers';
 import { SongResults } from '@/components/chat/song-results';
 import { ToolCard, ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
 import { ReadinessChecklist } from '@/components/rights/readiness-checklist';
@@ -29,6 +32,12 @@ import {
   pingResultSchema,
 } from '@/lib/agent/contract';
 import {
+  GET_CONTACT_TOOL_NAME,
+  getContactInputSchema,
+  SEARCH_CONTACTS_TOOL_NAME,
+  searchContactsInputSchema,
+} from '@/lib/agent/crm-tools';
+import {
   ATTEST_REPRESENTATION_TOOL_NAME,
   licensingContactsInputSchema,
   masterSharesInputSchema,
@@ -42,6 +51,7 @@ import {
 } from '@/lib/agent/rights-write-tools';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
+import type { ContactDetailDTO, ContactSummary } from '@/lib/dto/contacts';
 import type {
   DefaultOwnershipProposal,
   ReadinessReportDTO,
@@ -51,7 +61,7 @@ import type {
 type RenderProps<A> = { status: string; args?: Partial<A>; result?: unknown };
 
 /** One structured renderer per tool (§3.1): pending, refusal, or the component for the DTO. */
-const renderResult =
+export const renderResult =
   <T, A = unknown>(pending: string, render: (value: T, args: Partial<A>) => ReactElement) =>
   (props: RenderProps<A>) => {
     if (props.status !== 'complete') return <ToolPending label={pending} />;
@@ -89,6 +99,7 @@ const rightsFocus = (rights: RightsSummaryDTO): FocusedEntity | null =>
 
 /** Registers the chat renderer of every agent tool, keyed by tool name (§7.4, U-03). */
 export function useMelosToolRenderers() {
+  useReportToolRenderers();
   useRenderTool(
     {
       name: PING_TOOL_NAME,
@@ -163,6 +174,26 @@ export function useMelosToolRenderers() {
         'Working out your ownership...',
         (proposal) => <OwnershipProposal proposal={proposal} />,
       ),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: SEARCH_CONTACTS_TOOL_NAME,
+      parameters: searchContactsInputSchema,
+      render: renderResult<ContactSummary[]>('Searching contacts...', (contacts) => (
+        <ContactGrid contacts={contacts} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_CONTACT_TOOL_NAME,
+      parameters: getContactInputSchema,
+      render: renderResult<ContactDetailDTO>('Opening the contact...', (contact) => (
+        <ContactCard contact={contact} />
+      )),
     },
     [],
   );
