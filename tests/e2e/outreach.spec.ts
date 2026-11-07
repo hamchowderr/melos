@@ -43,3 +43,18 @@ test('OUT-E2E-001: a draft is created from a pitch and its edits are saved', asy
     'Neon Static, one more listen',
   );
 });
+
+test('OUT-E2E-002: sending asks to confirm and goes through the sandbox', async ({ page }) => {
+  const subject = `Neon Static send ${Date.now()}`;
+  const row = await newDraft(page, subject);
+  await row.click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByRole('button', { name: 'Send…' }).click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(confirm).toContainText(`Send "${subject}"?`);
+  await confirm.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Sent.');
+  await expect(row).toContainText('Sent');
+  await row.click();
+  await expect(page.getByRole('dialog')).toContainText('Checking in on Neon Static.');
+});
