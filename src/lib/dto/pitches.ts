@@ -232,6 +232,23 @@ export type PitchNoteInput = {
   nextFollowUpAt?: string | null;
 };
 
+/** A contact in a PitchEligibilityDTO list (§3.4). */
+export type EligibleContact = { contactId: string; displayName: string; roles: string[] };
+
+/**
+ * PitchEligibilityDTO (§3.4, CRM-006): the active contacts who have not heard a song (P-36), by
+ * role rank then name: those with a planned cell, and everyone else.
+ */
+export type PitchEligibilityDTO = {
+  item: { itemType: PitchItemType; itemId: string; title: string };
+  plannedNotContacted: (EligibleContact & {
+    pitchId: string;
+    pitchItemId: string;
+    currentStatus: PitchStatus;
+  })[];
+  neverPitched: EligibleContact[];
+};
+
 /** Cells counted open for ContactSummary.openItemCount: not passed, won, lost or archived. */
 export const CLOSED_STATUSES: readonly PitchStatus[] = [
   'passed',
