@@ -60,6 +60,7 @@ export const workspaceMemberSettings = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
     timezone: text('timezone').notNull().default('UTC'),
+    onboardingDismissedAt: text('onboarding_dismissed_at'),
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [primaryKey({ columns: [table.organizationId, table.userId] })],

@@ -1,10 +1,12 @@
 import { resolveWorkspacePage } from '@/app/workspace-page';
+import { OnboardingChecklist } from '@/components/onboarding/onboarding-checklist';
 import { ReadinessChecklist } from '@/components/rights/readiness-checklist';
 import { FollowUpQueue, TodaySide } from '@/components/today/follow-up-queue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PageHeader } from '@/components/workspace/page-header';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
 import { WorkspaceShell } from '@/components/workspace/workspace-shell';
+import { getOnboardingChecklist } from '@/server/services/onboarding/checklist';
 import { getTodayWorkspace } from '@/server/services/pitches/today';
 
 export const dynamic = 'force-dynamic';
@@ -14,18 +16,25 @@ const longDate = (date: string) =>
     ...{ weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' },
   });
 
-/** /today (§2.3 TodayWorkspace, CRM-005): follow-ups due, replies, readiness and ready to pitch. */
+/**
+ * /today (§2.3 TodayWorkspace, CRM-005): the getting-started checklist (ONB-003), follow-ups due,
+ * replies, readiness and ready to pitch.
+ */
 export default async function TodayPage() {
   const workspace = await resolveWorkspacePage();
   if (workspace.status === 'not-ready') {
     return <WorkspaceNotReady status={workspace.workspaceStatus} />;
   }
-  const today = await getTodayWorkspace(workspace.tenant);
+  const [today, onboarding] = await Promise.all([
+    getTodayWorkspace(workspace.tenant),
+    getOnboardingChecklist(workspace.tenant),
+  ]);
 
   return (
     <WorkspaceShell workspaceName={workspace.workspaceName} current="today">
       <PageHeader title="Today" count={today.ok ? longDate(today.value.date) : undefined} />
       <div className="flex flex-col gap-5 px-4 pt-3 pb-6 md:px-6">
+        {onboarding.ok ? <OnboardingChecklist checklist={onboarding.value} /> : null}
         {today.ok ? (
           <>
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">

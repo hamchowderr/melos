@@ -3,12 +3,17 @@
 import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
 import type { z } from 'zod';
+import { ContactCard } from '@/components/chat/contact-card';
+import { ContactGrid, EligibilityGrid } from '@/components/chat/contact-grid';
 import { FocusOn } from '@/components/chat/focus-context';
+import { MessageDraftCard, SendResultCard } from '@/components/chat/message-draft-card';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
+import { MessageThread, PitchDetail, PitchTable } from '@/components/chat/pitch-table';
 import { useReportToolRenderers } from '@/components/chat/report-renderers';
 import { SongResults } from '@/components/chat/song-results';
+import { TodayWorkspace } from '@/components/chat/today-workspace';
 import { ToolCard, ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
 import { ReadinessChecklist } from '@/components/rights/readiness-checklist';
 import { RightsPanel } from '@/components/rights/rights-panel';
@@ -30,6 +35,43 @@ import {
   pingResultSchema,
 } from '@/lib/agent/contract';
 import {
+  GET_CONTACT_TOOL_NAME,
+  getContactInputSchema,
+  SEARCH_CONTACTS_TOOL_NAME,
+  SEARCH_PITCH_ELIGIBILITY_TOOL_NAME,
+  searchContactsInputSchema,
+  searchPitchEligibilityInputSchema,
+} from '@/lib/agent/crm-tools';
+import {
+  DRAFT_PITCH_MESSAGE_TOOL_NAME,
+  draftPitchMessageInputSchema,
+  SEND_MESSAGE_TOOL_NAME,
+  sendMessageInputSchema,
+  UPDATE_MESSAGE_DRAFT_TOOL_NAME,
+  updateMessageDraftInputSchema,
+} from '@/lib/agent/outreach-tools';
+import {
+  GET_MESSAGE_THREAD_TOOL_NAME,
+  GET_PITCH_TOOL_NAME,
+  GET_TODAY_WORKSPACE_TOOL_NAME,
+  getMessageThreadInputSchema,
+  getPitchInputSchema,
+  getTodayWorkspaceInputSchema,
+  SEARCH_PITCHES_TOOL_NAME,
+  searchPitchesInputSchema,
+} from '@/lib/agent/pitch-tools';
+
+import {
+  ADD_PITCH_ITEM_TOOL_NAME,
+  ADD_PITCH_NOTE_TOOL_NAME,
+  addPitchItemInputSchema,
+  addPitchNoteInputSchema,
+  CREATE_PITCH_TOOL_NAME,
+  createPitchInputSchema,
+  TRANSITION_PITCH_STATUS_TOOL_NAME,
+  transitionPitchStatusInputSchema,
+} from '@/lib/agent/pitch-write-tools';
+import {
   ATTEST_REPRESENTATION_TOOL_NAME,
   licensingContactsInputSchema,
   masterSharesInputSchema,
@@ -43,6 +85,14 @@ import {
 } from '@/lib/agent/rights-write-tools';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
+import type { ContactDetailDTO, ContactSummary } from '@/lib/dto/contacts';
+import type { MessageDraftDTO, MessageThreadDTO, SendResultDTO } from '@/lib/dto/outreach';
+import type {
+  PitchDTO,
+  PitchEligibilityDTO,
+  PitchSummary,
+  TodayWorkspaceDTO,
+} from '@/lib/dto/pitches';
 import type {
   DefaultOwnershipProposal,
   ReadinessReportDTO,
@@ -165,6 +215,134 @@ export function useMelosToolRenderers() {
         'Working out your ownership...',
         (proposal) => <OwnershipProposal proposal={proposal} />,
       ),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: SEARCH_PITCHES_TOOL_NAME,
+      parameters: searchPitchesInputSchema,
+      render: renderResult<PitchSummary[]>('Searching pitches...', (cells) => (
+        <PitchTable cells={cells} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_PITCH_TOOL_NAME,
+      parameters: getPitchInputSchema,
+      render: renderResult<PitchDTO>('Opening the pitch...', (pitch) => (
+        <PitchDetail pitch={pitch} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: SEARCH_CONTACTS_TOOL_NAME,
+      parameters: searchContactsInputSchema,
+      render: renderResult<ContactSummary[]>('Searching contacts...', (contacts) => (
+        <ContactGrid contacts={contacts} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_CONTACT_TOOL_NAME,
+      parameters: getContactInputSchema,
+      render: renderResult<ContactDetailDTO>('Opening the contact...', (contact) => (
+        <ContactCard contact={contact} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: SEARCH_PITCH_ELIGIBILITY_TOOL_NAME,
+      parameters: searchPitchEligibilityInputSchema,
+      render: renderResult<PitchEligibilityDTO>('Checking who has heard it...', (eligibility) => (
+        <EligibilityGrid eligibility={eligibility} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_MESSAGE_THREAD_TOOL_NAME,
+      parameters: getMessageThreadInputSchema,
+      render: renderResult<MessageThreadDTO>('Reading the messages...', (thread) => (
+        <MessageThread thread={thread} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_TODAY_WORKSPACE_TOOL_NAME,
+      parameters: getTodayWorkspaceInputSchema,
+      render: renderResult<TodayWorkspaceDTO>('Opening today...', (today) => (
+        <TodayWorkspace today={today} />
+      )),
+    },
+    [],
+  );
+  // Pitch draft writes run at once and render the pitch they changed.
+  const pitchWritten = renderResult<PitchDTO>('Saving the pitch...', (pitch) => (
+    <PitchDetail pitch={pitch} />
+  ));
+  useRenderTool(
+    { name: CREATE_PITCH_TOOL_NAME, parameters: createPitchInputSchema, render: pitchWritten },
+    [],
+  );
+  useRenderTool(
+    { name: ADD_PITCH_ITEM_TOOL_NAME, parameters: addPitchItemInputSchema, render: pitchWritten },
+    [],
+  );
+  useRenderTool(
+    { name: ADD_PITCH_NOTE_TOOL_NAME, parameters: addPitchNoteInputSchema, render: pitchWritten },
+    [],
+  );
+  // A terminal move waits on ConfirmationCard with no result; other moves save at once.
+  useRenderTool(
+    {
+      name: TRANSITION_PITCH_STATUS_TOOL_NAME,
+      parameters: transitionPitchStatusInputSchema,
+      render: renderResult<PitchDTO>('Updating the pitch...', (pitch) => (
+        <PitchDetail pitch={pitch} />
+      )),
+    },
+    [],
+  );
+  // The key remounts the card when a later call returns a newer version of the draft.
+  const drafted = renderResult<MessageDraftDTO>('Writing the draft...', (draft) => (
+    <MessageDraftCard key={draft.contentHash} draft={draft} />
+  ));
+  useRenderTool(
+    {
+      name: DRAFT_PITCH_MESSAGE_TOOL_NAME,
+      parameters: draftPitchMessageInputSchema,
+      render: drafted,
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: UPDATE_MESSAGE_DRAFT_TOOL_NAME,
+      parameters: updateMessageDraftInputSchema,
+      render: drafted,
+    },
+    [],
+  );
+  // A send waits on ConfirmationCard with no result, then shows how it went.
+  useRenderTool(
+    {
+      name: SEND_MESSAGE_TOOL_NAME,
+      parameters: sendMessageInputSchema,
+      render: renderResult<SendResultDTO>('Waiting for your approval...', (result) => (
+        <SendResultCard result={result} />
+      )),
     },
     [],
   );

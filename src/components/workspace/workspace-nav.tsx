@@ -2,6 +2,7 @@ import {
   BookOpen,
   CalendarCheck,
   FileText,
+  Mail,
   MessageSquare,
   Scale,
   Send,
@@ -18,6 +19,7 @@ export type WorkspaceSection =
   | 'rights'
   | 'people'
   | 'pitches'
+  | 'outreach'
   | 'reports'
   | 'settings';
 
@@ -28,6 +30,7 @@ const SECTIONS = [
   { section: 'rights', href: '/rights', label: 'Rights', Icon: Scale },
   { section: 'people', href: '/people', label: 'People', Icon: Users },
   { section: 'pitches', href: '/pitches', label: 'Pitches', Icon: Send },
+  { section: 'outreach', href: '/outreach', label: 'Outreach', Icon: Mail },
   { section: 'reports', href: '/reports', label: 'Reports', Icon: FileText },
   { section: 'settings', href: '/settings', label: 'Settings', Icon: Settings },
 ] as const;

@@ -22,7 +22,7 @@ export type AuditAction =
   | 'report.generate'
   | 'import.apply'
   | `approval.${'requested' | 'granted' | 'declined' | 'stale'}`
-  | 'message.draft_updated';
+  | `message.${'draft_created' | 'draft_updated'}`;
 
 /** Who a write runs for (§4.3): a user, or an agent run or import acting for one (AUD-002). */
 export type Actor = {

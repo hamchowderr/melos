@@ -47,6 +47,7 @@ Document abbreviations used in alias columns:
 | 2026-09-12 | The primary persona is the independent sync artist: a songwriter/producer pitching their own catalog through licensing agents and music supervisors. Demo persona: Jordan Taylor (FX ICP-01). Defaults and UX priorities in this contract follow this persona. |
 | 2026-09-13 | Model calls go through the Vercel AI Gateway, not a direct provider key or the Mastra Gateway. Mastra stays the agent framework (ADR-034). |
 | 2026-10-30 | Catalog import and song codes (plan "Artist catalog import and licensing codes", approved in the project thread of that name). (1) MVP import adds presets for distributor earnings statements and The MLC catalog export on the CSV pipeline; DDEX feeds and live distributor connections stay out of scope (IMP-014, IMP-015). (2) Missing song details are suggested by ISRC from MusicBrainz and Deezer and saved only when the user accepts; Spotify is not used (IMP-016). (3) A log of issued licenses comes after the MVP exit gate (phase 12). (4) Each song records where it is registered and the code each registry returned, and readiness warns about gaps (CAT-010 to CAT-012, RGT-009, RGT-010). |
+| 2026-11-07 | Onboarding is plain screens, not AI (thread "Check onboarding for each ICP type", epic `melos-1z5`). A new workspace records which of the five ICP types (TS §14) describes its owner, shows a getting-started checklist for that type on `/today`, and opens that type's start page right after creation. Chat stays available but is not part of onboarding. Requirements ONB-001 to ONB-006, §5.10. |
 
 ### 1.2.1 Origin research used by this contract
 
@@ -275,6 +276,8 @@ The same React components render in chat (tool rendering) and in full-page views
 | `ReportPreview` | same name: BP §8.1, §9.2; TS §8 RPT-001, RPT-002, §11, §16 DEMO-009 | Text first, with a copy action; PDF export is secondary. |
 | `ReportTemplateList` | NEW | Renderer for `listReportTemplates`. |
 | `TodayWorkspace` | same name: BP §9.1, §9.2 | |
+| `OnboardingChecklist` | NEW (owner decision 2026-11-07) | Getting-started card at the top of `TodayWorkspace`: the workspace type's items with ticks and links (ONB-003). |
+| `WorkspaceTypePicker` | NEW (owner decision 2026-11-07) | "Which describes you?" choice in the create-workspace form and in `/settings` (ONB-001, ONB-002). |
 | `FollowUpQueue` | same name: BP §8.1 | Section of `TodayWorkspace`. |
 | `WorkflowProgress` | NEW · "Render progress/activity state from AG-UI shared state": TS §12 | Import apply progress in `/settings/import`. No Mastra workflow renders it at MVP. |
 | `ImportReport` | NEW | Dry-run validation report and apply results for Airtable and CSV imports. |
@@ -300,6 +303,7 @@ The same React components render in chat (tool rendering) and in full-page views
 | `ReportService` | same name: TS §8 · "Report engine": BP §13 | Templates, previews, snapshots, PDF rendering. |
 | `ImportService` | NEW | Airtable and CSV import pipeline. |
 | `CatalogLookupService` | NEW (owner decision 2026-10-30) | ISRC lookups on MusicBrainz and Deezer that return suggestions only; it writes nothing (IMP-016). |
+| `OnboardingService` | NEW (owner decision 2026-11-07) | Workspace type, the per-type checklist derived from workspace data, and the member's checklist dismissal (§5.10). It writes no workspace data. |
 | `AuditWriter` | NEW | `audit_log` rows inside service transactions. |
 | `TenantContextResolver` | "request-scoped workspace DB resolver": BP §16 Phase 1 | Session to workspace context (§7.1). |
 | `WorkspaceProvisioner` | "workspace provisioning": BP §16 Phase 1; TS TEN-004 | Creates, migrates and deletes workspace databases. |
@@ -332,6 +336,7 @@ The same React components render in chat (tool rendering) and in full-page views
 | `ReportPreviewDTO` | same name: BP App B |
 | `GeneratedReportDTO` | same name: BP App B |
 | `DefaultOwnershipProposal` | NEW |
+| `OnboardingChecklistDTO` | NEW |
 | `ApprovalRequest`, `ApprovalDecision` | NEW |
 
 ### 2.6 Demo fixture field map
@@ -542,6 +547,7 @@ CREATE TABLE workspace_member_settings (
   organization_id  TEXT NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
   user_id          TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   timezone         TEXT NOT NULL DEFAULT 'UTC',
+  onboarding_dismissed_at TEXT,   -- ONB-003: set when the member dismisses the checklist
   updated_at       TEXT NOT NULL,
   PRIMARY KEY (organization_id, user_id)
 );
@@ -569,7 +575,8 @@ CREATE TABLE control_audit_log (
   action           TEXT NOT NULL,   -- member.invited, member.role_changed, member.removed,
                                     -- member.added, member.left, invitation.accepted,
                                     -- invitation.rejected, invitation.canceled,
-                                    -- workspace.provisioned, workspace.deleted, migration.batch_started
+                                    -- workspace.provisioned, workspace.deleted, migration.batch_started,
+                                    -- workspace.type_changed (ONB-002)
   target_type      TEXT NOT NULL,
   target_id        TEXT NOT NULL,
   before_json      TEXT,
@@ -583,7 +590,7 @@ CREATE TRIGGER control_audit_log_no_delete BEFORE DELETE ON control_audit_log
 BEGIN SELECT RAISE(ABORT, 'control_audit_log is append-only'); END;
 ```
 
-Membership rows (AUTH-005, ADR-029) name the acting user in `actor_user_id`, NULL for a server call without a session, and hold `{"role": ...}` in `before_json` and `after_json`, NULL where the target had no role. `member.invited`, `invitation.rejected` and `invitation.canceled` target the invitation (`target_type` `invitation`); `member.added`, `invitation.accepted`, `member.role_changed`, `member.removed` and `member.left` target the member row (`target_type` `member`). Creating an organization appends `member.added` for its creator; accepting an invitation appends only `invitation.accepted`. Deleting a user or an organization leaves its rows, with the ids they hold, in place (ADR-030).
+Membership rows (AUTH-005, ADR-029) name the acting user in `actor_user_id`, NULL for a server call without a session, and hold `{"role": ...}` in `before_json` and `after_json`, NULL where the target had no role. `member.invited`, `invitation.rejected` and `invitation.canceled` target the invitation (`target_type` `invitation`); `member.added`, `invitation.accepted`, `member.role_changed`, `member.removed` and `member.left` target the member row (`target_type` `member`). `workspace.type_changed` targets the organization (`target_type` `organization`) and holds `{"workspaceType": ...}` in `before_json` and `after_json`, `null` where none was stored (ONB-002). Creating an organization appends `member.added` for its creator; accepting an invitation appends only `invitation.accepted`. Deleting a user or an organization leaves its rows, with the ids they hold, in place (ADR-030).
 
 `melos-agent-runtime` holds Mastra storage, created by `@mastra/libsql`, plus the runner tables below (§7.9). It is a Turso Cloud database in every deployed environment (P-33).
 
@@ -1710,6 +1717,50 @@ Frontend AGUIMock fixtures emit tool-call and result events per renderer (TS §1
 | ADR-034 NEW | Model calls go through the Vercel AI Gateway; Mastra (`@mastra/core` 1.66.0) stays the agent framework. `toModelConfig` (`src/mastra/model.ts`) gives the agent an AI SDK model from `createGateway` in `@ai-sdk/gateway` 3.0.193, a `LanguageModelV3` that `MastraModelConfig` accepts, not a `vercel/` model router string: the router's `ModelsDevGateway.getApiKey` throws without `AI_GATEWAY_API_KEY`, so a router string cannot use an OIDC token. On Vercel the credential is the deployment's OIDC token, which the provider reads on each request from the `x-vercel-oidc-token` header through `@vercel/oidc`; startup refuses any `AI_GATEWAY_API_KEY` there, even a blank one, because the provider reads a present key from the environment and prefers it over the token, and `toModelConfig` passes `apiKey: ''`, so the provider does not read the variable and sends the token. Off Vercel a real model requires a non-blank `AI_GATEWAY_API_KEY`; an unset or blank key does not stop operator scripts or the AIMock endpoint. The chat model and its key are checked by `requireChatModel` where the model is resolved, at app startup (`src/instrumentation.ts`) and in `src/mastra/index.ts`, so operator scripts, which call no model, do not need them. Operator commands drop `AI_GATEWAY_API_KEY` in `withControl` (`scripts/operator.ts`) before the environment is validated, because they never call a model. `MELOS_CHAT_MODEL` is an AI Gateway model id such as `anthropic/claude-haiku-4.5`; Mastra router spellings are refused: a `mastra/` prefix, a `vercel/<creator>/` prefix, an upper-case creator, and Anthropic ids with a hyphenated version such as `anthropic/claude-haiku-4-5`. No direct provider key (`ANTHROPIC_API_KEY`) or `mastra/` model is accepted: the Mastra Gateway was dropped on 2026-09-12 when it ran out of credits, and one credential path keeps startup validation exact. Tests keep the AIMock endpoint through `MELOS_LLM_BASE_URL`, which is refused on Vercel | Accepted; the OIDC path is unproven until a preview deploy runs the chat | Owner decision 2026-09-13; package source: `@mastra/core` 1.66.0 `dist/models-dev-*.js`, `@ai-sdk/gateway` 3.0.193 `getGatewayAuthToken` |
 | ADR-035 NEW | R2 configuration (U-27). Each environment has one private bucket (`melos-preview` for Vercel previews) on the Otaku Solutions Cloudflare account, reached through the S3 API with region `auto` and the account endpoint. The credentials are an R2 API token scoped to that bucket alone with Object Read & Write; its S3 key pair (the token id, and the SHA-256 of the token value) is stored as Sensitive Vercel variables for the environment and in Infisical `otaku-internal`, `dev`, `/melos`. The bucket's CORS rule allows `GET` and `PUT` from `https://*-otaku-solutions.vercel.app` with the `Content-Type` header, exposes `ETag`, and caches preflights for 3600 seconds; the single wildcard origin works for browser PUTs. An expired presigned GET answers 403, which `AudioPlayer` treats as the cue to re-sign once (§7.5). | Accepted | AST-E2E-002 on the preview deploy `melos-7r1kls18k-otaku-solutions.vercel.app` (branch `feature/r2-preview`, `df922e4`) on 2026-10-30; [SRC-099] |
 
+### 5.10 Onboarding (owner decision 2026-11-07)
+
+Onboarding uses ordinary screens and data checks; no item calls the model. Epic `melos-1z5`.
+
+| ID | Requirement | DB | Service | UI | Test |
+|---|---|---|---|---|---|
+| ONB-001 NEW | The create-workspace form requires a workspace type, stored as `{"workspaceType": "<type>"}` in ctl `organization.metadata`. The server refuses create or update metadata holding any other key or an unknown type; a create without metadata (API callers, the demo seed) is read by ONB-006. | ctl `organization.metadata` | `OnboardingService` (Better Auth `organizationHooks` before create and update) | `/workspaces/new`, `WorkspaceTypePicker` | ONB-INT-001; ONB-E2E-001: the form does not submit without a type |
+| ONB-002 NEW | Owners and admins change the workspace type in `/settings`; members and viewers see it read-only. A change appends `workspace.type_changed` to `control_audit_log` with the old and new type, and changes only the checklist and start page. | ctl `organization.metadata`, `control_audit_log` | `OnboardingService` | `/settings`, `WorkspaceTypePicker` | ONB-INT-002: member and viewer are refused |
+| ONB-003 NEW | `/today` shows the checklist for the workspace type at the top of the page, each item with a tick and a link. It hides when every item is done or when the member dismisses it. | ctl `workspace_member_settings.onboarding_dismissed_at` | `OnboardingService` | `OnboardingChecklist` | ONB-E2E-003 |
+| ONB-004 NEW | Each item's done state is derived on every read from live workspace rows by the rules below. Nothing stores a tick. | ws (read only) | `OnboardingService` | `OnboardingChecklist` | ONB-INT-004: each type against an empty workspace (no item done) and the Northstar seed |
+| ONB-005 NEW | Right after creating a workspace, the user opens the start page for its type. Signing in later still opens Chat. | — | — | `/workspaces/new` | ONB-E2E-005: one case per type |
+| ONB-006 NEW | A workspace with no type, or a type the code no longer knows, is read as `songwriter`, the primary persona (§1.2, 2026-09-12). | ctl `organization.metadata` | `OnboardingService` | all | ONB-UNIT-006 |
+
+Workspace types:
+
+| Type | ICP (TS §14) | Label in the picker | Start page (ONB-005) |
+|---|---|---|---|
+| `songwriter` | ICP-01 Independent singer-songwriter | Songwriter or artist | `/catalog` |
+| `producer` | ICP-02 Producer / co-writer | Producer or co-writer | `/catalog` |
+| `sync_agent` | ICP-03 Sync licensing agent | Sync licensing agent | `/today` |
+| `label` | ICP-04 Independent label operator | Independent label | `/catalog` |
+| `manager` | ICP-05 Artist manager / pitching operator | Artist manager | `/today` |
+
+Checklist items (ONB-004). "Live" means `deleted_at IS NULL` where the table has it.
+
+| Key | Item | Link | Done when | Types |
+|---|---|---|---|---|
+| `first_song` | Add or import your first song (`sync_agent`: "Add the catalog you represent") | `/catalog` | a live composition exists | songwriter, producer, sync_agent, manager |
+| `catalog_import` | Import your catalog from a CSV | `/catalog` | an `import_runs` row with `source_system = 'csv'` and status `succeeded` or `partial` exists, or a live composition exists | label |
+| `writer_splits` | Set the writer splits on a song | `/rights` | a live composition's writer shares total 10000 bp | songwriter, producer |
+| `co_writer` | Add a co-writer to a song | `/rights` | a live composition has two or more `composition_contributors` | producer |
+| `producer_credit` | Add a producer credit to a recording | `/catalog` | a `recording_contributors` row with `role = 'producer'` on a live recording exists | producer |
+| `master_owners` | Set the master owners on a recording | `/rights` | a live recording's master interests total 10000 bp | label |
+| `ready_song` | Get one song ready to pitch | `/rights` | a live recording has no blocking readiness issue (§6.5), the rule behind `TodayWorkspaceDTO.readyToPitch` | sync_agent |
+| `artist_songs` | Add a song by an artist you manage | `/catalog` | a `recording_artists` row with `role = 'primary'` on a live recording exists | manager |
+| `licensing_contact` | Add a licensing agent or music supervisor | `/people` | a live contact has role `licensing_agent` or `music_supervisor` | songwriter, label |
+| `supervisor_contact` | Add a music supervisor | `/people` | a live contact has role `music_supervisor` | sync_agent |
+| `contacts` | Add your contacts | `/people` | a live contact exists | manager |
+| `first_pitch` | Log your first pitch | `/pitches` | a `pitch_items` row exists | songwriter, sync_agent, label, manager |
+| `follow_up` | Set a follow-up date on a pitch | `/pitches` | a pitch has `next_follow_up_at` set | manager |
+| `multi_song_report` | Build a multi-song report | `/reports` | a `generated_reports` row has two or more `generated_report_items` | sync_agent |
+
+Items list in the order of the table, filtered by type. `OnboardingChecklistDTO`: `workspaceType`; `items[]` (`key`, `label`, `href`, `done`); `doneCount`; `total`; `dismissed`. Dismissal is `workspace_member_settings.onboarding_dismissed_at` (§4.1); dismissing first records the member's browser timezone, as P-24 does, so it never pins the row to UTC.
+
 ## 6. Conflict resolutions
 
 ### 6.1 Authentication baseline
@@ -1922,7 +1973,7 @@ DEMO-003 therefore lists Ocean Blue and Neon Static.
 
 **Decision.** `audit_log` (§4.3) in each workspace database and `control_audit_log` in `melos-control`. `AuditWriter` writes the row inside the service transaction that performs the mutation. `pitch_events` remains the domain history for pitch cells, notes and messages; those changes do not also write `audit_log` (AUD-001). Approvals and declines always write `audit_log` (AUD-002).
 
-Action vocabulary (`<entity>.<verb>`): `composition.create`, `composition.update`, `composition.delete`, `recording.create`, `recording.update`, `recording.delete`, `release.create`, `release.update`, `release.delete`, `recording_artists.replace`, `metadata_term.create`, `asset.create`, `asset.attach`, `writer_shares.replace`, `publishing_shares.replace`, `master_shares.replace`, `representation.attest`, `representation.clear`, `licensing_contacts.replace`, `composition_registrations.replace`, `recording_registrations.replace`, `self_parties.update`, `agreement.create`, `agreement.update`, `party.create`, `party.update`, `party.delete`, `contact.create`, `contact.update`, `contact.delete`, `report.generate`, `import.apply`, `approval.requested`, `approval.granted`, `approval.declined`, `approval.stale`, `message.draft_updated`. Rights actions store the full share set before and after. Owner decision 2026-09-14 (D-4) added `release.delete`, `metadata_term.create`, `asset.create`, `agreement.create`, `agreement.update`, `party.create`, `party.update` and `party.delete`; `AuditAction` in `src/server/services/audit-writer.ts` types the same list.
+Action vocabulary (`<entity>.<verb>`): `composition.create`, `composition.update`, `composition.delete`, `recording.create`, `recording.update`, `recording.delete`, `release.create`, `release.update`, `release.delete`, `recording_artists.replace`, `metadata_term.create`, `asset.create`, `asset.attach`, `writer_shares.replace`, `publishing_shares.replace`, `master_shares.replace`, `representation.attest`, `representation.clear`, `licensing_contacts.replace`, `composition_registrations.replace`, `recording_registrations.replace`, `self_parties.update`, `agreement.create`, `agreement.update`, `party.create`, `party.update`, `party.delete`, `contact.create`, `contact.update`, `contact.delete`, `report.generate`, `import.apply`, `approval.requested`, `approval.granted`, `approval.declined`, `approval.stale`, `message.draft_created`, `message.draft_updated`. Rights actions store the full share set before and after. Owner decision 2026-09-14 (D-4) added `release.delete`, `metadata_term.create`, `asset.create`, `agreement.create`, `agreement.update`, `party.create`, `party.update` and `party.delete`; `AuditAction` in `src/server/services/audit-writer.ts` types the same list.
 
 **No-op writes.** A call that changes nothing writes nothing and adds no `audit_log` row: a self-party set, an agreement patch or a party child set equal to what is stored, or an `addAsset` link that exists, returns success without writing (rpr.11 and rpr.15 reviews). `tests/integration/phase4-writes.test.ts` (melos-rpr.42) runs every exported Catalog, Contact, Rights and Asset write once to success and once to a refusal, and checks the exact audit actions, no audit row on a refusal, and an empty `PRAGMA foreign_key_check` after each (AUD-001, DAT-001). It fails when a new write is exported without a case, and when a Phase 4 action above has no service that writes it.
 
@@ -2131,7 +2182,7 @@ interface AssetStorage {
 }
 ```
 
-- **Sending.** The approval transaction moves the message from `draft` to `queued`; the transport call then moves it through `sending` to `sent` or `failed`. `updateMessageDraft` only edits `draft` messages. `ResendEmailTransport` passes `messageId` as the Resend idempotency key. Resend accepts keys up to 256 characters, keeps them for 24 hours, returns the original email id for a repeated key with the same payload, and answers 409 `invalid_idempotent_request` when the payload differs ([SRC-098](https://resend.com/docs/dashboard/emails/idempotency-keys)). A 409 marks the message `failed` with `IDEMPOTENCY_CONFLICT`. Only a `queued` message is sent, so a retry after 24 hours cannot send twice. Production sending-domain verification is U-28.
+- **Sending.** The approval transaction re-checks the bound `beforeHash` and `contentHash`, snapshots the sender as the `from` recipient (the transport's verified sender, `MELOS_EMAIL_FROM` for `ResendEmailTransport`, else the member's own address) and moves the message from `draft` to `queued`; the transport call then moves it through `sending` to `sent` or `failed`. `updateMessageDraft` only edits `draft` messages. `ResendEmailTransport` passes `messageId` as the Resend idempotency key. Resend accepts keys up to 256 characters, keeps them for 24 hours, returns the original email id for a repeated key with the same payload, and answers 409 `invalid_idempotent_request` when the payload differs ([SRC-098](https://resend.com/docs/dashboard/emails/idempotency-keys)). A 409 marks the message `failed` with `IDEMPOTENCY_CONFLICT`. Only a `queued` message is sent, so a retry after 24 hours cannot send twice. `ResendEmailTransport` posts to `https://api.resend.com/emails` with `RESEND_API_KEY` as the bearer token, never puts the key in an error, and reports any other refusal as `TRANSPORT_ERROR`. Production sending-domain verification is U-28.
 - **Sandbox.** `SandboxEmailTransport` makes no network calls. It returns `providerMessageId = sandbox_<messageId>` and `providerThreadId = sandbox_thread_<pitchId>`, stores the payload under `.data/sandbox-outbox/<workspaceId>/<messageId>.json` in development and in memory in tests, and returns the stored result for a repeated `messageId`. `OutreachService.simulateInboundReply(messageId, bodyText)` exists only when the sandbox transport is active; it creates an inbound message and a `reply_received` pitch event (OUT-003). Production reply ingestion is U-29.
 - **Asset keys (AST-001).** `AssetService` generates every key as `<workspaceId>/<assetId>/<sanitized file name>` from the workspace resolved for the request; clients never supply keys. Every `AssetStorage` method refuses a key that does not start with `<workspaceId>/` for that workspace. A presigned URL is bound to its object key, so a signed PUT cannot write elsewhere ([SRC-099](https://developers.cloudflare.com/r2/api/s3/presigned-urls/)).
 - **R2 (AST-002).** `R2AssetStorage` generates presigned GET and PUT URLs on the server with R2 API credentials and AWS Signature Version 4; R2 accepts expiries from 1 second to 7 days ([SRC-099](https://developers.cloudflare.com/r2/api/s3/presigned-urls/)). Melos signs audio downloads for 3600 seconds, other downloads for 300 seconds and uploads for 900 seconds, with one private bucket per environment (P-35). When a media request fails to load (an expired URL answers 403), `AudioPlayer` requests a fresh URL and retries once. U-27 is closed: the S3 client uses region `auto` and the account endpoint `https://<accountId>.r2.cloudflarestorage.com` with virtual-hosted URLs, configured by `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET` (ADR-035). `LocalAssetStorage` serves files from `.data/assets/` through an authenticated route in development and tests.
@@ -2143,11 +2194,11 @@ interface AssetStorage {
 | Vercel preview | `sandbox` (P-34) | `r2`, preview bucket (P-34) |
 | Vercel production | `resend` | `r2`, production bucket |
 
-Production startup fails when either variable selects `sandbox` or `local` (owner decision 2026-09-12).
+`MELOS_EMAIL_TRANSPORT=resend` and `MELOS_AUTH_MAILER=resend` each require `RESEND_API_KEY` and `MELOS_EMAIL_FROM` at startup. Production startup fails when `MELOS_ASSET_STORAGE` selects `local` (owner decision 2026-09-12). Until U-28 configures Resend, production with `MELOS_EMAIL_TRANSPORT=sandbox` starts but refuses every send, so each message is `failed` with `TRANSPORT_ERROR` and nothing pretends to deliver (P-14); startup refuses sandbox once production has Resend.
 
 `LocalAssetStorage` keeps objects under `<MELOS_WORKSPACE_DATA_DIR>/assets` (`.data/assets` by default). Its URLs carry an HMAC-SHA256 signature over the method, storage key, content type and `expires` (epoch seconds), with expiries from 1 second to 7 days as on R2; the signing key is derived from `BETTER_AUTH_SECRET` with the label `melos local asset url` (P-44). The route `/api/assets/local/<key>` (GET, PUT) also requires the session's active workspace, a key under its prefix, and `catalog:read` to download or `catalog:update` to upload (D-5). With `MELOS_ASSET_STORAGE` unset, storage is `local` off Vercel and `r2` on Vercel. Storage is built on the first asset call, which throws `AssetStorageUnavailableError` while `r2` is selected, until `R2AssetStorage` exists (melos-rpr.12). Startup refuses `local` on every Vercel deploy, preview included.
 
-**Auth email and sign-up.** Better Auth's verification and invitation emails go through `sendAuthEmail` (`src/server/auth/mailer.ts`), selected by `MELOS_AUTH_MAILER`: `outbox` (development default, `.data/auth-outbox/`), `memory` (tests) or `disabled`, which sends and writes nothing. Until phase 8 wires Resend, production startup accepts only `disabled` (owner decision 2026-09-12): sign-up sends no verification email, and a `hooks.before` handler refuses `/organization/invite-member` with 403 `INVITATIONS_UNAVAILABLE` before Better Auth writes or extends an invitation. `MELOS_SIGNUP_ALLOWED_EMAILS` lists the addresses that may sign up, comma-separated and compared case-insensitively; `databaseHooks.user.create.before`, which every Better Auth user-creation path runs, refuses any other address with 422 `SIGN_UP_NOT_ALLOWED`. Unset, anyone may sign up outside production and nobody may in production. Signing in never consults the list.
+**Auth email and sign-up.** Better Auth's verification and invitation emails go through `sendAuthEmail` (`src/server/auth/mailer.ts`), selected by `MELOS_AUTH_MAILER`: `outbox` (development default, `.data/auth-outbox/`), `memory` (tests), `resend` (`ResendEmailTransport` from `MELOS_EMAIL_FROM`) or `disabled`, which sends and writes nothing. Production startup accepts only `resend` or `disabled` (owner decision 2026-09-12). With `disabled`, sign-up sends no verification email, and a `hooks.before` handler refuses `/organization/invite-member` with 403 `INVITATIONS_UNAVAILABLE` before Better Auth writes or extends an invitation. `MELOS_SIGNUP_ALLOWED_EMAILS` lists the addresses that may sign up, comma-separated and compared case-insensitively; `databaseHooks.user.create.before`, which every Better Auth user-creation path runs, refuses any other address with 422 `SIGN_UP_NOT_ALLOWED`. Unset, anyone may sign up outside production and nobody may in production. Signing in never consults the list.
 
 ### 7.6 Import pipeline (Airtable and CSV)
 
@@ -2268,6 +2319,8 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | 12 | Post-MVP: production reply ingestion (U-29), CopilotKit Channels, A2UI surfaces (BP §16 phases 9–10), production hardening. | External integration tests and a threat review pass. |
 
 Owner decisions 2026-10-30 place CAT-010 to CAT-012, RGT-009 and RGT-010 in epic `melos-9b6`, which depends only on phase 4 services and gates phase 11. IMP-014 to IMP-016 join phase 10. The issued-license log joins phase 12. Each `melos-9b6` task changes the §4.2 and §4.3 DDL, the §6.5 code tables and the §6.6 action vocabulary in the same change as its migration or service, because TEN-004, the readiness unit test and AUD-001 compare them with the code.
+
+Owner decision 2026-11-07 places ONB-001 to ONB-006 (§5.10) in epic `melos-1z5`, which depends only on phase 4 and phase 8 services and does not gate phase 11.
 
 ## 9. Unified source register
 

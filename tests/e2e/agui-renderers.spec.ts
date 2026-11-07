@@ -96,6 +96,115 @@ test('TST-AI-003: AGUIMock drives the ownership proposal', async ({ page }) => {
   );
 });
 
+test('TST-AI-003: AGUIMock drives PitchTable', async ({ page }) => {
+  await ask(page, 'agui pitches');
+  const table = page.getByRole('region', { name: 'Pitches', exact: true });
+  await expect(table.getByRole('list', { name: 'Pitch list' })).toContainText(
+    'Harbor Lights to Mock SupervisorAwaiting reply · follow-up due',
+  );
+});
+
+test('TST-AI-003: AGUIMock drives PitchCard and PitchTimeline', async ({ page }) => {
+  await ask(page, 'agui pitch');
+  const card = page.getByRole('region', { name: 'Pitch', exact: true });
+  await expect(card).toContainText('Mock Supervisor');
+  await expect(card.getByRole('list', { name: 'Songs in this pitch' })).toContainText(
+    'Harbor LightsAwaiting reply · follow-up due',
+  );
+  const timeline = card.getByRole('list', { name: 'Timeline' });
+  await expect(timeline.locator('li').first()).toContainText(
+    '2026-09-03Sent: Harbor Lights for your show',
+  );
+  await expect(timeline.locator('li').nth(1)).toContainText(
+    'status changed · Pitched to Awaiting reply',
+  );
+});
+
+test('TST-AI-003: AGUIMock drives the getMessageThread PitchTimeline', async ({ page }) => {
+  await ask(page, 'agui thread');
+  const timeline = page
+    .getByRole('region', { name: 'Messages', exact: true })
+    .getByRole('list', { name: 'Timeline' });
+  await expect(timeline.locator('li').first()).toContainText(
+    'Sent: Harbor Lights for your showHi, here is Harbor Lights.',
+  );
+  await expect(timeline.locator('li').nth(1)).toContainText(
+    '2026-09-05Reply: Re: Harbor Lights for your showLove it, send stems.',
+  );
+});
+
+test('TST-AI-003: AGUIMock drives ContactGrid', async ({ page }) => {
+  await ask(page, 'agui contacts');
+  const grid = page.getByRole('region', { name: 'Contacts', exact: true });
+  await expect(grid.getByRole('link', { name: 'Mock Supervisor' })).toBeVisible();
+  await expect(grid).toContainText('Mock Sync Co · music supervisor · supervisor@mock.example');
+  await expect(grid).toContainText('1 open pitch');
+});
+
+test('TST-AI-003: AGUIMock drives ContactCard', async ({ page }) => {
+  await ask(page, 'agui contact card');
+  const card = page.getByRole('region', { name: 'Contact', exact: true });
+  await expect(card).toContainText('Mock Supervisor');
+  await expect(card.getByRole('list', { name: 'Pitched songs' })).toContainText(
+    'Harbor LightsAwaiting reply · follow-up due',
+  );
+  await expect(card.getByRole('list', { name: 'Recent messages' })).toContainText(
+    '2026-09-03 to them Harbor Lights for your show',
+  );
+});
+
+test('TST-AI-003: AGUIMock drives the eligibility ContactGrid', async ({ page }) => {
+  await ask(page, 'agui eligibility');
+  const grid = page.getByRole('region', { name: "Who hasn't heard Harbor Lights", exact: true });
+  await expect(grid.getByRole('list', { name: 'Planned, not contacted' })).toContainText(
+    "Mock Supervisormusic supervisor · Hasn't heard",
+  );
+  await expect(grid.getByRole('list', { name: 'Never pitched' })).toContainText(
+    'Mock Agentlicensing agent',
+  );
+});
+
+test('TST-AI-003: AGUIMock drives TodayWorkspace with FollowUpQueue', async ({ page }) => {
+  await ask(page, 'agui today');
+  const today = page.getByRole('region', { name: 'Today, 2026-09-10', exact: true });
+  await expect(today.getByRole('list', { name: 'Follow-up queue' })).toContainText(
+    'Harbor Lights to Mock SupervisorAwaiting reply · follow-up due',
+  );
+  await expect(today.getByRole('list', { name: 'Recent replies' })).toContainText(
+    'Mock Agent on Tidewater2026-09-09',
+  );
+  await expect(today.getByRole('list', { name: 'Ready to pitch' })).toContainText(
+    'Harbor Lights2 licensing agents have not heard it',
+  );
+  await expect(today).toContainText('1 recording is not ready to license.');
+});
+
+test('TST-AI-003: AGUIMock renders createPitch as its PitchCard', async ({ page }) => {
+  await ask(page, 'agui create pitch');
+  const card = page.getByRole('region', { name: 'Pitch', exact: true });
+  await expect(card.getByRole('list', { name: 'Songs in this pitch' })).toContainText(
+    'Harbor LightsDraft',
+  );
+});
+
+test('TST-AI-003: AGUIMock drives MessageDraftCard', async ({ page }) => {
+  await ask(page, 'agui draft');
+  const card = page.getByRole('region', { name: 'Email draft', exact: true });
+  await expect(card).toContainText('To supervisor@mock.example');
+  await expect(card.getByRole('textbox', { name: 'Subject' })).toHaveValue(
+    'Harbor Lights, following up',
+  );
+  await expect(card.getByRole('textbox', { name: 'Body' })).toHaveValue(
+    'Checking in on Harbor Lights.',
+  );
+  await expect(card.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+  await card.getByRole('textbox', { name: 'Subject' }).fill('Harbor Lights, one more time');
+  await expect(card.getByRole('button', { name: 'Save draft' })).toBeEnabled();
+  await expect(card.getByRole('complementary', { name: 'Drafted from' })).toContainText(
+    'Harbor Lights · https://example.com/harbor',
+  );
+});
+
 test('TST-AI-003: a refusal renders a plain sentence, not a card', async ({ page }) => {
   await ask(page, 'agui not found');
   const alert = page.locator('[data-error-code="NOT_FOUND"]');

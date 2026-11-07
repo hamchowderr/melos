@@ -100,6 +100,7 @@ describe('AUTH-INT-006: control-plane migrations are separate from workspace mig
       'user_id TEXT NOT NULL PK2',
       "timezone TEXT NOT NULL 'UTC'",
       'updated_at TEXT NOT NULL',
+      'onboarding_dismissed_at TEXT',
       'FK organization_id -> organization(id) ON DELETE CASCADE',
       'FK user_id -> user(id) ON DELETE CASCADE',
     ]);

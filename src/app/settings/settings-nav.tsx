@@ -4,6 +4,7 @@ import { buttonVariants } from '@/components/ui/button';
 const PAGES = [
   { page: 'members', href: '/settings', label: 'Members' },
   { page: 'ownership', href: '/settings/ownership', label: 'Ownership' },
+  { page: 'metrics', href: '/settings/metrics', label: 'North Star' },
 ] as const;
 
 /** The /settings pages (§2.3), with the current one marked. */

@@ -58,3 +58,46 @@ export type UpdateDraftInput = {
   cc?: string[];
   bcc?: string[];
 };
+
+/** SendResultDTO (§3.4, OUT-002): the outcome of sendMessage, stored on the message. */
+export type SendResultDTO = {
+  messageId: string;
+  status: 'sent' | 'failed';
+  provider: 'sandbox' | 'resend' | null;
+  providerMessageId: string | null;
+  sentAt: string | null;
+  failureReason: string | null;
+};
+
+/** One message in a thread (§3.4 MessageThreadDTO), with its body and recipients. */
+export type ThreadMessageDTO = {
+  messageId: string;
+  direction: 'outbound' | 'inbound';
+  purpose: MessagePurpose | null;
+  status: 'draft' | 'queued' | 'sending' | 'sent' | 'failed' | 'received';
+  subject: string | null;
+  bodyText: string | null;
+  from: string | null;
+  to: string[];
+  cc: string[];
+  inReplyToMessageId: string | null;
+  sentAt: string | null;
+  receivedAt: string | null;
+  failureReason: string | null;
+  createdAt: string;
+};
+
+/** MessageThreadDTO (§3.4, OUT-003): a pitch's messages in time order. */
+export type MessageThreadDTO = { pitchId: string; messages: ThreadMessageDTO[] };
+
+/** One outbound message on /outreach (§2.3): its pitch's contact and that party's email methods. */
+export type OutboxMessageDTO = {
+  messageId: string;
+  pitchId: string;
+  contactName: string;
+  emails: { contactMethodId: string; address: string }[];
+  purpose: MessagePurpose | null;
+  status: ThreadMessageDTO['status'];
+  subject: string | null;
+  at: string;
+};
