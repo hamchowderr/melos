@@ -423,6 +423,97 @@
           ]
         }
       }
+    },
+    {
+      "message": "agui pitches",
+      "toolName": "searchPitches",
+      "args": {
+        "statuses": ["awaiting_reply"]
+      },
+      "result": {
+        "status": "ok",
+        "value": [
+          {
+            "pitchId": "pit_AGUI1",
+            "pitchItemId": "pti_AGUI1",
+            "contactId": "con_AGUI1",
+            "contactName": "Mock Supervisor",
+            "contactRoles": ["music_supervisor"],
+            "itemType": "composition",
+            "itemId": "cmp_AGUI1",
+            "itemTitle": "Harbor Lights",
+            "currentStatus": "awaiting_reply",
+            "nextFollowUpAt": "2026-09-10T17:00:00.000Z",
+            "followUpDue": true,
+            "lastContactedAt": "2026-09-03T17:00:00.000Z",
+            "lastOutboundMessageId": "msg_AGUI1",
+            "priorityRank": null
+          }
+        ]
+      }
+    },
+    {
+      "message": "agui pitch",
+      "toolName": "getPitch",
+      "args": {
+        "pitchId": "pit_AGUI1"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "pitchId": "pit_AGUI1",
+          "contactId": "con_AGUI1",
+          "contactName": "Mock Supervisor",
+          "subject": "Harbor Lights for your show",
+          "items": [
+            {
+              "pitchId": "pit_AGUI1",
+              "pitchItemId": "pti_AGUI1",
+              "contactId": "con_AGUI1",
+              "contactName": "Mock Supervisor",
+              "contactRoles": ["music_supervisor"],
+              "itemType": "composition",
+              "itemId": "cmp_AGUI1",
+              "itemTitle": "Harbor Lights",
+              "currentStatus": "awaiting_reply",
+              "nextFollowUpAt": "2026-09-10T17:00:00.000Z",
+              "followUpDue": true,
+              "lastContactedAt": "2026-09-03T17:00:00.000Z",
+              "lastOutboundMessageId": "msg_AGUI1",
+              "priorityRank": null
+            }
+          ],
+          "nextFollowUpAt": "2026-09-10T17:00:00.000Z",
+          "followUpDue": true,
+          "lastContactedAt": "2026-09-03T17:00:00.000Z",
+          "events": [
+            {
+              "eventId": "pev_AGUI1",
+              "pitchItemId": "pti_AGUI1",
+              "eventType": "status_changed",
+              "fromStatus": "sent",
+              "toStatus": "awaiting_reply",
+              "actorType": "system",
+              "note": null,
+              "metadata": null,
+              "occurredAt": "2026-09-03T17:00:01.000Z"
+            }
+          ],
+          "messages": [
+            {
+              "messageId": "msg_AGUI1",
+              "direction": "outbound",
+              "purpose": "initial",
+              "status": "sent",
+              "subject": "Harbor Lights for your show",
+              "inReplyToMessageId": null,
+              "sentAt": "2026-09-03T17:00:00.000Z",
+              "receivedAt": null,
+              "createdAt": "2026-09-03T16:00:00.000Z"
+            }
+          ]
+        }
+      }
     }
   ]
 }

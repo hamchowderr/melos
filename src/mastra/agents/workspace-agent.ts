@@ -6,6 +6,7 @@ import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
 import { getContactTool, searchContactsTool, searchPitchEligibilityTool } from '../tools/contacts';
 import { pingTool } from '../tools/ping';
+import { getPitchTool, searchPitchesTool } from '../tools/pitches';
 import { generateReportTool, listReportTemplatesTool, previewReportTool } from '../tools/reports';
 import {
   attestRepresentationTool,
@@ -56,6 +57,8 @@ export const WORKSPACE_AGENT_TOOLS = {
   getRightsSummary: getRightsSummaryTool,
   getReadinessIssues: getReadinessIssuesTool,
   proposeDefaultOwnership: proposeDefaultOwnershipTool,
+  searchPitches: searchPitchesTool,
+  getPitch: getPitchTool,
   searchContacts: searchContactsTool,
   getContact: getContactTool,
   searchPitchEligibility: searchPitchEligibilityTool,
