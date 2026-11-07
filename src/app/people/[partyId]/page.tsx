@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { resolveWorkspacePage } from '@/app/workspace-page';
 import { ContactMethodsEditor } from '@/components/people/contact-methods-editor';
+import { ContactPitches, pitchableSongs } from '@/components/people/contact-pitches';
+import { CreatePitch } from '@/components/people/create-pitch';
 import { DeleteParty } from '@/components/people/delete-party';
 import { IdentityEditors } from '@/components/people/identity-editors';
 import { PartyDetails } from '@/components/people/party-details';
@@ -8,6 +10,8 @@ import { PartyForm } from '@/components/people/party-form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { WorkspaceNotReady } from '@/components/workspace/workspace-not-ready';
 import { WorkspaceShell } from '@/components/workspace/workspace-shell';
+import { listSongs } from '@/server/services/catalog/read';
+import { getContact } from '@/server/services/contacts/contacts';
 import { getParty } from '@/server/services/contacts/read';
 import { requirePermission } from '@/server/services/permissions';
 
@@ -27,6 +31,13 @@ export default async function PartyPage({ params }: Props) {
   // Edit controls follow the §6.2 roles; the services check them again on save.
   const can = (action: 'update' | 'delete') =>
     requirePermission(workspace.tenant, { contact: [action] }).ok;
+  // A contact's pitch history needs pitch:read; Create pitch needs pitch:create and the catalog.
+  const contactId = party.ok ? party.value.contact?.contactId : undefined;
+  const contact = contactId ? await getContact(workspace.tenant, contactId) : null;
+  const songs = requirePermission(workspace.tenant, { pitch: ['create'] }).ok
+    ? await listSongs(workspace.tenant)
+    : null;
+  const pitchable = songs?.ok ? pitchableSongs(songs.value) : null;
 
   return (
     <WorkspaceShell workspaceName={workspace.workspaceName} current="people">
@@ -47,6 +58,16 @@ export default async function PartyPage({ params }: Props) {
               ) : null}
             </div>
             <PartyDetails party={party.value} />
+            {contact?.ok ? (
+              <ContactPitches
+                contact={contact.value}
+                create={
+                  pitchable ? (
+                    <CreatePitch contactId={contact.value.contactId} songs={pitchable} />
+                  ) : null
+                }
+              />
+            ) : null}
           </>
         ) : (
           // The other refusal is FORBIDDEN: this request's role lacks contact:read (§6.2).

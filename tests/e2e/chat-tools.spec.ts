@@ -165,3 +165,23 @@ test('melos-2xl.6: the song card sets the focused entity that "it" resolves to (
   ).toContainText('100.00%');
   await expect(page.getByText('Here are the writers of the focused song.')).toBeVisible();
 });
+
+// fixtures/aimock/contacts.json: searchContacts, then getContact (melos-ajt.12).
+test('melos-ajt.12: searchContacts and getContact render ContactGrid and ContactCard', async ({
+  page,
+}) => {
+  await signInAsJordan(page);
+  await ask(page, 'who is rebecca carter');
+
+  const grid = page.getByRole('region', { name: 'Contacts', exact: true });
+  await expect(grid.getByRole('link', { name: 'Rebecca Carter' })).toBeVisible({ timeout: 60_000 });
+  // The email is not in the model summary (§3.6): the grid got the full DTO.
+  await expect(grid).toContainText('rebecca@cartersync.example');
+  const card = page.getByRole('region', { name: 'Contact', exact: true });
+  await expect(card.getByRole('list', { name: 'Pitched songs' })).toContainText(
+    'Paper Planes at 2AM',
+  );
+  await expect(page.getByText('Rebecca Carter is a music supervisor')).toBeVisible({
+    timeout: 60_000,
+  });
+});
