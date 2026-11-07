@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signUpWithWorkspace } from './support';
+import { signIn, signUp, signUpWithWorkspace } from './support';
 
 test('sign up, sign in, create a workspace, and render the ping tool in chat', async ({ page }) => {
   const workspaceName = await signUpWithWorkspace(page, 'Smoke');
@@ -22,4 +22,14 @@ test('sign up, sign in, create a workspace, and render the ping tool in chat', a
   );
   await expect(page.getByTestId('ping-workspace-id')).toHaveText(/^ws_[0-9A-HJKMNP-TV-Z]{26}$/);
   await page.screenshot({ path: 'test-results/ping-card.png', fullPage: true });
+});
+
+test('ONB-E2E-001: a workspace cannot be created without choosing a type', async ({ page }) => {
+  await signIn(page, await signUp(page, 'NoType'));
+  await page.getByLabel('Workspace name').fill(`NoType Records ${Date.now()}`);
+  await page.getByRole('button', { name: 'Create workspace' }).click();
+  await expect(page).toHaveURL(/\/workspaces\/new$/);
+  const radio = page.getByRole('radio', { name: 'Songwriter or artist' });
+  expect(await radio.evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
+  await page.screenshot({ path: 'test-results/workspace-type-picker.png', fullPage: true });
 });

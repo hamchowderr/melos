@@ -12,6 +12,7 @@ import { controlDeleteHooks, controlDeletesPlugin } from './control-deletes';
 import { sendAuthEmail } from './mailer';
 import { membershipAuditAfterHook, membershipAuditHooks } from './membership-audit';
 import { singleRolePlugin } from './single-role';
+import { workspaceTypeHooks } from './workspace-type-hooks';
 
 const env = getServerEnv();
 const mailerDisabled = env.authMailer === 'disabled';
@@ -94,7 +95,12 @@ export const auth = betterAuth({
       roles,
       creatorRole: 'owner',
       // No key repeats: membership audit has no afterCreateOrganization, deletes one before hook.
-      organizationHooks: { ...membershipAuditHooks, ...controlDeleteHooks, ...provisioningHooks },
+      organizationHooks: {
+        ...membershipAuditHooks,
+        ...controlDeleteHooks,
+        ...provisioningHooks,
+        ...workspaceTypeHooks,
+      },
       // Explicit, per GHSA-fmh4-wcc4-5jm3: the implicit default flips with ID generation.
       requireEmailVerificationOnInvitation: true,
       sendInvitationEmail: ({ id, email, role, organization: workspace, inviter }) => {
