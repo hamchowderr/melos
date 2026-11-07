@@ -1,8 +1,23 @@
-import { BookOpen, CalendarCheck, MessageSquare, Scale, Settings, Users } from 'lucide-react';
+import {
+  BookOpen,
+  CalendarCheck,
+  FileText,
+  MessageSquare,
+  Scale,
+  Settings,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
-export type WorkspaceSection = 'today' | 'chat' | 'catalog' | 'rights' | 'people' | 'settings';
+export type WorkspaceSection =
+  | 'today'
+  | 'chat'
+  | 'catalog'
+  | 'rights'
+  | 'people'
+  | 'reports'
+  | 'settings';
 
 const SECTIONS = [
   { section: 'today', href: '/today', label: 'Today', Icon: CalendarCheck },
@@ -10,6 +25,7 @@ const SECTIONS = [
   { section: 'catalog', href: '/catalog', label: 'Catalog', Icon: BookOpen },
   { section: 'rights', href: '/rights', label: 'Rights', Icon: Scale },
   { section: 'people', href: '/people', label: 'People', Icon: Users },
+  { section: 'reports', href: '/reports', label: 'Reports', Icon: FileText },
   { section: 'settings', href: '/settings', label: 'Settings', Icon: Settings },
 ] as const;
 
