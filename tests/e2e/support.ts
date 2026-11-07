@@ -66,9 +66,17 @@ export async function signUpWithWorkspace(page: Page, label: string): Promise<st
   return workspaceName;
 }
 
-/** On /workspaces/new: creates a workspace, which becomes the active one, and opens it. */
-export async function createWorkspace(page: Page, workspaceName: string): Promise<void> {
+/**
+ * On /workspaces/new: creates a workspace of the given type (ONB-001), which becomes the active
+ * one, and opens it.
+ */
+export async function createWorkspace(
+  page: Page,
+  workspaceName: string,
+  typeLabel = 'Songwriter or artist',
+): Promise<void> {
   await page.getByLabel('Workspace name').fill(workspaceName);
+  await page.getByRole('radio', { name: typeLabel }).check();
   await page.getByRole('button', { name: 'Create workspace' }).click();
   await expect(page).toHaveURL(`${new URL(page.url()).origin}/`, AUTH_REDIRECT);
   await expect(page.getByTestId('active-workspace-name')).toHaveText(workspaceName);

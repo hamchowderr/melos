@@ -1,0 +1,25 @@
+{
+  "fixtures": [
+    {
+      "match": { "userMessage": "who is rebecca carter", "hasToolResult": false },
+      "response": {
+        "toolCalls": [{ "name": "searchContacts", "arguments": "{\"query\":\"Rebecca Carter\"}" }]
+      }
+    },
+    {
+      "match": { "userMessage": "who is rebecca carter", "toolResultContains": "\"pitchItems\"" },
+      "response": { "content": "Rebecca Carter is a music supervisor at Carter Sync Agency." }
+    },
+    {
+      "match": { "userMessage": "who is rebecca carter", "toolResultContains": "\"contactId\"" },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "getContact",
+            "arguments": "{\"contactId\":\"con_01KZP9VTM0RP7M79V1M77S93K8\"}"
+          }
+        ]
+      }
+    }
+  ]
+}
