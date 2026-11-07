@@ -457,7 +457,7 @@ Field lists are the contract. Exact TypeScript types are derived from the tool s
 - `MessageDraftDTO`: `messageId`, `pitchId`, `purpose`, `status` (draft), `subject`, `bodyText`, `to[]`, `cc[]`, `bcc[]` (`contactMethodId`, `address`), `contentHash`, `updatedAt`, `sourceFacts` (item titles, primary links, contact name, attached report id).
 - `SendResultDTO`: `messageId`, `status` (sent or failed), `provider`, `providerMessageId`, `sentAt`, `failureReason` (for example `IDEMPOTENCY_CONFLICT`, `STATE_CHANGED`).
 - `MessageThreadDTO`: `pitchId`, `messages[]` in time order.
-- `TodayWorkspaceDTO`: `date`; `timezone`; `followUpsDue[]` (`PitchSummary` with `priorityRank`, ordered by §3.7); `recentReplies[]` (`PitchSummary` plus `receivedAt`, last 7 days); `readinessIssues` (`ReadinessReportDTO`); `readyToPitch[]` (`recordingId`, `title`, `neverPitchedLicensingAgentCount`). `TodayWorkspace` renders `followUpsDue` as `PitchCard` rows inside `FollowUpQueue`.
+- `TodayWorkspaceDTO`: `date`; `timezone`; `followUpsDue[]` (`PitchSummary` with `priorityRank`, ordered by §3.7); `recentReplies[]` (`PitchSummary` plus `receivedAt`, last 7 days); `readinessIssues` (`ReadinessReportDTO`); `readyToPitch[]` (`recordingId`, `title`, `neverPitchedLicensingAgentCount`): one-stop-ready recordings that at least one active `licensing_agent` contact has never been pitched (§3.7), most such agents first (PROPOSED). `recentReplies` lists the cells of each pitch with an inbound message received in the 7 days up to `end(D)`, newest reply first. `TodayWorkspace` renders `followUpsDue` as `PitchCard` rows inside `FollowUpQueue`.
 - `ReportTemplateSummary`: `templateId`, `name`, `reportType`, `presetKey`, `isSystem`, `sections[]` (`id`, `enabled`).
 - `ReportPreviewDTO`: `templateId`, `items[]` (`recordingId`, `compositionId`), `sections[]` (`id`, `enabled`), `text`.
 - `GeneratedReportDTO`: `reportId`, `templateId`, `items[]`, `generatedAt`, `text`, `pdfAssetId`.
@@ -2381,7 +2381,7 @@ Owner decisions 2026-10-30 place CAT-010 to CAT-012, RGT-009 and RGT-010 in epic
 | P-21 | Withdrawn during drafting (became requirement AUTH-009) | — |
 | P-22 | Creatives classification: organization when referenced only through Publishing or MasterOwner with no Songwriter Name; otherwise person, with `PARTY_KIND_UNCERTAIN` when neither signal is present | §7.6 |
 | P-23 | Failed provisioning leaves the organization in place with `status = 'failed'` for retry | §7.2 |
-| P-24 | "Today" uses the member's IANA timezone from `workspace_member_settings`; the row is created at first sign-in from the browser's timezone, UTC when the browser reports none; the phase 3 seed sets Jordan Taylor to `America/Los_Angeles` | §3.3, §4.1, §6.4 |
+| P-24 | "Today" uses the member's IANA timezone from `workspace_member_settings`; the row is created the first time the member opens the workspace after signing in, from the browser's timezone (`MemberTimezone` in `WorkspaceShell`), UTC when the browser reports none or a name Intl refuses; an existing row is never overwritten; the phase 3 seed sets Jordan Taylor to `America/Los_Angeles` | §3.3, §4.1, §6.4 |
 | P-25 | CSV apply batches of 500 rows; 5,000-row acceptance fixture | IMP-013 |
 | P-26 | CSV template columns and value formats | §7.6 |
 | P-27 | CopilotKit runtime telemetry disabled in production | §7.8 |
