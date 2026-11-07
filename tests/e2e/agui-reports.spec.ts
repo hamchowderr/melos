@@ -57,3 +57,9 @@ test('TST-AI-003: AGUIMock drives ReportPreview, text first with copy', async ({
   await expect(preview).not.toContainText('lyrics');
   await expect(preview.getByRole('button', { name: 'Copy text' })).toBeVisible();
 });
+
+test('TST-AI-003: AGUIMock renders a generateReport snapshot', async ({ page }) => {
+  await ask(page, 'agui saved report');
+  const saved = page.getByRole('region', { name: 'Saved report', exact: true });
+  await expect(saved).toContainText('saved 2026-09-10');
+});
