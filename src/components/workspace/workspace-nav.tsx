@@ -4,6 +4,7 @@ import {
   FileText,
   MessageSquare,
   Scale,
+  Send,
   Settings,
   Users,
 } from 'lucide-react';
@@ -16,6 +17,7 @@ export type WorkspaceSection =
   | 'catalog'
   | 'rights'
   | 'people'
+  | 'pitches'
   | 'reports'
   | 'settings';
 
@@ -25,6 +27,7 @@ const SECTIONS = [
   { section: 'catalog', href: '/catalog', label: 'Catalog', Icon: BookOpen },
   { section: 'rights', href: '/rights', label: 'Rights', Icon: Scale },
   { section: 'people', href: '/people', label: 'People', Icon: Users },
+  { section: 'pitches', href: '/pitches', label: 'Pitches', Icon: Send },
   { section: 'reports', href: '/reports', label: 'Reports', Icon: FileText },
   { section: 'settings', href: '/settings', label: 'Settings', Icon: Settings },
 ] as const;
