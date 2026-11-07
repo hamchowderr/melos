@@ -5,6 +5,7 @@ import { PITCH_STATUSES } from '../dto/pitches';
 export const SEARCH_PITCHES_TOOL_NAME = 'searchPitches';
 export const GET_PITCH_TOOL_NAME = 'getPitch';
 export const GET_MESSAGE_THREAD_TOOL_NAME = 'getMessageThread';
+export const GET_TODAY_WORKSPACE_TOOL_NAME = 'getTodayWorkspace';
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 
@@ -28,4 +29,8 @@ export const getPitchInputSchema = z.object({ pitchId: z.string().min(1) });
 export const getMessageThreadInputSchema = z.object({
   messageId: z.string().min(1).optional().describe('Give this or pitchId, not both.'),
   pitchId: z.string().min(1).optional(),
+});
+
+export const getTodayWorkspaceInputSchema = z.object({
+  date: date.optional().describe("Default today in the member's timezone."),
 });

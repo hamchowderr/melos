@@ -1,8 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { MessageThreadDTO } from '../../src/lib/dto/outreach';
-import type { PitchDTO, PitchSummary } from '../../src/lib/dto/pitches';
-import { summarizePitch, summarizePitches, summarizeThread } from '../../src/mastra/tools/pitches';
+import type { PitchDTO, PitchSummary, TodayWorkspaceDTO } from '../../src/lib/dto/pitches';
+import {
+  summarizePitch,
+  summarizePitches,
+  summarizeThread,
+  summarizeToday,
+} from '../../src/mastra/tools/pitches';
 
 const { fixtures } = JSON.parse(readFileSync('fixtures/agui/renderers.json', 'utf8')) as {
   fixtures: { toolName: string; result: { value: unknown } }[];
@@ -53,5 +58,18 @@ describe('melos-ajt.13: pitch tools model output (§3.6)', () => {
         ...{ subject: 'Re: Harbor Lights for your show', receivedAt: '2026-09-05T09:00:00.000Z' },
       },
     ]);
+  });
+
+  it('getTodayWorkspace keeps each due cell and counts the other sections', () => {
+    expect(summarizeToday(value('getTodayWorkspace') as TodayWorkspaceDTO)).toEqual({
+      date: '2026-09-10',
+      followUpsDue: [
+        {
+          ...{ pitchItemId: 'pti_AGUI1', pitchId: 'pit_AGUI1', contactName: 'Mock Supervisor' },
+          ...{ itemTitle: 'Harbor Lights', currentStatus: 'awaiting_reply', priorityRank: 1 },
+        },
+      ],
+      ...{ recentReplyCount: 1, readinessIssueCount: 1, readyToPitchCount: 1 },
+    });
   });
 });
