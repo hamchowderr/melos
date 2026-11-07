@@ -2210,6 +2210,7 @@ CSV sources are identified by a user-chosen source key stored in `source_contain
 - **Disco block (RPT-004).** `disco_track_info` produces one plain-text block per song for pasting into Disco track info or comments, with the same section toggles. Work on RPT-004 starts only after U-20 confirms the field labels and layout against Disco's current documentation (phase 9).
 - **Multi-song ("Schedule A", RPT-005).** `items` holds 1–50 songs in order. The text repeats the enabled sections per song, in item order, each song block headed by its title; lyrics stay last within each song block. `generateReport` stores one `generated_reports` row and one `generated_report_items` row per song, under the same snapshot policy as single-song reports.
 - Every value in a report comes from canonical data at generation time; readiness and totals are computed by `RightsService`, never read from stored flags.
+- **Text layout (PROPOSED).** Each song block starts with the composition title (the recording title without one). `core` prints unheaded; every other enabled section prints its heading, then one `Label: value` line per field that has a value, and a section with no values prints nothing. `lyrics` prints the lyrics as stored. Song blocks are separated by a `---` line. Shares print as percentages of basis points (5000 as 50%). `ReportPreviewDTO.items` holds each resolved item: a composition item names its primary recording, or `recordingId` null without one (P-37).
 
 ### 7.8 Dependency constraints found in Gate A
 
