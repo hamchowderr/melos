@@ -7,6 +7,7 @@ import { FocusOn } from '@/components/chat/focus-context';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
+import { PitchDetail, PitchTable } from '@/components/chat/pitch-table';
 import { SongResults } from '@/components/chat/song-results';
 import { ToolCard, ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
 import { ReadinessChecklist } from '@/components/rights/readiness-checklist';
@@ -29,6 +30,12 @@ import {
   pingResultSchema,
 } from '@/lib/agent/contract';
 import {
+  GET_PITCH_TOOL_NAME,
+  getPitchInputSchema,
+  SEARCH_PITCHES_TOOL_NAME,
+  searchPitchesInputSchema,
+} from '@/lib/agent/pitch-tools';
+import {
   ATTEST_REPRESENTATION_TOOL_NAME,
   licensingContactsInputSchema,
   masterSharesInputSchema,
@@ -42,6 +49,7 @@ import {
 } from '@/lib/agent/rights-write-tools';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
+import type { PitchDTO, PitchSummary } from '@/lib/dto/pitches';
 import type {
   DefaultOwnershipProposal,
   ReadinessReportDTO,
@@ -163,6 +171,26 @@ export function useMelosToolRenderers() {
         'Working out your ownership...',
         (proposal) => <OwnershipProposal proposal={proposal} />,
       ),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: SEARCH_PITCHES_TOOL_NAME,
+      parameters: searchPitchesInputSchema,
+      render: renderResult<PitchSummary[]>('Searching pitches...', (cells) => (
+        <PitchTable cells={cells} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_PITCH_TOOL_NAME,
+      parameters: getPitchInputSchema,
+      render: renderResult<PitchDTO>('Opening the pitch...', (pitch) => (
+        <PitchDetail pitch={pitch} />
+      )),
     },
     [],
   );

@@ -96,6 +96,23 @@ test('TST-AI-003: AGUIMock drives the ownership proposal', async ({ page }) => {
   );
 });
 
+test('TST-AI-003: AGUIMock drives PitchTable', async ({ page }) => {
+  await ask(page, 'agui pitches');
+  const table = page.getByRole('region', { name: 'Pitches', exact: true });
+  await expect(table.getByRole('list', { name: 'Pitch list' })).toContainText(
+    'Harbor Lights to Mock SupervisorAwaiting reply · follow-up due',
+  );
+});
+
+test('TST-AI-003: AGUIMock drives the getPitch PitchCard', async ({ page }) => {
+  await ask(page, 'agui pitch');
+  const card = page.getByRole('region', { name: 'Pitch', exact: true });
+  await expect(card).toContainText('Mock Supervisor');
+  await expect(card.getByRole('list', { name: 'Songs in this pitch' })).toContainText(
+    'Harbor LightsAwaiting reply · follow-up due',
+  );
+});
+
 test('TST-AI-003: a refusal renders a plain sentence, not a card', async ({ page }) => {
   await ask(page, 'agui not found');
   const alert = page.locator('[data-error-code="NOT_FOUND"]');
