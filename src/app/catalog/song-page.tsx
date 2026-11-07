@@ -12,6 +12,7 @@ import { RecordingSection, recordingTitle } from '@/components/catalog/recording
 import { RecordingTermsEditor } from '@/components/catalog/recording-terms-editor';
 import { ReleaseForm } from '@/components/catalog/release-form';
 import { ReleaseSection } from '@/components/catalog/release-section';
+import { WhoHasntHeard } from '@/components/people/contact-pitches';
 import { AgreementForm } from '@/components/rights/agreement-form';
 import { FillOwnership } from '@/components/rights/fill-ownership';
 import { HolderSplitEditor } from '@/components/rights/holder-split-editor';
@@ -28,6 +29,7 @@ import { getDownloadUrl, listRecordingAudio } from '@/server/services/assets/ass
 import { getMusicWorkspace } from '@/server/services/catalog/music-workspace';
 import { listArtistAliases, listParties } from '@/server/services/contacts/read';
 import { requirePermission } from '@/server/services/permissions';
+import { searchPitchEligibility } from '@/server/services/pitches/eligibility';
 import { listAgreements } from '@/server/services/rights/agreements';
 import { proposeDefaultOwnership } from '@/server/services/rights/default-ownership';
 import { getHolderSharesHashes } from '@/server/services/rights/holder-shares';
@@ -198,6 +200,16 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
       />
     ) : undefined;
 
+  // "Who hasn't heard this" (CRM-006) for the composition, or a lone recording.
+  const heard = song.ok
+    ? await searchPitchEligibility(
+        workspace.tenant,
+        composition
+          ? { itemType: 'composition', itemId: composition.id }
+          : { itemType: 'recording', itemId: song.value.recordings[0].id },
+      )
+    : null;
+
   return (
     <WorkspaceShell workspaceName={workspace.workspaceName} current="catalog">
       {song.ok ? (
@@ -265,6 +277,7 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
             </div>
             <aside className="flex min-w-0 flex-col gap-4">
               {composition ? <CompositionSection composition={composition} /> : null}
+              {heard?.ok ? <WhoHasntHeard eligibility={heard.value} /> : null}
               <ReleaseSection releases={song.value.releases} recordings={song.value.recordings} />
               {releaseForm}
             </aside>
