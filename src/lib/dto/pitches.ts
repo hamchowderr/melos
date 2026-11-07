@@ -37,6 +37,49 @@ export const PITCH_STATUS_LABELS: Record<PitchStatus, string> = {
   archived: 'Archived',
 };
 
+/**
+ * Allowed status transitions (§6.4, CRM-004). `archived` returns only to the status the cell held
+ * before it was archived (unarchive), which PitchService reads from the cell's events.
+ */
+export const PITCH_TRANSITIONS: Record<Exclude<PitchStatus, 'archived'>, readonly PitchStatus[]> = {
+  draft: ['not_contacted', 'sent', 'archived'],
+  not_contacted: ['sent', 'archived'],
+  sent: [
+    'awaiting_reply',
+    'responded',
+    'interested',
+    'requested_more',
+    'passed',
+    'closed_lost',
+    'archived',
+  ],
+  awaiting_reply: [
+    'responded',
+    'interested',
+    'requested_more',
+    'passed',
+    'closed_lost',
+    'archived',
+  ],
+  responded: [
+    'awaiting_reply',
+    'interested',
+    'requested_more',
+    'passed',
+    'closed_lost',
+    'archived',
+  ],
+  interested: ['awaiting_reply', 'requested_more', 'accepted', 'passed', 'closed_lost', 'archived'],
+  requested_more: ['awaiting_reply', 'interested', 'accepted', 'passed', 'closed_lost', 'archived'],
+  accepted: ['closed_won', 'closed_lost', 'archived'],
+  passed: ['interested', 'requested_more', 'archived'],
+  closed_won: ['archived'],
+  closed_lost: ['archived'],
+};
+
+/** Terminal statuses an agent may set only after approval (P-07). */
+export const TERMINAL_STATUSES: readonly PitchStatus[] = ['closed_won', 'closed_lost', 'archived'];
+
 /** Statuses whose cells can be due for a follow-up (§6.4 followUpDue). */
 export const FOLLOW_UP_STATUSES: readonly PitchStatus[] = [
   'sent',
@@ -160,4 +203,31 @@ export type PitchSearch = {
   itemType?: PitchItemType;
   itemId?: string;
   followUpDueOn?: string;
+};
+
+/** One song in a pitch: a composition or a recording (§6.10). */
+export type PitchItemInput = { itemType: PitchItemType; itemId: string };
+
+/** createPitch input (§3.3): one contact, 1..n songs, an optional subject and opening note. */
+export type CreatePitchInput = {
+  contactId: string;
+  items: PitchItemInput[];
+  subject?: string | null;
+  note?: string | null;
+};
+
+/** transitionPitchStatus input (§3.3): one cell, its new status, a note and a follow-up date. */
+export type TransitionInput = {
+  pitchItemId: string;
+  toStatus: PitchStatus;
+  note?: string | null;
+  nextFollowUpAt?: string | null;
+};
+
+/** addPitchNote input (§3.3): a note on a pitch, or on one of its cells, and a follow-up date. */
+export type PitchNoteInput = {
+  pitchId: string;
+  note: string;
+  pitchItemId?: string | null;
+  nextFollowUpAt?: string | null;
 };
