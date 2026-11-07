@@ -175,49 +175,49 @@ export function PitchGrid({ cells, updates }: { cells: PitchSummary[]; updates: 
     setPitch(next);
     router.refresh();
   };
-  if (cells.length === 0) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyTitle>No pitches</EmptyTitle>
-          <EmptyDescription>No song has been pitched with this status.</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
+  // The panel stays open when a change moves its cell out of the filtered list.
   return (
     <>
-      <GridFrame>
-        <Table aria-label="Pitch list">
-          <TableHeader>
-            <TableRow>
-              {['Song', 'Contact', 'Status', 'Follow up', 'Last contact'].map((heading) => (
-                <TableHead key={heading}>{heading}</TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {cells.map((cell) => (
-              <TableRow
-                key={cell.pitchItemId}
-                tabIndex={0}
-                aria-label={`${cell.itemTitle} to ${cell.contactName}`}
-                className="cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none"
-                onClick={() => open(cell)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') open(cell);
-                }}
-              >
-                <TableCell className="font-medium whitespace-normal">{cell.itemTitle}</TableCell>
-                <TableCell className="whitespace-normal">{cell.contactName}</TableCell>
-                <TableCell>{PITCH_STATUS_LABELS[cell.currentStatus]}</TableCell>
-                <TableCell>{cell.followUpDue ? 'Due' : day(cell.nextFollowUpAt)}</TableCell>
-                <TableCell>{day(cell.lastContactedAt)}</TableCell>
+      {cells.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>No pitches</EmptyTitle>
+            <EmptyDescription>No song has been pitched with this status.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <GridFrame>
+          <Table aria-label="Pitch list">
+            <TableHeader>
+              <TableRow>
+                {['Song', 'Contact', 'Status', 'Follow up', 'Last contact'].map((heading) => (
+                  <TableHead key={heading}>{heading}</TableHead>
+                ))}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </GridFrame>
+            </TableHeader>
+            <TableBody>
+              {cells.map((cell) => (
+                <TableRow
+                  key={cell.pitchItemId}
+                  tabIndex={0}
+                  aria-label={`${cell.itemTitle} to ${cell.contactName}`}
+                  className="cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none"
+                  onClick={() => open(cell)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') open(cell);
+                  }}
+                >
+                  <TableCell className="font-medium whitespace-normal">{cell.itemTitle}</TableCell>
+                  <TableCell className="whitespace-normal">{cell.contactName}</TableCell>
+                  <TableCell>{PITCH_STATUS_LABELS[cell.currentStatus]}</TableCell>
+                  <TableCell>{cell.followUpDue ? 'Due' : day(cell.nextFollowUpAt)}</TableCell>
+                  <TableCell>{day(cell.lastContactedAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </GridFrame>
+      )}
       <Sheet open={pitch !== null} onOpenChange={(isOpen) => (isOpen ? null : setPitch(null))}>
         <SheetContent>
           {pitch ? (
