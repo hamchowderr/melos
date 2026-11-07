@@ -68,3 +68,24 @@ export type SendResultDTO = {
   sentAt: string | null;
   failureReason: string | null;
 };
+
+/** One message in a thread (§3.4 MessageThreadDTO), with its body and recipients. */
+export type ThreadMessageDTO = {
+  messageId: string;
+  direction: 'outbound' | 'inbound';
+  purpose: MessagePurpose | null;
+  status: 'draft' | 'queued' | 'sending' | 'sent' | 'failed' | 'received';
+  subject: string | null;
+  bodyText: string | null;
+  from: string | null;
+  to: string[];
+  cc: string[];
+  inReplyToMessageId: string | null;
+  sentAt: string | null;
+  receivedAt: string | null;
+  failureReason: string | null;
+  createdAt: string;
+};
+
+/** MessageThreadDTO (§3.4, OUT-003): a pitch's messages in time order. */
+export type MessageThreadDTO = { pitchId: string; messages: ThreadMessageDTO[] };
