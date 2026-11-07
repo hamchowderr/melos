@@ -1,5 +1,5 @@
 import { and, eq, isNull, max } from 'drizzle-orm';
-import { ulid } from 'ulid';
+import { monotonicFactory, ulid } from 'ulid';
 import type { WorkspacePermissions } from '../../../lib/auth/permissions';
 import type { CreatePitchInput, PitchDTO, PitchItemInput } from '../../../lib/dto/pitches';
 import { contacts, pitchEvents, pitches, pitchItems } from '../../db/schema/workspace.generated';
@@ -12,6 +12,8 @@ import { getPitch } from './read';
 const CREATE: WorkspacePermissions = { pitch: ['create'] };
 const UPDATE: WorkspacePermissions = { pitch: ['update'] };
 const NOTE_MAX = 5000;
+// Events written in one millisecond keep their write order (§4.3 id order breaks time ties).
+const nextUlid = monotonicFactory();
 
 export const refuse = (field: string, reason: string) =>
   failure({ code: 'VALIDATION', field, reason });
@@ -39,7 +41,7 @@ export function event(
     Partial<typeof pitchEvents.$inferInsert>,
 ): typeof pitchEvents.$inferInsert {
   return {
-    id: `pev_${ulid()}`,
+    id: `pev_${nextUlid()}`,
     actorType: origin.type,
     actorId: tenant.userId,
     occurredAt: at,
