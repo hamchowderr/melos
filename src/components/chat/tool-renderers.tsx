@@ -3,12 +3,15 @@
 import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
 import type { z } from 'zod';
+import { ContactCard } from '@/components/chat/contact-card';
+import { ContactGrid, EligibilityGrid } from '@/components/chat/contact-grid';
 import { FocusOn } from '@/components/chat/focus-context';
 import { MessageDraftCard, SendResultCard } from '@/components/chat/message-draft-card';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
 import { MessageThread, PitchDetail, PitchTable } from '@/components/chat/pitch-table';
+import { useReportToolRenderers } from '@/components/chat/report-renderers';
 import { SongResults } from '@/components/chat/song-results';
 import { TodayWorkspace } from '@/components/chat/today-workspace';
 import { ToolCard, ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
@@ -32,6 +35,14 @@ import {
   pingResultSchema,
 } from '@/lib/agent/contract';
 import {
+  GET_CONTACT_TOOL_NAME,
+  getContactInputSchema,
+  SEARCH_CONTACTS_TOOL_NAME,
+  SEARCH_PITCH_ELIGIBILITY_TOOL_NAME,
+  searchContactsInputSchema,
+  searchPitchEligibilityInputSchema,
+} from '@/lib/agent/crm-tools';
+import {
   DRAFT_PITCH_MESSAGE_TOOL_NAME,
   draftPitchMessageInputSchema,
   SEND_MESSAGE_TOOL_NAME,
@@ -49,6 +60,7 @@ import {
   SEARCH_PITCHES_TOOL_NAME,
   searchPitchesInputSchema,
 } from '@/lib/agent/pitch-tools';
+
 import {
   ADD_PITCH_ITEM_TOOL_NAME,
   ADD_PITCH_NOTE_TOOL_NAME,
@@ -73,8 +85,14 @@ import {
 } from '@/lib/agent/rights-write-tools';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
+import type { ContactDetailDTO, ContactSummary } from '@/lib/dto/contacts';
 import type { MessageDraftDTO, MessageThreadDTO, SendResultDTO } from '@/lib/dto/outreach';
-import type { PitchDTO, PitchSummary, TodayWorkspaceDTO } from '@/lib/dto/pitches';
+import type {
+  PitchDTO,
+  PitchEligibilityDTO,
+  PitchSummary,
+  TodayWorkspaceDTO,
+} from '@/lib/dto/pitches';
 import type {
   DefaultOwnershipProposal,
   ReadinessReportDTO,
@@ -84,7 +102,7 @@ import type {
 type RenderProps<A> = { status: string; args?: Partial<A>; result?: unknown };
 
 /** One structured renderer per tool (§3.1): pending, refusal, or the component for the DTO. */
-const renderResult =
+export const renderResult =
   <T, A = unknown>(pending: string, render: (value: T, args: Partial<A>) => ReactElement) =>
   (props: RenderProps<A>) => {
     if (props.status !== 'complete') return <ToolPending label={pending} />;
@@ -122,6 +140,7 @@ const rightsFocus = (rights: RightsSummaryDTO): FocusedEntity | null =>
 
 /** Registers the chat renderer of every agent tool, keyed by tool name (§7.4, U-03). */
 export function useMelosToolRenderers() {
+  useReportToolRenderers();
   useRenderTool(
     {
       name: PING_TOOL_NAME,
@@ -215,6 +234,36 @@ export function useMelosToolRenderers() {
       parameters: getPitchInputSchema,
       render: renderResult<PitchDTO>('Opening the pitch...', (pitch) => (
         <PitchDetail pitch={pitch} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: SEARCH_CONTACTS_TOOL_NAME,
+      parameters: searchContactsInputSchema,
+      render: renderResult<ContactSummary[]>('Searching contacts...', (contacts) => (
+        <ContactGrid contacts={contacts} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_CONTACT_TOOL_NAME,
+      parameters: getContactInputSchema,
+      render: renderResult<ContactDetailDTO>('Opening the contact...', (contact) => (
+        <ContactCard contact={contact} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: SEARCH_PITCH_ELIGIBILITY_TOOL_NAME,
+      parameters: searchPitchEligibilityInputSchema,
+      render: renderResult<PitchEligibilityDTO>('Checking who has heard it...', (eligibility) => (
+        <EligibilityGrid eligibility={eligibility} />
       )),
     },
     [],

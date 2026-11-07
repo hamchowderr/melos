@@ -4,6 +4,7 @@ import { WORKSPACE_AGENT_ID } from '../../lib/agent/contract';
 import { focusInstruction } from '../focus';
 import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
+import { getContactTool, searchContactsTool, searchPitchEligibilityTool } from '../tools/contacts';
 import { draftPitchMessageTool, sendMessageTool, updateMessageDraftTool } from '../tools/outreach';
 import { pingTool } from '../tools/ping';
 import {
@@ -18,6 +19,7 @@ import {
   getTodayWorkspaceTool,
   searchPitchesTool,
 } from '../tools/pitches';
+import { generateReportTool, listReportTemplatesTool, previewReportTool } from '../tools/reports';
 import {
   attestRepresentationTool,
   updateLicensingContactsTool,
@@ -45,7 +47,10 @@ export const WORKSPACE_AGENT_INSTRUCTIONS = [
   'otherwise list the candidates and ask which one the user means.',
   'When a tool needs a recording, use the song primaryRecordingId; if it is null, ask which recording.',
   '"This" or "that song" means the focused entity in the context, then the most recent result in this chat that fits, otherwise ask.',
+  'To act on a person the user names, call searchContacts first and resolve one contact the same way; ask when several match.',
+  '"Who hasn\'t heard this?" means searchPitchEligibility for that song.',
   'proposeDefaultOwnership only proposes; never say a proposal was saved.',
+  'Reports: you see only their length, so never quote or summarize report text; the member reads it in the card.',
   'createPitch records a planned pitch and sends nothing; say so, and never say a pitch was sent.',
   'Write email drafts from the pitch facts (song titles, links, the contact name) and never invent facts; a draft is not sent.',
   '"Send it" means sendMessage for the most recent draft in this chat; the member approves every send, so never say an email went out before the result says sent.',
@@ -70,6 +75,12 @@ export const WORKSPACE_AGENT_TOOLS = {
   proposeDefaultOwnership: proposeDefaultOwnershipTool,
   searchPitches: searchPitchesTool,
   getPitch: getPitchTool,
+  searchContacts: searchContactsTool,
+  getContact: getContactTool,
+  searchPitchEligibility: searchPitchEligibilityTool,
+  listReportTemplates: listReportTemplatesTool,
+  previewReport: previewReportTool,
+  generateReport: generateReportTool,
   getMessageThread: getMessageThreadTool,
   getTodayWorkspace: getTodayWorkspaceTool,
   createPitch: createPitchTool,

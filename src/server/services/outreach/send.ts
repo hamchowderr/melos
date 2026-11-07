@@ -16,6 +16,7 @@ import {
 } from '../../db/schema/workspace.generated';
 import { canonicalJson } from '../audit-writer';
 import { workspaceIntegrityGuard as guard } from '../integrity-guard';
+import { oneStopReadyCells, type SentFacts } from '../metrics/north-star';
 import { requirePermission } from '../permissions';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
@@ -127,6 +128,7 @@ async function settle(
     providerThreadId?: string;
     at: string;
     failureReason?: string;
+    ready?: ReadonlySet<string>;
   },
 ) {
   const { at } = outcome;
@@ -154,7 +156,15 @@ async function settle(
   ) => ({
     ...{ id: `pev_${nextUlid()}`, pitchId, actorType: 'system', occurredAt: at, ...row },
   });
-  const metadataJson = JSON.stringify({ messageId: message.id });
+  // melos-ajt.1: whether each song was one-stop ready, and a follow-up sent by its due date.
+  const [pitch] = await tx.select().from(pitches).where(eq(pitches.id, pitchId));
+  const due = pitch?.nextFollowUpAt?.slice(0, 10);
+  const followUpOnTime =
+    message.purpose === 'follow_up' ? !due || at.slice(0, 10) <= due : undefined;
+  const factsOf = (cellId: string): SentFacts => ({
+    ...{ messageId: message.id, packageComplete: outcome.ready?.has(cellId) ?? false },
+    followUpOnTime,
+  });
   if (!sent) {
     const reason = JSON.stringify({ messageId: message.id, failureReason: outcome.failureReason });
     await guard.insert(tx, pitchEvents, [
@@ -163,7 +173,11 @@ async function settle(
     return;
   }
   const events = cells.map((cell) =>
-    event({ pitchItemId: cell.id, eventType: 'message_sent', metadataJson }),
+    event({
+      pitchItemId: cell.id,
+      eventType: 'message_sent',
+      metadataJson: JSON.stringify(factsOf(cell.id)),
+    }),
   );
   // A successful send moves draft and not_contacted cells to sent (§6.4).
   const moving = cells.filter(
@@ -200,6 +214,17 @@ async function settle(
     { lastContactedAt: at, nextFollowUpAt, updatedAt: at, updatedBy: tenant.userId },
     eq(pitches.id, pitchId),
   );
+}
+
+/** The pitch's cells whose song is one-stop ready as it is sent (melos-ajt.1). */
+async function readyCellsOf(tenant: TenantContext, pitchId: string) {
+  const cells = await sanitized(tenant.workspaceId, async () =>
+    (await getWorkspaceDatabase(tenant.workspaceId))
+      .select()
+      .from(pitchItems)
+      .where(eq(pitchItems.pitchId, pitchId)),
+  );
+  return oneStopReadyCells(tenant, cells);
 }
 
 /**
@@ -265,12 +290,13 @@ export async function sendMessage(
   );
   const { id: messageId, subject, bodyText, bodyHtml, pitchId } = message;
   let outcome: Parameters<typeof settle>[3];
+  const ready = pitchId ? await readyCellsOf(tenant, pitchId) : new Set<string>();
   try {
     const receipt = await transport.send({
       ...{ messageId, from, to, cc, bcc, subject: subject ?? '', bodyText: bodyText ?? '' },
       ...{ bodyHtml: bodyHtml ?? undefined, pitchId, workspaceId: tenant.workspaceId },
     });
-    outcome = { provider: transport.provider, ...receipt, at: receipt.acceptedAt };
+    outcome = { provider: transport.provider, ...receipt, at: receipt.acceptedAt, ready };
   } catch (error) {
     const code = (error as { code?: unknown }).code;
     const failureReason = code === 'IDEMPOTENCY_CONFLICT' ? code : 'TRANSPORT_ERROR';
