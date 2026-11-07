@@ -78,7 +78,10 @@ export async function createWorkspace(
   await page.getByLabel('Workspace name').fill(workspaceName);
   await page.getByRole('radio', { name: typeLabel }).check();
   await page.getByRole('button', { name: 'Create workspace' }).click();
-  await expect(page).toHaveURL(`${new URL(page.url()).origin}/`, AUTH_REDIRECT);
+  const origin = new URL(page.url()).origin;
+  // ONB-005: the type's start page first; callers then work from Chat, as a later sign-in does.
+  await expect(page).toHaveURL(new RegExp(`^${origin}/(catalog|today)$`), AUTH_REDIRECT);
+  await page.goto('/');
   await expect(page.getByTestId('active-workspace-name')).toHaveText(workspaceName);
 }
 
