@@ -1,3 +1,5 @@
+import type { ReadinessReportDTO } from './rights';
+
 /**
  * Pitch DTOs and the §6.4 status vocabulary for PitchService (docs/CONTRACT.md §3.4, §6.4, §6.10).
  * Types and pure rules only, with no server import, so client components can import them.
@@ -256,3 +258,27 @@ export const CLOSED_STATUSES: readonly PitchStatus[] = [
   'closed_lost',
   'archived',
 ];
+
+/** Follow-up status rank (§3.7, P-31): requested_more first, sent last. */
+export const FOLLOW_UP_STATUS_RANK: readonly PitchStatus[] = [
+  'requested_more',
+  'interested',
+  'responded',
+  'awaiting_reply',
+  'sent',
+];
+
+/**
+ * TodayWorkspaceDTO (§3.4, CRM-005): for `date` in the member's `timezone`, the due cells by P-31
+ * priority, the cells of pitches with a reply received in the 7 days to the end of `date` (newest
+ * first), the catalog's not-ready recordings, and one-stop-ready recordings that an active licensing
+ * agent has never been pitched, most such agents first.
+ */
+export type TodayWorkspaceDTO = {
+  date: string;
+  timezone: string;
+  followUpsDue: PitchSummary[];
+  recentReplies: (PitchSummary & { receivedAt: string })[];
+  readinessIssues: ReadinessReportDTO;
+  readyToPitch: { recordingId: string; title: string; neverPitchedLicensingAgentCount: number }[];
+};
