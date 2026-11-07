@@ -1,5 +1,7 @@
 import { ToolCard } from '@/components/chat/tool-card';
+import type { MessageThreadDTO } from '@/lib/dto/outreach';
 import { PITCH_STATUS_LABELS, type PitchDTO, type PitchSummary } from '@/lib/dto/pitches';
+import { PitchTimeline } from './pitch-timeline';
 
 /** An ISO time as its calendar date. */
 export const day = (iso: string | null) => (iso ? iso.slice(0, 10) : null);
@@ -60,7 +62,7 @@ export function PitchTable({ cells }: { cells: PitchSummary[] }) {
   );
 }
 
-/** getPitch's PitchCard header (§3.3); PitchTimeline goes below it. */
+/** getPitch's PitchCard header above PitchTimeline (§3.3). */
 export function PitchDetail({ pitch }: { pitch: PitchDTO }) {
   return (
     <ToolCard title="Pitch">
@@ -73,6 +75,20 @@ export function PitchDetail({ pitch }: { pitch: PitchDTO }) {
           <PitchCard key={cell.pitchItemId} cell={cell} show="song" />
         ))}
       </ul>
+      <PitchTimeline events={pitch.events} messages={pitch.messages} />
+    </ToolCard>
+  );
+}
+
+/** getMessageThread's PitchTimeline (§3.3, OUT-003): the messages with bodies. */
+export function MessageThread({ thread }: { thread: MessageThreadDTO }) {
+  return (
+    <ToolCard title="Messages">
+      {thread.messages.length === 0 ? (
+        <p className="px-4 pb-3 text-muted-foreground">No messages on this pitch yet.</p>
+      ) : (
+        <PitchTimeline messages={thread.messages} />
+      )}
     </ToolCard>
   );
 }

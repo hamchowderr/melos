@@ -5,7 +5,7 @@ import { focusInstruction } from '../focus';
 import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
 import { pingTool } from '../tools/ping';
-import { getPitchTool, searchPitchesTool } from '../tools/pitches';
+import { getMessageThreadTool, getPitchTool, searchPitchesTool } from '../tools/pitches';
 import {
   attestRepresentationTool,
   updateLicensingContactsTool,
@@ -54,6 +54,7 @@ export const WORKSPACE_AGENT_TOOLS = {
   proposeDefaultOwnership: proposeDefaultOwnershipTool,
   searchPitches: searchPitchesTool,
   getPitch: getPitchTool,
+  getMessageThread: getMessageThreadTool,
   updateWriterShares: updateWriterSharesTool,
   updatePublishingShares: updatePublishingSharesTool,
   updateMasterShares: updateMasterSharesTool,

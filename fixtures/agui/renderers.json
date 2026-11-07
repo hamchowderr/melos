@@ -394,6 +394,53 @@
           ]
         }
       }
+    },
+    {
+      "message": "agui thread",
+      "toolName": "getMessageThread",
+      "args": {
+        "pitchId": "pit_AGUI1"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "pitchId": "pit_AGUI1",
+          "messages": [
+            {
+              "messageId": "msg_AGUI1",
+              "direction": "outbound",
+              "purpose": "initial",
+              "status": "sent",
+              "subject": "Harbor Lights for your show",
+              "bodyText": "Hi, here is Harbor Lights.",
+              "from": "me@mock.example",
+              "to": ["supervisor@mock.example"],
+              "cc": [],
+              "inReplyToMessageId": null,
+              "sentAt": "2026-09-03T17:00:00.000Z",
+              "receivedAt": null,
+              "failureReason": null,
+              "createdAt": "2026-09-03T16:00:00.000Z"
+            },
+            {
+              "messageId": "msg_AGUI2",
+              "direction": "inbound",
+              "purpose": "reply",
+              "status": "received",
+              "subject": "Re: Harbor Lights for your show",
+              "bodyText": "Love it, send stems.",
+              "from": "supervisor@mock.example",
+              "to": ["me@mock.example"],
+              "cc": [],
+              "inReplyToMessageId": "msg_AGUI1",
+              "sentAt": null,
+              "receivedAt": "2026-09-05T09:00:00.000Z",
+              "failureReason": null,
+              "createdAt": "2026-09-05T09:00:00.000Z"
+            }
+          ]
+        }
+      }
     }
   ]
 }

@@ -7,7 +7,7 @@ import { FocusOn } from '@/components/chat/focus-context';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
-import { PitchDetail, PitchTable } from '@/components/chat/pitch-table';
+import { MessageThread, PitchDetail, PitchTable } from '@/components/chat/pitch-table';
 import { SongResults } from '@/components/chat/song-results';
 import { ToolCard, ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
 import { ReadinessChecklist } from '@/components/rights/readiness-checklist';
@@ -30,7 +30,9 @@ import {
   pingResultSchema,
 } from '@/lib/agent/contract';
 import {
+  GET_MESSAGE_THREAD_TOOL_NAME,
   GET_PITCH_TOOL_NAME,
+  getMessageThreadInputSchema,
   getPitchInputSchema,
   SEARCH_PITCHES_TOOL_NAME,
   searchPitchesInputSchema,
@@ -49,6 +51,7 @@ import {
 } from '@/lib/agent/rights-write-tools';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
+import type { MessageThreadDTO } from '@/lib/dto/outreach';
 import type { PitchDTO, PitchSummary } from '@/lib/dto/pitches';
 import type {
   DefaultOwnershipProposal,
@@ -190,6 +193,16 @@ export function useMelosToolRenderers() {
       parameters: getPitchInputSchema,
       render: renderResult<PitchDTO>('Opening the pitch...', (pitch) => (
         <PitchDetail pitch={pitch} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_MESSAGE_THREAD_TOOL_NAME,
+      parameters: getMessageThreadInputSchema,
+      render: renderResult<MessageThreadDTO>('Reading the messages...', (thread) => (
+        <MessageThread thread={thread} />
       )),
     },
     [],
