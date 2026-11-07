@@ -29,6 +29,13 @@
       "when": 1789323719377,
       "tag": "0003_workspace_registry_attempt_id",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794023994810,
+      "tag": "0004_member_onboarding_dismissed",
+      "breakpoints": true
     }
   ]
 }

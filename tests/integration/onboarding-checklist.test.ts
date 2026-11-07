@@ -111,3 +111,15 @@ describe('ONB-INT-004: getOnboardingChecklist', () => {
     expect((await onboarding.getOnboardingChecklist(withRole(empty, 'viewer'))).ok).toBe(true);
   });
 });
+
+describe('ONB-003: dismissing the checklist', () => {
+  it('marks it dismissed for that member only and keeps the stored timezone', async () => {
+    const settings = await import('../../src/server/services/member-settings');
+    const other = { ...northstar, userId: 'usr_other_member' };
+    expect(accepted(await onboarding.getOnboardingChecklist(northstar)).dismissed).toBe(false);
+    await settings.dismissOnboarding(northstar, 'Europe/Berlin');
+    expect(accepted(await onboarding.getOnboardingChecklist(northstar)).dismissed).toBe(true);
+    expect(await settings.getMemberTimezone(northstar)).toBe('America/Los_Angeles');
+    expect(accepted(await onboarding.getOnboardingChecklist(other)).dismissed).toBe(false);
+  });
+});

@@ -3,6 +3,7 @@ import type { OnboardingChecklistDTO } from '../../../lib/dto/onboarding';
 import { readWorkspaceType, type WorkspaceType } from '../../../lib/workspace-type';
 import { controlDb } from '../../db/client';
 import { organization } from '../../db/schema/auth';
+import { isOnboardingDismissed } from '../member-settings';
 import { requirePermission } from '../permissions';
 import { getReadinessIssues } from '../rights/read';
 import { failure, type ServiceResult, success } from '../service-result';
@@ -177,13 +178,16 @@ async function readFacts(
 
 /**
  * The getting-started checklist for the workspace type (ONB-003, ONB-004): every tick is derived
- * from live workspace rows on this read. catalog:read. `dismissed` is false until melos-1z5.5.
+ * from live workspace rows on this read. catalog:read. `dismissed` is the member's choice (ONB-003).
  */
 export async function getOnboardingChecklist(
   tenant: TenantContext,
 ): Promise<ServiceResult<OnboardingChecklistDTO>> {
   if (!requirePermission(tenant, { catalog: ['read'] }).ok) return failure('FORBIDDEN');
-  const workspaceType = await getWorkspaceType(tenant);
+  const [workspaceType, dismissed] = await Promise.all([
+    getWorkspaceType(tenant),
+    isOnboardingDismissed(tenant),
+  ]);
   const facts = await readFacts(tenant, workspaceType);
   if (!facts.ok) return facts;
   const items = ITEMS.filter((item) => item.types.includes(workspaceType)).map((item) => ({
@@ -193,5 +197,5 @@ export async function getOnboardingChecklist(
     done: item.done(facts.value),
   }));
   const doneCount = items.filter((item) => item.done).length;
-  return success({ workspaceType, items, doneCount, total: items.length, dismissed: false });
+  return success({ workspaceType, items, doneCount, total: items.length, dismissed });
 }
