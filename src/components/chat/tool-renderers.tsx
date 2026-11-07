@@ -4,7 +4,7 @@ import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
 import type { z } from 'zod';
 import { ContactCard } from '@/components/chat/contact-card';
-import { ContactGrid, ContactGrid, EligibilityGrid } from '@/components/chat/contact-grid';
+import { ContactGrid, EligibilityGrid } from '@/components/chat/contact-grid';
 import { FocusOn } from '@/components/chat/focus-context';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';

@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { ContactDetailDTO } from '../../src/lib/dto/contacts';
 import type { PitchEligibilityDTO } from '../../src/lib/dto/pitches';
 import {
-  summarizeContact,summarizeContact, 
-  summarizeContacts,summarizeContacts, 
-  summarizeEligibility
+  summarizeContact,
+  summarizeContacts,
+  summarizeEligibility,
 } from '../../src/mastra/tools/contacts';
 
 const { fixtures } = JSON.parse(readFileSync('fixtures/agui/renderers.json', 'utf8')) as {

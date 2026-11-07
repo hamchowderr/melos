@@ -4,7 +4,7 @@ import { WORKSPACE_AGENT_ID } from '../../lib/agent/contract';
 import { focusInstruction } from '../focus';
 import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
-import { getContactTool, getContactTool, searchContactsTool, searchContactsTool, searchPitchEligibilityTool } from '../tools/contacts';
+import { getContactTool, searchContactsTool, searchPitchEligibilityTool } from '../tools/contacts';
 import { pingTool } from '../tools/ping';
 import { generateReportTool, listReportTemplatesTool, previewReportTool } from '../tools/reports';
 import {
