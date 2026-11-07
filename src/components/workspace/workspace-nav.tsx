@@ -1,8 +1,15 @@
-import { BookOpen, MessageSquare, Scale, Send, Settings, Users } from 'lucide-react';
+import { BookOpen, FileText, MessageSquare, Scale, Send, Settings, Users } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
-export type WorkspaceSection = 'chat' | 'catalog' | 'rights' | 'people' | 'pitches' | 'settings';
+export type WorkspaceSection =
+  | 'chat'
+  | 'catalog'
+  | 'rights'
+  | 'people'
+  | 'pitches'
+  | 'reports'
+  | 'settings';
 
 const SECTIONS = [
   { section: 'chat', href: '/', label: 'Chat', Icon: MessageSquare },
@@ -10,6 +17,7 @@ const SECTIONS = [
   { section: 'rights', href: '/rights', label: 'Rights', Icon: Scale },
   { section: 'people', href: '/people', label: 'People', Icon: Users },
   { section: 'pitches', href: '/pitches', label: 'Pitches', Icon: Send },
+  { section: 'reports', href: '/reports', label: 'Reports', Icon: FileText },
   { section: 'settings', href: '/settings', label: 'Settings', Icon: Settings },
 ] as const;
 
