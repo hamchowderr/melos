@@ -96,6 +96,43 @@ test('TST-AI-003: AGUIMock drives the ownership proposal', async ({ page }) => {
   );
 });
 
+test('TST-AI-003: AGUIMock drives PitchTable', async ({ page }) => {
+  await ask(page, 'agui pitches');
+  const table = page.getByRole('region', { name: 'Pitches', exact: true });
+  await expect(table.getByRole('list', { name: 'Pitch list' })).toContainText(
+    'Harbor Lights to Mock SupervisorAwaiting reply · follow-up due',
+  );
+});
+
+test('TST-AI-003: AGUIMock drives PitchCard and PitchTimeline', async ({ page }) => {
+  await ask(page, 'agui pitch');
+  const card = page.getByRole('region', { name: 'Pitch', exact: true });
+  await expect(card).toContainText('Mock Supervisor');
+  await expect(card.getByRole('list', { name: 'Songs in this pitch' })).toContainText(
+    'Harbor LightsAwaiting reply · follow-up due',
+  );
+  const timeline = card.getByRole('list', { name: 'Timeline' });
+  await expect(timeline.locator('li').first()).toContainText(
+    '2026-09-03Sent: Harbor Lights for your show',
+  );
+  await expect(timeline.locator('li').nth(1)).toContainText(
+    'status changed · Pitched to Awaiting reply',
+  );
+});
+
+test('TST-AI-003: AGUIMock drives the getMessageThread PitchTimeline', async ({ page }) => {
+  await ask(page, 'agui thread');
+  const timeline = page
+    .getByRole('region', { name: 'Messages', exact: true })
+    .getByRole('list', { name: 'Timeline' });
+  await expect(timeline.locator('li').first()).toContainText(
+    'Sent: Harbor Lights for your showHi, here is Harbor Lights.',
+  );
+  await expect(timeline.locator('li').nth(1)).toContainText(
+    '2026-09-05Reply: Re: Harbor Lights for your showLove it, send stems.',
+  );
+});
+
 test('TST-AI-003: AGUIMock drives ContactGrid', async ({ page }) => {
   await ask(page, 'agui contacts');
   const grid = page.getByRole('region', { name: 'Contacts', exact: true });
