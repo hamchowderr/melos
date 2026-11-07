@@ -2,11 +2,13 @@
 
 import { type FormEvent, useState } from 'react';
 import { SignOutButton } from '@/components/auth/sign-out-button';
+import { WorkspaceTypePicker } from '@/components/onboarding/workspace-type-picker';
 import { PageCard } from '@/components/page-card';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { authClient } from '@/lib/auth/client';
+import { isWorkspaceType, WORKSPACE_TYPE_INFO } from '@/lib/workspace-type';
 
 function toSlug(name: string): string {
   const base =
@@ -24,13 +26,20 @@ export function CreateWorkspaceForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const name = String(new FormData(event.currentTarget).get('name')).trim();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get('name')).trim();
+    const workspaceType = form.get('workspaceType');
+    // The radios are required, so the browser asks first; this covers a form that skipped it.
+    if (!isWorkspaceType(workspaceType)) {
+      setError('Choose which describes you.');
+      return;
+    }
     setPending(true);
     setError(null);
 
     // The auth client throws on a network error instead of returning one.
     const created = await authClient.organization
-      .create({ name, slug: toSlug(name) })
+      .create({ name, slug: toSlug(name), metadata: { workspaceType } })
       .catch(() => null);
     if (!created || created.error || !created.data) {
       setPending(false);
@@ -46,7 +55,8 @@ export function CreateWorkspaceForm() {
       setError(active?.error?.message ?? 'Could not open the workspace.');
       return;
     }
-    window.location.assign('/');
+    // ONB-005: a new workspace opens its type's start page; later sign-ins still open Chat.
+    window.location.assign(WORKSPACE_TYPE_INFO[workspaceType].startPath);
   }
 
   return (
@@ -57,6 +67,7 @@ export function CreateWorkspaceForm() {
             <FieldLabel htmlFor="name">Workspace name</FieldLabel>
             <Input id="name" name="name" autoComplete="organization" required maxLength={80} />
           </Field>
+          <WorkspaceTypePicker required />
           <FieldError>{error}</FieldError>
           <Button type="submit" disabled={pending}>
             {pending ? 'Creating workspace...' : 'Create workspace'}
