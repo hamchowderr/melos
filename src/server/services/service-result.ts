@@ -12,11 +12,11 @@ export type RowCounts = Readonly<Record<string, number>>;
  * `reason` is a stable snake_case code. INVALID_ISRC, INVALID_ISWC, INVALID_UPC_EAN, INVALID_IPI: an identifier
  * the normalizer refuses, with its `reason`; CONFLICT: a unique value a live row already holds
  * (§3.1, P-46); both name the input `field`. STATE_CHANGED: the rows an approval's `beforeHash`
- * covers changed since it was taken (§7.4, AUD-003); nothing was written. requirePermission's FORBIDDEN adds a fixed sentence for
+ * covers changed since it was taken (§7.4, AUD-003); nothing was written. FOLLOW_UP_BEFORE_LAST_CONTACT: an explicit `nextFollowUpAt` not later than the pitch's `last_contacted_at` (§6.4, CRM-005). requirePermission's FORBIDDEN adds a fixed sentence for
  * pages; services return the code alone, so every service refuses with the same value.
  */
 export type ServiceError =
-  | { code: 'FORBIDDEN' | 'STATE_CHANGED' }
+  | { code: 'FORBIDDEN' | 'STATE_CHANGED' | 'FOLLOW_UP_BEFORE_LAST_CONTACT' }
   | { code: 'NOT_FOUND'; counts?: RowCounts }
   | { code: 'REFERENCED' | 'SONG_LEVEL_CONFLICT'; counts: RowCounts }
   | { code: 'VALIDATION'; field: string; reason: string }
@@ -36,7 +36,12 @@ export const success = <T>(value: T): ServiceResult<T> => ({ ok: true, value });
 
 /** A refusal from a code that needs no details, or from a complete error. */
 export const failure = (
-  error: 'FORBIDDEN' | 'NOT_FOUND' | 'STATE_CHANGED' | ServiceError,
+  error:
+    | 'FORBIDDEN'
+    | 'NOT_FOUND'
+    | 'STATE_CHANGED'
+    | 'FOLLOW_UP_BEFORE_LAST_CONTACT'
+    | ServiceError,
 ): ServiceResult<never> => ({
   ok: false,
   error: typeof error === 'string' ? { code: error } : error,
