@@ -237,10 +237,32 @@ describe('parseServerEnv', () => {
     const { register } = await import('../../src/instrumentation');
     const failure = (await register().catch((error: unknown) => error)) as ServerEnvError;
     expect(failure.problems.map((p) => p.name)).toEqual(['MELOS_AUTH_MAILER']);
-    expect(failure.message).toContain('must be disabled in production');
+    expect(failure.message).toContain('must be disabled or resend in production');
   });
 
-  it('accepts the disabled mailer everywhere and only it in production', () => {
+  it('requires a Resend key and sender when Resend is selected, and sends nothing as sandbox in production', () => {
+    const production = { ...TEST_MODEL, VERCEL_ENV: 'production', MELOS_AUTH_MAILER: 'disabled' };
+    expect(parseServerEnv(production)).toMatchObject({
+      emailTransport: 'unavailable',
+      resend: null,
+    });
+    for (const selected of [{ MELOS_EMAIL_TRANSPORT: 'resend' }, { MELOS_AUTH_MAILER: 'resend' }]) {
+      expect(problemsOf({ ...production, ...selected }).problems.map((p) => p.name)).toEqual([
+        'RESEND_API_KEY',
+        'MELOS_EMAIL_FROM',
+      ]);
+    }
+    const resend = { RESEND_API_KEY: 're_key', MELOS_EMAIL_FROM: 'pitch@northstar.example' };
+    const env = parseServerEnv({
+      ...production,
+      ...{ ...resend, MELOS_EMAIL_TRANSPORT: 'resend', MELOS_AUTH_MAILER: 'resend' },
+    });
+    expect(env).toMatchObject({ emailTransport: 'resend', authMailer: 'resend' });
+    expect(env.resend).toEqual({ apiKey: 're_key', from: 'pitch@northstar.example' });
+    expect(parseServerEnv({ ...TEST_MODEL, VERCEL_ENV: 'preview' }).emailTransport).toBe('sandbox');
+  });
+
+  it('accepts the disabled mailer everywhere and only it or resend in production', () => {
     for (const mailer of ['outbox', 'memory', undefined]) {
       const error = problemsOf({
         ...TEST_MODEL,

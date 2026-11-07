@@ -43,8 +43,9 @@ const resultOf = (message: Message): SendResultDTO => ({
   failureReason: message.failureReason,
 });
 
-/** The address the workspace sends from: the member's own (Resend overrides it, melos-ajt.9). */
-async function senderOf(tenant: TenantContext) {
+/** The address a send comes from: the transport's verified sender, else the member's own. */
+async function senderOf(tenant: TenantContext, transport: EmailTransport) {
+  if (transport.from) return transport.from;
   const [row] = await controlDb
     .select({ email: user.email })
     .from(user)
@@ -150,7 +151,7 @@ export async function sendMessage(
   origin: WriteOrigin = { type: 'user' },
   transport: EmailTransport = getEmailTransport(),
 ): Promise<ServiceResult<SendResultDTO>> {
-  const from = await senderOf(tenant);
+  const from = await senderOf(tenant, transport);
   type Queued = { stored: SendResultDTO; message?: never } | { stored: null; message: Message };
   const queued = await runWorkspaceWrite<Queued>(
     tenant,

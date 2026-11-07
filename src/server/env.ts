@@ -49,14 +49,18 @@ const rawEnvSchema = z.object({
   MELOS_LLM_BASE_URL: optionalUrl,
   MELOS_EMAIL_TRANSPORT: z.preprocess(
     blankToUndefined,
-    z.enum(['sandbox'], { error: 'must be one of: sandbox' }).default('sandbox'),
+    z.enum(['sandbox', 'resend'], { error: 'must be one of: sandbox, resend' }).default('sandbox'),
   ),
   MELOS_AUTH_MAILER: z.preprocess(
     blankToUndefined,
     z
-      .enum(['outbox', 'memory', 'disabled'], { error: 'must be one of: outbox, memory, disabled' })
+      .enum(['outbox', 'memory', 'disabled', 'resend'], {
+        error: 'must be one of: outbox, memory, disabled, resend',
+      })
       .default('outbox'),
   ),
+  RESEND_API_KEY: optionalText,
+  MELOS_EMAIL_FROM: optionalText,
   MELOS_SIGNUP_ALLOWED_EMAILS: optionalText,
   R2_ACCOUNT_ID: optionalText,
   R2_ACCESS_KEY_ID: optionalText,
@@ -138,12 +142,18 @@ const envSchema = rawEnvSchema.superRefine((env, ctx) => {
     }
   }
 
-  // outbox and memory are development mailers; production gets one when phase 8 wires Resend.
-  if (env.VERCEL_ENV === 'production' && env.MELOS_AUTH_MAILER !== 'disabled') {
+  // outbox and memory are development mailers; production sends auth email through Resend or not at all.
+  const productionMailers = ['disabled', 'resend'];
+  if (env.VERCEL_ENV === 'production' && !productionMailers.includes(env.MELOS_AUTH_MAILER)) {
     flag(
       'MELOS_AUTH_MAILER',
-      'must be disabled in production (outbox and memory are for development)',
+      'must be disabled or resend in production (outbox and memory are for development)',
     );
+  }
+
+  if (env.MELOS_EMAIL_TRANSPORT === 'resend' || env.MELOS_AUTH_MAILER === 'resend') {
+    if (!env.RESEND_API_KEY) flag('RESEND_API_KEY', 'is required when Resend sends email');
+    if (!env.MELOS_EMAIL_FROM) flag('MELOS_EMAIL_FROM', 'is required when Resend sends email');
   }
 });
 
@@ -188,8 +198,14 @@ export type ServerEnv = {
   agentDatabase: DatabaseSetting;
   workspaceHost: WorkspaceHostSetting;
   chatModel: ChatModelSetting | UnconfiguredChatModel;
-  emailTransport: 'sandbox';
-  authMailer: 'outbox' | 'memory' | 'disabled';
+  /**
+   * The outreach transport (§7.5). `unavailable` is sandbox selected in production, which refuses
+   * every send instead of pretending to deliver it (P-14) until Resend is configured (U-28).
+   */
+  emailTransport: 'sandbox' | 'resend' | 'unavailable';
+  authMailer: 'outbox' | 'memory' | 'disabled' | 'resend';
+  /** The Resend key and verified sender, set when either email path selects Resend. */
+  resend: { apiKey: string; from: string } | null;
   /** Lower-cased addresses that may sign up; null lets anyone sign up (never in production). */
   signUpAllowedEmails: string[] | null;
 };
@@ -358,8 +374,15 @@ export function parseServerEnv(source: Record<string, string | undefined>): Serv
     },
     workspaceHost,
     chatModel: resolveChatModel(env),
-    emailTransport: env.MELOS_EMAIL_TRANSPORT,
+    emailTransport:
+      env.VERCEL_ENV === 'production' && env.MELOS_EMAIL_TRANSPORT === 'sandbox'
+        ? 'unavailable'
+        : env.MELOS_EMAIL_TRANSPORT,
     authMailer: env.MELOS_AUTH_MAILER,
+    resend:
+      env.RESEND_API_KEY && env.MELOS_EMAIL_FROM
+        ? { apiKey: env.RESEND_API_KEY, from: env.MELOS_EMAIL_FROM }
+        : null,
     signUpAllowedEmails: parseSignUpAllowlist(env),
   };
 }
