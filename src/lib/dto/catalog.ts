@@ -3,6 +3,7 @@
  * components can import them.
  */
 
+import type { PitchStatus } from './pitches';
 import type { RecordingReadiness, RightsSummaryDTO } from './rights';
 
 export type CatalogFocus = { entityType: 'composition' | 'recording'; entityId: string };
@@ -303,20 +304,7 @@ export type SongCatalogDTO = {
   releases: SongReleaseDTO[];
 };
 
-/** `pitch_items.current_status` codes (§6.4). */
-export type PitchStatus =
-  | 'draft'
-  | 'not_contacted'
-  | 'sent'
-  | 'awaiting_reply'
-  | 'responded'
-  | 'interested'
-  | 'requested_more'
-  | 'passed'
-  | 'accepted'
-  | 'closed_won'
-  | 'closed_lost'
-  | 'archived';
+export type { PitchStatus };
 
 /**
  * The pitch cells on a song's composition or on one of its live recordings (§3.4, §3.7, D-6).
