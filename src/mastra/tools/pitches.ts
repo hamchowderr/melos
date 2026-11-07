@@ -1,13 +1,20 @@
 import { createTool } from '@mastra/core/tools';
 import {
+  GET_MESSAGE_THREAD_TOOL_NAME,
   GET_PITCH_TOOL_NAME,
+  GET_TODAY_WORKSPACE_TOOL_NAME,
+  getMessageThreadInputSchema,
   getPitchInputSchema,
+  getTodayWorkspaceInputSchema,
   SEARCH_PITCHES_TOOL_NAME,
   searchPitchesInputSchema,
 } from '../../lib/agent/pitch-tools';
 import { toolResultSchema } from '../../lib/agent/tool-result';
-import type { PitchDTO, PitchSummary } from '../../lib/dto/pitches';
+import type { MessageThreadDTO } from '../../lib/dto/outreach';
+import type { PitchDTO, PitchSummary, TodayWorkspaceDTO } from '../../lib/dto/pitches';
+import { getMessageThread } from '../../server/services/outreach/replies';
 import { getPitch, searchPitches } from '../../server/services/pitches/read';
+import { getTodayWorkspace } from '../../server/services/pitches/today';
 import { modelOutput, runTool } from './run-tool';
 
 /** searchPitches's §3.6 model fields, per cell. */
@@ -67,4 +74,57 @@ export const getPitchTool = createTool({
   outputSchema: toolResultSchema<PitchDTO>(),
   execute: ({ pitchId }, context) => runTool(context, (tenant) => getPitch(tenant, pitchId)),
   toModelOutput: modelOutput(summarizePitch),
+});
+
+/** getMessageThread's §3.6 model fields, per message; bodies and addresses stay in the UI. */
+export const summarizeThread = (thread: MessageThreadDTO) => ({
+  pitchId: thread.pitchId,
+  messages: thread.messages.map((message) => ({
+    messageId: message.messageId,
+    direction: message.direction,
+    status: message.status,
+    subject: message.subject,
+    ...(message.direction === 'inbound'
+      ? { receivedAt: message.receivedAt }
+      : { sentAt: message.sentAt }),
+  })),
+});
+
+export const getMessageThreadTool = createTool({
+  id: GET_MESSAGE_THREAD_TOOL_NAME,
+  description:
+    "Every message on a pitch in time order, sent and received, given a pitch id or one of its message ids. Use it to read a contact's reply.",
+  inputSchema: getMessageThreadInputSchema,
+  outputSchema: toolResultSchema<MessageThreadDTO>(),
+  execute: (input, context) => runTool(context, (tenant) => getMessageThread(tenant, input)),
+  toModelOutput: modelOutput(summarizeThread),
+});
+
+/** getTodayWorkspace's §3.6 model fields: each due cell, then counts of the other sections. */
+export const summarizeToday = (today: TodayWorkspaceDTO) => ({
+  date: today.date,
+  followUpsDue: today.followUpsDue.map((cell) => ({
+    pitchItemId: cell.pitchItemId,
+    pitchId: cell.pitchId,
+    contactName: cell.contactName,
+    itemTitle: cell.itemTitle,
+    currentStatus: cell.currentStatus,
+    priorityRank: cell.priorityRank,
+  })),
+  recentReplyCount: today.recentReplies.length,
+  readinessIssueCount: today.readinessIssues.recordings.reduce(
+    (count, recording) => count + recording.issues.length,
+    0,
+  ),
+  readyToPitchCount: today.readyToPitch.length,
+});
+
+export const getTodayWorkspaceTool = createTool({
+  id: GET_TODAY_WORKSPACE_TOOL_NAME,
+  description:
+    "The member's day: follow-ups due in priority order, recent replies, readiness issues and songs ready to pitch. Use it for 'what should I do today?'.",
+  inputSchema: getTodayWorkspaceInputSchema,
+  outputSchema: toolResultSchema<TodayWorkspaceDTO>(),
+  execute: (input, context) => runTool(context, (tenant) => getTodayWorkspace(tenant, input)),
+  toModelOutput: modelOutput(summarizeToday),
 });

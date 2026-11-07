@@ -104,12 +104,32 @@ test('TST-AI-003: AGUIMock drives PitchTable', async ({ page }) => {
   );
 });
 
-test('TST-AI-003: AGUIMock drives the getPitch PitchCard', async ({ page }) => {
+test('TST-AI-003: AGUIMock drives PitchCard and PitchTimeline', async ({ page }) => {
   await ask(page, 'agui pitch');
   const card = page.getByRole('region', { name: 'Pitch', exact: true });
   await expect(card).toContainText('Mock Supervisor');
   await expect(card.getByRole('list', { name: 'Songs in this pitch' })).toContainText(
     'Harbor LightsAwaiting reply · follow-up due',
+  );
+  const timeline = card.getByRole('list', { name: 'Timeline' });
+  await expect(timeline.locator('li').first()).toContainText(
+    '2026-09-03Sent: Harbor Lights for your show',
+  );
+  await expect(timeline.locator('li').nth(1)).toContainText(
+    'status changed · Pitched to Awaiting reply',
+  );
+});
+
+test('TST-AI-003: AGUIMock drives the getMessageThread PitchTimeline', async ({ page }) => {
+  await ask(page, 'agui thread');
+  const timeline = page
+    .getByRole('region', { name: 'Messages', exact: true })
+    .getByRole('list', { name: 'Timeline' });
+  await expect(timeline.locator('li').first()).toContainText(
+    'Sent: Harbor Lights for your showHi, here is Harbor Lights.',
+  );
+  await expect(timeline.locator('li').nth(1)).toContainText(
+    '2026-09-05Reply: Re: Harbor Lights for your showLove it, send stems.',
   );
 });
 
@@ -142,6 +162,21 @@ test('TST-AI-003: AGUIMock drives the eligibility ContactGrid', async ({ page })
   await expect(grid.getByRole('list', { name: 'Never pitched' })).toContainText(
     'Mock Agentlicensing agent',
   );
+});
+
+test('TST-AI-003: AGUIMock drives TodayWorkspace with FollowUpQueue', async ({ page }) => {
+  await ask(page, 'agui today');
+  const today = page.getByRole('region', { name: 'Today, 2026-09-10', exact: true });
+  await expect(today.getByRole('list', { name: 'Follow-up queue' })).toContainText(
+    'Harbor Lights to Mock SupervisorAwaiting reply · follow-up due',
+  );
+  await expect(today.getByRole('list', { name: 'Recent replies' })).toContainText(
+    'Mock Agent on Tidewater2026-09-09',
+  );
+  await expect(today.getByRole('list', { name: 'Ready to pitch' })).toContainText(
+    'Harbor Lights2 licensing agents have not heard it',
+  );
+  await expect(today).toContainText('1 recording is not ready to license.');
 });
 
 test('TST-AI-003: a refusal renders a plain sentence, not a card', async ({ page }) => {
