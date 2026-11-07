@@ -1,5 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { getServerEnv } from '../../env';
+import { ResendEmailTransport } from './resend-transport';
 
 /** One outbound email (§7.5). `messageId` is the idempotency key. */
 export type EmailPayload = {
@@ -22,6 +24,8 @@ export type EmailReceipt = {
 /** The adapter every send goes through (§7.5, OUT-002). */
 export interface EmailTransport {
   readonly provider: 'sandbox' | 'resend';
+  /** The verified sender this transport always uses; unset sends from the member's address. */
+  readonly from?: string;
   send(
     input: EmailPayload & { pitchId?: string | null; workspaceId: string },
   ): Promise<EmailReceipt>;
@@ -68,17 +72,33 @@ export class SandboxEmailTransport implements EmailTransport {
   }
 }
 
+/** Sandbox selected in production (P-14): every send fails, and nothing pretends to deliver. */
+class UnavailableEmailTransport implements EmailTransport {
+  readonly provider = 'sandbox' as const;
+  async send(): Promise<EmailReceipt> {
+    throw new Error('No production email transport (MELOS_EMAIL_TRANSPORT=resend is unset, U-28)');
+  }
+}
+
 let transport: EmailTransport | undefined;
 
 /**
- * The transport for this process (§7.5): the sandbox, in memory under tests and on Vercel, and in
- * `.data/sandbox-outbox` in development. ResendEmailTransport joins in melos-ajt.9.
+ * The transport for this process (§7.5): Resend when MELOS_EMAIL_TRANSPORT=resend, otherwise the
+ * sandbox, in memory under tests and on Vercel and in `.data/sandbox-outbox` in development.
+ * Production with the sandbox selected refuses every send.
  */
 export function getEmailTransport(): EmailTransport {
   if (!transport) {
-    // Vercel has no writable project directory, so preview keeps the outbox in memory (P-34).
-    const memory = process.env.VITEST || process.env.VERCEL;
-    transport = new SandboxEmailTransport(memory ? undefined : '.data/sandbox-outbox');
+    const env = getServerEnv();
+    if (env.emailTransport === 'resend' && env.resend) {
+      transport = new ResendEmailTransport(env.resend);
+    } else if (env.emailTransport === 'unavailable') {
+      transport = new UnavailableEmailTransport();
+    } else {
+      // Vercel has no writable project directory, so preview keeps the outbox in memory (P-34).
+      const memory = process.env.VITEST || env.onVercel;
+      transport = new SandboxEmailTransport(memory ? undefined : '.data/sandbox-outbox');
+    }
   }
   return transport;
 }
