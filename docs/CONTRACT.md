@@ -569,7 +569,8 @@ CREATE TABLE control_audit_log (
   action           TEXT NOT NULL,   -- member.invited, member.role_changed, member.removed,
                                     -- member.added, member.left, invitation.accepted,
                                     -- invitation.rejected, invitation.canceled,
-                                    -- workspace.provisioned, workspace.deleted, migration.batch_started
+                                    -- workspace.provisioned, workspace.deleted, migration.batch_started,
+                                    -- workspace.type_changed (ONB-002)
   target_type      TEXT NOT NULL,
   target_id        TEXT NOT NULL,
   before_json      TEXT,
@@ -583,7 +584,7 @@ CREATE TRIGGER control_audit_log_no_delete BEFORE DELETE ON control_audit_log
 BEGIN SELECT RAISE(ABORT, 'control_audit_log is append-only'); END;
 ```
 
-Membership rows (AUTH-005, ADR-029) name the acting user in `actor_user_id`, NULL for a server call without a session, and hold `{"role": ...}` in `before_json` and `after_json`, NULL where the target had no role. `member.invited`, `invitation.rejected` and `invitation.canceled` target the invitation (`target_type` `invitation`); `member.added`, `invitation.accepted`, `member.role_changed`, `member.removed` and `member.left` target the member row (`target_type` `member`). Creating an organization appends `member.added` for its creator; accepting an invitation appends only `invitation.accepted`. Deleting a user or an organization leaves its rows, with the ids they hold, in place (ADR-030).
+Membership rows (AUTH-005, ADR-029) name the acting user in `actor_user_id`, NULL for a server call without a session, and hold `{"role": ...}` in `before_json` and `after_json`, NULL where the target had no role. `member.invited`, `invitation.rejected` and `invitation.canceled` target the invitation (`target_type` `invitation`); `member.added`, `invitation.accepted`, `member.role_changed`, `member.removed` and `member.left` target the member row (`target_type` `member`). `workspace.type_changed` targets the organization (`target_type` `organization`) and holds `{"workspaceType": ...}` in `before_json` and `after_json`, `null` where none was stored (ONB-002). Creating an organization appends `member.added` for its creator; accepting an invitation appends only `invitation.accepted`. Deleting a user or an organization leaves its rows, with the ids they hold, in place (ADR-030).
 
 `melos-agent-runtime` holds Mastra storage, created by `@mastra/libsql`, plus the runner tables below (§7.9). It is a Turso Cloud database in every deployed environment (P-33).
 
