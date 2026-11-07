@@ -58,3 +58,13 @@ export type UpdateDraftInput = {
   cc?: string[];
   bcc?: string[];
 };
+
+/** SendResultDTO (§3.4, OUT-002): the outcome of sendMessage, stored on the message. */
+export type SendResultDTO = {
+  messageId: string;
+  status: 'sent' | 'failed';
+  provider: 'sandbox' | 'resend' | null;
+  providerMessageId: string | null;
+  sentAt: string | null;
+  failureReason: string | null;
+};
