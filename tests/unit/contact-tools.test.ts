@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { ContactDetailDTO } from '../../src/lib/dto/contacts';
-import { summarizeContact, summarizeContacts } from '../../src/mastra/tools/contacts';
+import type { PitchEligibilityDTO } from '../../src/lib/dto/pitches';
+import {
+  summarizeContact,
+  summarizeContacts,
+  summarizeEligibility,
+} from '../../src/mastra/tools/contacts';
 
 const { fixtures } = JSON.parse(readFileSync('fixtures/agui/renderers.json', 'utf8')) as {
   fixtures: { toolName: string; result: { value: unknown } }[];
@@ -18,6 +23,28 @@ describe('melos-ajt.12: contact tools model output (§3.6)', () => {
       ...{ organizationName: 'Mock Sync Co', roles: ['music_supervisor'] },
       pitchItems: [
         { pitchItemId: 'pti_AGUI1', itemTitle: 'Harbor Lights', currentStatus: 'awaiting_reply' },
+      ],
+    });
+  });
+
+  it('lists eligible contacts with their list name and planned cell (melos-ajt.12)', () => {
+    const eligibility = value('searchPitchEligibility') as PitchEligibilityDTO;
+    expect(summarizeEligibility(eligibility)).toEqual({
+      itemType: 'composition',
+      itemId: 'cmp_AGUI1',
+      contacts: [
+        {
+          ...{
+            contactId: 'con_AGUI1',
+            displayName: 'Mock Supervisor',
+            roles: ['music_supervisor'],
+          },
+          ...{ list: 'planned_not_contacted', pitchItemId: 'pti_AGUI1' },
+        },
+        {
+          ...{ contactId: 'con_AGUI2', displayName: 'Mock Agent', roles: ['licensing_agent'] },
+          list: 'never_pitched',
+        },
       ],
     });
   });

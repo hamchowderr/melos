@@ -4,7 +4,7 @@ import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
 import type { z } from 'zod';
 import { ContactCard } from '@/components/chat/contact-card';
-import { ContactGrid } from '@/components/chat/contact-grid';
+import { ContactGrid, EligibilityGrid } from '@/components/chat/contact-grid';
 import { FocusOn } from '@/components/chat/focus-context';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
@@ -35,7 +35,9 @@ import {
   GET_CONTACT_TOOL_NAME,
   getContactInputSchema,
   SEARCH_CONTACTS_TOOL_NAME,
+  SEARCH_PITCH_ELIGIBILITY_TOOL_NAME,
   searchContactsInputSchema,
+  searchPitchEligibilityInputSchema,
 } from '@/lib/agent/crm-tools';
 import {
   ATTEST_REPRESENTATION_TOOL_NAME,
@@ -52,6 +54,7 @@ import {
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
 import type { ContactDetailDTO, ContactSummary } from '@/lib/dto/contacts';
+import type { PitchEligibilityDTO } from '@/lib/dto/pitches';
 import type {
   DefaultOwnershipProposal,
   ReadinessReportDTO,
@@ -193,6 +196,16 @@ export function useMelosToolRenderers() {
       parameters: getContactInputSchema,
       render: renderResult<ContactDetailDTO>('Opening the contact...', (contact) => (
         <ContactCard contact={contact} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: SEARCH_PITCH_ELIGIBILITY_TOOL_NAME,
+      parameters: searchPitchEligibilityInputSchema,
+      render: renderResult<PitchEligibilityDTO>('Checking who has heard it...', (eligibility) => (
+        <EligibilityGrid eligibility={eligibility} />
       )),
     },
     [],

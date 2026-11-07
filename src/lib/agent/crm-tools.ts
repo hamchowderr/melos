@@ -22,3 +22,9 @@ export const searchContactsInputSchema = z.object({
 });
 
 export const getContactInputSchema = z.object({ contactId: z.string().min(1) });
+
+export const SEARCH_PITCH_ELIGIBILITY_TOOL_NAME = 'searchPitchEligibility';
+
+export const searchPitchEligibilityInputSchema = pitchItemRefSchema.describe(
+  'The song: a composition id, or a recording id for one version.',
+);
