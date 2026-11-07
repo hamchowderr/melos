@@ -566,6 +566,50 @@
           "messages": []
         }
       }
+    },
+    {
+      "message": "agui draft",
+      "toolName": "draftPitchMessage",
+      "args": {
+        "pitchId": "pit_AGUI1",
+        "purpose": "follow_up",
+        "subject": "Harbor Lights, following up",
+        "bodyText": "Checking in on Harbor Lights."
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "messageId": "msg_AGUI3",
+          "pitchId": "pit_AGUI1",
+          "purpose": "follow_up",
+          "status": "draft",
+          "subject": "Harbor Lights, following up",
+          "bodyText": "Checking in on Harbor Lights.",
+          "to": [
+            {
+              "contactMethodId": "cm_AGUI1",
+              "address": "supervisor@mock.example"
+            }
+          ],
+          "cc": [],
+          "bcc": [],
+          "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "updatedAt": "2026-09-10T12:00:00.000Z",
+          "sourceFacts": {
+            "contactName": "Mock Supervisor",
+            "items": [
+              {
+                "itemType": "composition",
+                "itemId": "cmp_AGUI1",
+                "title": "Harbor Lights",
+                "primaryLink": "https://example.com/harbor"
+              }
+            ],
+            "generatedReportId": null,
+            "replyToMessageId": null
+          }
+        }
+      }
     }
   ]
 }

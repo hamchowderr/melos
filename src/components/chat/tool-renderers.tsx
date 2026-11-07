@@ -4,6 +4,7 @@ import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
 import type { z } from 'zod';
 import { FocusOn } from '@/components/chat/focus-context';
+import { MessageDraftCard } from '@/components/chat/message-draft-card';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
@@ -30,6 +31,12 @@ import {
   pingInputSchema,
   pingResultSchema,
 } from '@/lib/agent/contract';
+import {
+  DRAFT_PITCH_MESSAGE_TOOL_NAME,
+  draftPitchMessageInputSchema,
+  UPDATE_MESSAGE_DRAFT_TOOL_NAME,
+  updateMessageDraftInputSchema,
+} from '@/lib/agent/outreach-tools';
 import {
   GET_MESSAGE_THREAD_TOOL_NAME,
   GET_PITCH_TOOL_NAME,
@@ -64,7 +71,7 @@ import {
 } from '@/lib/agent/rights-write-tools';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
-import type { MessageThreadDTO } from '@/lib/dto/outreach';
+import type { MessageDraftDTO, MessageThreadDTO } from '@/lib/dto/outreach';
 import type { PitchDTO, PitchSummary, TodayWorkspaceDTO } from '@/lib/dto/pitches';
 import type {
   DefaultOwnershipProposal,
@@ -254,6 +261,26 @@ export function useMelosToolRenderers() {
       render: renderResult<PitchDTO>('Updating the pitch...', (pitch) => (
         <PitchDetail pitch={pitch} />
       )),
+    },
+    [],
+  );
+  // The key remounts the card when a later call returns a newer version of the draft.
+  const drafted = renderResult<MessageDraftDTO>('Writing the draft...', (draft) => (
+    <MessageDraftCard key={draft.contentHash} draft={draft} />
+  ));
+  useRenderTool(
+    {
+      name: DRAFT_PITCH_MESSAGE_TOOL_NAME,
+      parameters: draftPitchMessageInputSchema,
+      render: drafted,
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: UPDATE_MESSAGE_DRAFT_TOOL_NAME,
+      parameters: updateMessageDraftInputSchema,
+      render: drafted,
     },
     [],
   );
