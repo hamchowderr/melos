@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { MemberTimezone } from '@/components/workspace/member-timezone';
 import { WorkspaceMenu } from '@/components/workspace/workspace-menu';
 import type { WorkspaceSection } from '@/components/workspace/workspace-nav';
 import { WorkspaceSidebarContent } from '@/components/workspace/workspace-sidebar';
@@ -19,6 +20,7 @@ type Props = {
 export function WorkspaceShell({ workspaceName, current, fill, children }: Props) {
   return (
     <div className={cn('flex bg-sidebar', fill ? 'h-dvh' : 'min-h-dvh')}>
+      <MemberTimezone />
       <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 text-sidebar-foreground md:block">
         <WorkspaceSidebarContent workspaceName={workspaceName} current={current} />
       </aside>
