@@ -520,6 +520,52 @@
           ]
         }
       }
+    },
+    {
+      "message": "agui create pitch",
+      "toolName": "createPitch",
+      "args": {
+        "contactId": "con_AGUI1",
+        "items": [
+          {
+            "itemType": "composition",
+            "itemId": "cmp_AGUI1"
+          }
+        ],
+        "subject": "Harbor Lights for your show"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "pitchId": "pit_AGUI1",
+          "contactId": "con_AGUI1",
+          "contactName": "Mock Supervisor",
+          "subject": "Harbor Lights for your show",
+          "items": [
+            {
+              "pitchId": "pit_AGUI1",
+              "pitchItemId": "pti_AGUI1",
+              "contactId": "con_AGUI1",
+              "contactName": "Mock Supervisor",
+              "contactRoles": ["music_supervisor"],
+              "itemType": "composition",
+              "itemId": "cmp_AGUI1",
+              "itemTitle": "Harbor Lights",
+              "currentStatus": "draft",
+              "nextFollowUpAt": null,
+              "followUpDue": false,
+              "lastContactedAt": null,
+              "lastOutboundMessageId": null,
+              "priorityRank": null
+            }
+          ],
+          "nextFollowUpAt": null,
+          "followUpDue": false,
+          "lastContactedAt": null,
+          "events": [],
+          "messages": []
+        }
+      }
     }
   ]
 }

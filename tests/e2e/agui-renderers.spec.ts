@@ -148,6 +148,14 @@ test('TST-AI-003: AGUIMock drives TodayWorkspace with FollowUpQueue', async ({ p
   await expect(today).toContainText('1 recording is not ready to license.');
 });
 
+test('TST-AI-003: AGUIMock renders createPitch as its PitchCard', async ({ page }) => {
+  await ask(page, 'agui create pitch');
+  const card = page.getByRole('region', { name: 'Pitch', exact: true });
+  await expect(card.getByRole('list', { name: 'Songs in this pitch' })).toContainText(
+    'Harbor LightsDraft',
+  );
+});
+
 test('TST-AI-003: a refusal renders a plain sentence, not a card', async ({ page }) => {
   await ask(page, 'agui not found');
   const alert = page.locator('[data-error-code="NOT_FOUND"]');
