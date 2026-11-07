@@ -27,6 +27,8 @@ export type ApprovalPreview = {
   before: ApprovalRow[];
   after: ApprovalRow[];
   beforeHash: string;
+  /** sendMessage only: the content the approval binds (§7.4). */
+  contentHash?: string;
   reasons?: string[];
 };
 
@@ -52,6 +54,7 @@ export type ApprovedWrite<I, T> = {
     input: I,
     expectedBeforeHash: string,
     origin: WriteOrigin,
+    request: ApprovalRequest,
   ) => Promise<ServiceResult<T>>;
 };
 
@@ -126,7 +129,7 @@ export function approvedWrite<I, T>(write: ApprovedWrite<I, T>) {
 
     const granted = { ...target, after: { inputHash, beforeHash: request.beforeHash } };
     const origin = { type: 'agent' as const, approvalToolCallId: callId, granted };
-    const applied = await write.apply(tenant, input, request.beforeHash, origin);
+    const applied = await write.apply(tenant, input, request.beforeHash, origin, request);
     if (!applied.ok && applied.error.code === 'STATE_CHANGED') {
       await recordApprovalOutcome(tenant, permissions, callId, target, {
         ...{ action: 'approval.stale', inputHash, beforeHash: request.beforeHash },

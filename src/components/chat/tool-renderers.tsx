@@ -4,7 +4,7 @@ import { useRenderTool } from '@copilotkit/react-core/v2';
 import type { ReactElement } from 'react';
 import type { z } from 'zod';
 import { FocusOn } from '@/components/chat/focus-context';
-import { MessageDraftCard } from '@/components/chat/message-draft-card';
+import { MessageDraftCard, SendResultCard } from '@/components/chat/message-draft-card';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
@@ -34,6 +34,8 @@ import {
 import {
   DRAFT_PITCH_MESSAGE_TOOL_NAME,
   draftPitchMessageInputSchema,
+  SEND_MESSAGE_TOOL_NAME,
+  sendMessageInputSchema,
   UPDATE_MESSAGE_DRAFT_TOOL_NAME,
   updateMessageDraftInputSchema,
 } from '@/lib/agent/outreach-tools';
@@ -71,7 +73,7 @@ import {
 } from '@/lib/agent/rights-write-tools';
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
-import type { MessageDraftDTO, MessageThreadDTO } from '@/lib/dto/outreach';
+import type { MessageDraftDTO, MessageThreadDTO, SendResultDTO } from '@/lib/dto/outreach';
 import type { PitchDTO, PitchSummary, TodayWorkspaceDTO } from '@/lib/dto/pitches';
 import type {
   DefaultOwnershipProposal,
@@ -281,6 +283,17 @@ export function useMelosToolRenderers() {
       name: UPDATE_MESSAGE_DRAFT_TOOL_NAME,
       parameters: updateMessageDraftInputSchema,
       render: drafted,
+    },
+    [],
+  );
+  // A send waits on ConfirmationCard with no result, then shows how it went.
+  useRenderTool(
+    {
+      name: SEND_MESSAGE_TOOL_NAME,
+      parameters: sendMessageInputSchema,
+      render: renderResult<SendResultDTO>('Waiting for your approval...', (result) => (
+        <SendResultCard result={result} />
+      )),
     },
     [],
   );
