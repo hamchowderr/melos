@@ -6,7 +6,7 @@ import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
 import { getContactTool, searchContactsTool, searchPitchEligibilityTool } from '../tools/contacts';
 import { pingTool } from '../tools/ping';
-import { getPitchTool, searchPitchesTool } from '../tools/pitches';
+import { getMessageThreadTool, getPitchTool, searchPitchesTool } from '../tools/pitches';
 import { generateReportTool, listReportTemplatesTool, previewReportTool } from '../tools/reports';
 import {
   attestRepresentationTool,
@@ -65,6 +65,7 @@ export const WORKSPACE_AGENT_TOOLS = {
   listReportTemplates: listReportTemplatesTool,
   previewReport: previewReportTool,
   generateReport: generateReportTool,
+  getMessageThread: getMessageThreadTool,
   updateWriterShares: updateWriterSharesTool,
   updatePublishingShares: updatePublishingSharesTool,
   updateMasterShares: updateMasterSharesTool,

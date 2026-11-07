@@ -1,12 +1,16 @@
 import { createTool } from '@mastra/core/tools';
 import {
+  GET_MESSAGE_THREAD_TOOL_NAME,
   GET_PITCH_TOOL_NAME,
+  getMessageThreadInputSchema,
   getPitchInputSchema,
   SEARCH_PITCHES_TOOL_NAME,
   searchPitchesInputSchema,
 } from '../../lib/agent/pitch-tools';
 import { toolResultSchema } from '../../lib/agent/tool-result';
+import type { MessageThreadDTO } from '../../lib/dto/outreach';
 import type { PitchDTO, PitchSummary } from '../../lib/dto/pitches';
+import { getMessageThread } from '../../server/services/outreach/replies';
 import { getPitch, searchPitches } from '../../server/services/pitches/read';
 import { modelOutput, runTool } from './run-tool';
 
@@ -67,4 +71,28 @@ export const getPitchTool = createTool({
   outputSchema: toolResultSchema<PitchDTO>(),
   execute: ({ pitchId }, context) => runTool(context, (tenant) => getPitch(tenant, pitchId)),
   toModelOutput: modelOutput(summarizePitch),
+});
+
+/** getMessageThread's §3.6 model fields, per message; bodies and addresses stay in the UI. */
+export const summarizeThread = (thread: MessageThreadDTO) => ({
+  pitchId: thread.pitchId,
+  messages: thread.messages.map((message) => ({
+    messageId: message.messageId,
+    direction: message.direction,
+    status: message.status,
+    subject: message.subject,
+    ...(message.direction === 'inbound'
+      ? { receivedAt: message.receivedAt }
+      : { sentAt: message.sentAt }),
+  })),
+});
+
+export const getMessageThreadTool = createTool({
+  id: GET_MESSAGE_THREAD_TOOL_NAME,
+  description:
+    "Every message on a pitch in time order, sent and received, given a pitch id or one of its message ids. Use it to read a contact's reply.",
+  inputSchema: getMessageThreadInputSchema,
+  outputSchema: toolResultSchema<MessageThreadDTO>(),
+  execute: (input, context) => runTool(context, (tenant) => getMessageThread(tenant, input)),
+  toModelOutput: modelOutput(summarizeThread),
 });
