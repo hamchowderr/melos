@@ -6,6 +6,7 @@ import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
 import { getContactTool, searchContactsTool, searchPitchEligibilityTool } from '../tools/contacts';
 import { pingTool } from '../tools/ping';
+import { addPitchItemTool, addPitchNoteTool, createPitchTool } from '../tools/pitch-writes';
 import {
   getMessageThreadTool,
   getPitchTool,
@@ -44,6 +45,7 @@ export const WORKSPACE_AGENT_INSTRUCTIONS = [
   '"Who hasn\'t heard this?" means searchPitchEligibility for that song.',
   'proposeDefaultOwnership only proposes; never say a proposal was saved.',
   'Reports: you see only their length, so never quote or summarize report text; the member reads it in the card.',
+  'createPitch records a planned pitch and sends nothing; say so, and never say a pitch was sent.',
   'Rights changes (shares, representation, licensing contacts) always wait for the member to approve them on a confirmation card: call the tool with the full proposed set and never say a change was saved before its result says so.',
   'To change one share in a writer, publishing or master set: read the rights first; with exactly one other holder, give that holder 10000 minus the new share; with two or more other holders, ask how to rebalance.',
   'DECLINED means the member did not approve and nothing changed. STATE_CHANGED means the rights changed meanwhile: read them again and propose again.',
@@ -72,6 +74,9 @@ export const WORKSPACE_AGENT_TOOLS = {
   generateReport: generateReportTool,
   getMessageThread: getMessageThreadTool,
   getTodayWorkspace: getTodayWorkspaceTool,
+  createPitch: createPitchTool,
+  addPitchItem: addPitchItemTool,
+  addPitchNote: addPitchNoteTool,
   updateWriterShares: updateWriterSharesTool,
   updatePublishingShares: updatePublishingSharesTool,
   updateMasterShares: updateMasterSharesTool,

@@ -53,6 +53,14 @@ import {
 } from '@/lib/agent/pitch-tools';
 
 import {
+  ADD_PITCH_ITEM_TOOL_NAME,
+  ADD_PITCH_NOTE_TOOL_NAME,
+  addPitchItemInputSchema,
+  addPitchNoteInputSchema,
+  CREATE_PITCH_TOOL_NAME,
+  createPitchInputSchema,
+} from '@/lib/agent/pitch-write-tools';
+import {
   ATTEST_REPRESENTATION_TOOL_NAME,
   licensingContactsInputSchema,
   masterSharesInputSchema,
@@ -267,6 +275,22 @@ export function useMelosToolRenderers() {
         <TodayWorkspace today={today} />
       )),
     },
+    [],
+  );
+  // Pitch draft writes run at once and render the pitch they changed.
+  const pitchWritten = renderResult<PitchDTO>('Saving the pitch...', (pitch) => (
+    <PitchDetail pitch={pitch} />
+  ));
+  useRenderTool(
+    { name: CREATE_PITCH_TOOL_NAME, parameters: createPitchInputSchema, render: pitchWritten },
+    [],
+  );
+  useRenderTool(
+    { name: ADD_PITCH_ITEM_TOOL_NAME, parameters: addPitchItemInputSchema, render: pitchWritten },
+    [],
+  );
+  useRenderTool(
+    { name: ADD_PITCH_NOTE_TOOL_NAME, parameters: addPitchNoteInputSchema, render: pitchWritten },
     [],
   );
   // While a write is suspended it has no result; ConfirmationCard asks (melos-qlw.3).
