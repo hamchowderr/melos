@@ -7,8 +7,8 @@ test('ONB-E2E-003: a new workspace shows its checklist on Today until dismissed'
   await signUpWithWorkspace(page, 'Checklist');
   await page.goto('/today');
   const card = page.getByTestId('onboarding-checklist');
-  await expect(card).toContainText('Getting started 0 of 4');
-  await expect(card.getByRole('link', { name: /Add or import your first song/ })).toHaveAttribute(
+  await expect(card).toContainText('Getting Started 0 of 4');
+  await expect(card.getByRole('link', { name: /Add or Import Your First Song/ })).toHaveAttribute(
     'href',
     '/catalog',
   );

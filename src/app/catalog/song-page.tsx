@@ -109,7 +109,7 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
             key={recordingId}
             {...options}
             target={{ side: 'master', recordingId }}
-            label="Edit master"
+            label="Edit Master"
             beforeHash={hashes.value.masters[recordingId] ?? hashes.value.empty}
             holders={holders}
           />,
@@ -200,7 +200,7 @@ export async function SongPage({ focus }: { focus: CatalogFocus }) {
       />
     ) : undefined;
 
-  // "Who hasn't heard this" (CRM-006) for the composition, or a lone recording.
+  // "Who Hasn't Heard This" (CRM-006) for the composition, or a lone recording.
   const heard = song.ok
     ? await searchPitchEligibility(
         workspace.tenant,

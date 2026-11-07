@@ -192,7 +192,7 @@ export function useMelosToolRenderers() {
       render: renderResult<ReadinessReportDTO, z.infer<typeof readinessIssuesInputSchema>>(
         'Checking readiness...',
         (report, args) => (
-          <ToolCard title="Rights readiness">
+          <ToolCard title="Rights Readiness">
             <div className="px-3 pb-3">
               <ReadinessChecklist
                 recordings={report.recordings}

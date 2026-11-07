@@ -33,7 +33,7 @@ export function SignUpForm() {
   }
 
   return (
-    <PageCard title="Create your account">
+    <PageCard title="Create Your Account">
       <form onSubmit={onSubmit}>
         <FieldGroup>
           <Field>
@@ -58,10 +58,10 @@ export function SignUpForm() {
           <FieldError>{error}</FieldError>
           <Field>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Creating account...' : 'Create account'}
+              {pending ? 'Creating account...' : 'Create Account'}
             </Button>
             <FieldDescription className="text-center">
-              Already have an account? <Link href="/sign-in">Sign in</Link>
+              Already have an account? <Link href="/sign-in">Sign In</Link>
             </FieldDescription>
           </Field>
         </FieldGroup>

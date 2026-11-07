@@ -19,7 +19,7 @@ export function ContactGrid({ contacts }: { contacts: ContactSummary[] }) {
   }
   return (
     <ToolCard title={title}>
-      <ul aria-label="Contact list" className="flex flex-col">
+      <ul aria-label="Contact List" className="flex flex-col">
         {contacts.map((contact) => (
           <li
             key={contact.contactId}
@@ -87,7 +87,7 @@ function EligibleList({
 export function EligibilityGrid({ eligibility }: { eligibility: PitchEligibilityDTO }) {
   const { item, plannedNotContacted, neverPitched } = eligibility;
   return (
-    <ToolCard title={`Who hasn't heard ${item.title}`}>
+    <ToolCard title={`Who Hasn't Heard ${item.title}`}>
       <EligibleList
         label="Planned, not contacted"
         contacts={plannedNotContacted.map((contact) => ({
@@ -95,7 +95,7 @@ export function EligibilityGrid({ eligibility }: { eligibility: PitchEligibility
           note: PITCH_STATUS_LABELS[contact.currentStatus],
         }))}
       />
-      <EligibleList label="Never pitched" contacts={neverPitched} />
+      <EligibleList label="Never Pitched" contacts={neverPitched} />
     </ToolCard>
   );
 }

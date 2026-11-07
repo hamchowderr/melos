@@ -54,7 +54,7 @@ export function ConfirmationCard({
     void onDecide({ approved, inputHash: request.inputHash });
   };
   return (
-    <ToolCard title="Approve this change">
+    <ToolCard title="Approve This Change">
       <p className="px-4 pb-3">{request.summary}</p>
       <div className="flex flex-col gap-3 pb-3 sm:flex-row">
         <Rows label="Before" rows={request.before} />

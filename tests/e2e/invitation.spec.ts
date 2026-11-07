@@ -24,7 +24,7 @@ test('an invitee verifies their email, accepts the invitation and opens the work
   await inviteePage.goto(readOutboxLink('invitation', invitee.email));
   await expect(inviteePage.getByTestId('invitation-workspace-name')).toHaveText(workspaceName);
   await expect(inviteePage.getByTestId('invitation-role')).toHaveText('admin');
-  await inviteePage.getByRole('button', { name: 'Accept invitation' }).click();
+  await inviteePage.getByRole('button', { name: 'Accept Invitation' }).click();
   await expect(inviteePage.getByTestId('active-workspace-name')).toHaveText(
     workspaceName,
     AUTH_REDIRECT,

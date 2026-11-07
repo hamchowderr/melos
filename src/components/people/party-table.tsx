@@ -52,7 +52,7 @@ const NAME: Column = {
   ),
   wrap: true,
 };
-const EMAIL: Column = { heading: 'Primary email', cell: ({ primaryEmail }) => primaryEmail };
+const EMAIL: Column = { heading: 'Primary Email', cell: ({ primaryEmail }) => primaryEmail };
 
 /** People list their contact's company and roles; organizations their type and linked people. */
 const COLUMNS: Record<Props['noun'], Column[]> = {
@@ -61,7 +61,7 @@ const COLUMNS: Record<Props['noun'], Column[]> = {
     EMAIL,
     { heading: 'Company', cell: ({ contact }) => contact?.organizationName, wrap: true },
     {
-      heading: 'Contact roles',
+      heading: 'Contact Roles',
       cell: ({ contact }) => <RoleBadges roles={contact?.roles ?? []} />,
     },
   ],

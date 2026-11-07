@@ -31,14 +31,14 @@ test('melos-rpr.35: an owner adds and edits recordings (CAT-E2E-002, CAT-E2E-004
   });
   await page.goto('/catalog/compositions/cmp_TIDE');
 
-  await open(page, page.getByRole('button', { name: 'Add recording' }));
+  await open(page, page.getByRole('button', { name: 'Add Recording' }));
   await expect(dialog(page).getByLabel('Title')).toHaveValue('Tide Song');
   await dialog(page).getByLabel('Version').fill('Instrumental');
   await save(page);
   await expect(take(page, 'Tide Song (Instrumental)')).toBeVisible();
   await expect(page.getByRole('region', { name: /^Tide Song/ })).toHaveCount(2);
 
-  await open(page, take(page, 'Tide Song').getByRole('button', { name: 'Edit recording' }));
+  await open(page, take(page, 'Tide Song').getByRole('button', { name: 'Edit Recording' }));
   await dialog(page).getByLabel('ISRC').fill('USDMO2600009');
   await dialog(page).getByLabel('BPM').fill('92');
   await dialog(page).getByLabel('Key').fill('A minor');
@@ -49,7 +49,7 @@ test('melos-rpr.35: an owner adds and edits recordings (CAT-E2E-002, CAT-E2E-004
 
   // The ISRC is unique among live recordings: the other take cannot take it.
   const instrumental = take(page, 'Tide Song (Instrumental)');
-  await open(page, instrumental.getByRole('button', { name: 'Edit recording' }));
+  await open(page, instrumental.getByRole('button', { name: 'Edit Recording' }));
   await dialog(page).getByLabel('ISRC').fill('US-DMO-26-00009');
   await save(page);
   await expect(dialog(page).getByText('Another recording already holds this ISRC.')).toBeVisible();

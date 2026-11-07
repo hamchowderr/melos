@@ -42,10 +42,10 @@ export function TodayWorkspace({ today }: { today: TodayWorkspaceDTO }) {
     <ToolCard title={`Today, ${today.date}`}>
       <FollowUpQueue cells={today.followUpsDue} />
       <Section
-        label={`Recent replies (${today.recentReplies.length})`}
+        label={`Recent Replies (${today.recentReplies.length})`}
         empty={today.recentReplies.length === 0}
       >
-        <ul aria-label="Recent replies" className="flex flex-col">
+        <ul aria-label="Recent Replies" className="flex flex-col">
           {today.recentReplies.map((cell) => (
             <li
               key={cell.pitchItemId}
@@ -62,10 +62,10 @@ export function TodayWorkspace({ today }: { today: TodayWorkspaceDTO }) {
         </ul>
       </Section>
       <Section
-        label={`Ready to pitch (${today.readyToPitch.length})`}
+        label={`Ready to Pitch (${today.readyToPitch.length})`}
         empty={today.readyToPitch.length === 0}
       >
-        <ul aria-label="Ready to pitch" className="flex flex-col">
+        <ul aria-label="Ready to Pitch" className="flex flex-col">
           {today.readyToPitch.map((song) => (
             <li
               key={song.recordingId}

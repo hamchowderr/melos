@@ -131,7 +131,7 @@ export function HolderSplitEditor(props: Props) {
     >
       {target.side === 'publishing' && target.territory === null ? (
         <Input
-          aria-label="Publishing territory"
+          aria-label="Publishing Territory"
           className="w-28"
           value={territory}
           onChange={(event) => setTerritory(event.target.value)}
@@ -175,7 +175,7 @@ export function HolderSplitEditor(props: Props) {
                 value={row.agreementId}
                 onChange={(event) => change(row.key, { agreementId: event.target.value })}
               >
-                <NativeSelectOption value="">No agreement</NativeSelectOption>
+                <NativeSelectOption value="">No Agreement</NativeSelectOption>
                 {agreements.map(({ value, label: title }) => (
                   <NativeSelectOption key={value} value={value}>
                     {title}
@@ -202,7 +202,7 @@ export function HolderSplitEditor(props: Props) {
           setRows([...rows, { key: nextKey++, partyId: null, percent: '', agreementId: '' }])
         }
       >
-        Add holder
+        Add Holder
       </Button>
       <p className="text-sm tabular-nums">
         {`Total ${formatShare(totalBp)}, ${formatShare(Math.max(10_000 - totalBp, 0))} remaining`}

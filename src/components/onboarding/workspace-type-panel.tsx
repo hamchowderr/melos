@@ -38,7 +38,7 @@ export function WorkspaceTypePanel({ workspaceType, canEdit }: Props) {
     <Card className="w-full max-w-2xl" data-testid="workspace-type-panel">
       <CardHeader>
         <CardTitle>
-          <h2>Workspace type</h2>
+          <h2>Workspace Type</h2>
         </CardTitle>
         <CardDescription>
           Sets the getting-started checklist on Today. Currently {WORKSPACE_TYPE_INFO[saved].label}.
@@ -50,7 +50,7 @@ export function WorkspaceTypePanel({ workspaceType, canEdit }: Props) {
           <FieldError>{error}</FieldError>
           {canEdit ? (
             <Button type="submit" className="self-start" disabled={pending}>
-              {pending ? 'Saving...' : 'Save type'}
+              {pending ? 'Saving...' : 'Save Type'}
             </Button>
           ) : null}
         </form>

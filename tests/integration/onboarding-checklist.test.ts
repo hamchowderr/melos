@@ -98,7 +98,7 @@ describe('ONB-INT-004: getOnboardingChecklist', () => {
 
   it('names the sync agent first item for a represented catalog', async () => {
     const list = await checklist(empty, 'sync_agent');
-    expect(list.items[0].label).toBe('Add the catalog you represent');
+    expect(list.items[0].label).toBe('Add the Catalog You Represent');
   });
 
   it('ONB-006: reads a workspace with no type as songwriter', async () => {

@@ -32,7 +32,7 @@ export function CreatePitch({ contactId, songs }: { contactId: string; songs: Pi
   return (
     <div className="flex flex-wrap items-center gap-2">
       <NativeSelect
-        aria-label="Song to pitch"
+        aria-label="Song to Pitch"
         value={song}
         onChange={(event) => setSong(event.target.value)}
       >
@@ -44,14 +44,14 @@ export function CreatePitch({ contactId, songs }: { contactId: string; songs: Pi
         ))}
       </NativeSelect>
       <Input
-        aria-label="Pitch subject"
+        aria-label="Pitch Subject"
         placeholder="Subject (optional)"
         className="h-8 w-56"
         value={subject}
         onChange={(event) => setSubject(event.target.value)}
       />
       <Button size="sm" disabled={!song || saving} onClick={create}>
-        Create pitch
+        Create Pitch
       </Button>
       {error ? <span className="text-xs text-destructive">{error}</span> : null}
     </div>

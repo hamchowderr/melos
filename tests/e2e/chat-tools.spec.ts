@@ -15,7 +15,7 @@ test('melos-2xl.1: searchMusic renders its song grid from the full result (U-03)
   await signInAsJordan(page);
   await ask(page, 'show me midnight drive');
 
-  const grid = page.getByRole('region', { name: 'Song search results' });
+  const grid = page.getByRole('region', { name: 'Song Search Results' });
   await expect(grid).toBeVisible({ timeout: 60_000 });
   const song = grid.getByRole('listitem').filter({ hasText: 'Midnight Drive' });
   await expect(song.getByRole('link', { name: 'Midnight Drive' })).toHaveAttribute(
@@ -45,7 +45,7 @@ test('READ-VS-001: "show me midnight drive" renders its song card with tenant da
   await expect(recording).toHaveCount(1);
   await expect(recording).toContainText('US-DMO-26-00001');
   await expect(recording.getByTestId('readiness')).toContainText('One Stop Ready');
-  await expect(card.getByRole('link', { name: 'Open song' })).toHaveAttribute(
+  await expect(card.getByRole('link', { name: 'Open Song' })).toHaveAttribute(
     'href',
     /^\/catalog\/compositions\//,
   );
@@ -77,7 +77,7 @@ test('melos-2xl.4: getReadinessIssues renders the readiness checklist with its p
   await signInAsJordan(page);
   await ask(page, 'not ready for sync');
 
-  const card = page.getByRole('region', { name: 'Rights readiness' });
+  const card = page.getByRole('region', { name: 'Rights Readiness' });
   await expect(card).toBeVisible({ timeout: 60_000 });
   const recordings = card.getByRole('table', { name: 'Recordings' });
   // EXPECTED.md §6 DEMO-003, by title.
@@ -125,9 +125,9 @@ test('melos-2xl.5: proposeDefaultOwnership renders the proposal and saves nothin
   await page.goto('/');
   await ask(page, 'propose my default ownership');
 
-  const card = page.getByRole('region', { name: 'Proposed ownership' });
+  const card = page.getByRole('region', { name: 'Proposed Ownership' });
   await expect(card).toBeVisible({ timeout: 60_000 });
-  const shares = card.getByRole('list', { name: 'Proposed shares' }).getByRole('listitem');
+  const shares = card.getByRole('list', { name: 'Proposed Shares' }).getByRole('listitem');
   await expect(shares).toHaveText([
     /^Writer\s*Riley Stone · songwriter\s*100\.00%$/,
     /^Publishing\s*Harbor Lane Music · World\s*100\.00%$/,
@@ -178,7 +178,7 @@ test('melos-ajt.12: searchContacts and getContact render ContactGrid and Contact
   // The email is not in the model summary (§3.6): the grid got the full DTO.
   await expect(grid).toContainText('rebecca@cartersync.example');
   const card = page.getByRole('region', { name: 'Contact', exact: true });
-  await expect(card.getByRole('list', { name: 'Pitched songs' })).toContainText(
+  await expect(card.getByRole('list', { name: 'Pitched Songs' })).toContainText(
     'Paper Planes at 2AM',
   );
   await expect(page.getByText('Rebecca Carter is a music supervisor')).toBeVisible({

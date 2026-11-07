@@ -55,10 +55,10 @@ export default async function MetricsPage() {
                   : 'No complete package sent yet.'}
               </p>
               <GridFrame>
-                <Table aria-label="North Star by week">
+                <Table aria-label="North Star by Week">
                   <TableHeader>
                     <TableRow>
-                      {['Week of', 'Complete', 'Songs sent', 'Follow-ups on time'].map((h) => (
+                      {['Week Of', 'Complete', 'Songs Sent', 'Follow-Ups on Time'].map((h) => (
                         <TableHead key={h}>{h}</TableHead>
                       ))}
                     </TableRow>

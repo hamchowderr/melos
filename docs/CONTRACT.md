@@ -253,6 +253,8 @@ Tool IDs are the Mastra `createTool` ids. Frontend tools are CopilotKit frontend
 
 The same React components render in chat (tool rendering) and in full-page views (BP §10).
 
+**UI copy case (owner decision 2026-11-07).** Labels use Title Case: page and card titles, section headings, dialog titles, buttons, tabs, menu and select options, field labels, column headers, badges and empty-state titles. Articles, coordinating conjunctions and short prepositions (a, an, the, and, or, but, for, nor, to, of, in, on, at, by, with, from, into, as, via, per) stay lowercase unless first or last; both parts of a hyphenated word are capitalized (Follow-Up, Co-Writer). Full sentences stay in sentence case: descriptions, help text, placeholders, notices, errors, and titles that read as a sentence ("You do not have access to pitches").
+
 | Canonical | Aliases seen (doc §) | Notes |
 |---|---|---|
 | `MusicWorkspaceCard` | same name: BP §9.1, §9.2 · `CompositionDetail`: TS §11, §12, §16 DEMO-001, §19 READ-VS-001 · `CompositionCard`: TS §8 CAT-001, §11 · `RecordingCard`: TS §8 CAT-002 · `SongCard`: BP §8.1; TS §7 TST-AI-003 | Song workspace summary: artwork, player, identifiers, rights readiness, pitch summary. |
@@ -277,7 +279,7 @@ The same React components render in chat (tool rendering) and in full-page views
 | `ReportTemplateList` | NEW | Renderer for `listReportTemplates`. |
 | `TodayWorkspace` | same name: BP §9.1, §9.2 | |
 | `OnboardingChecklist` | NEW (owner decision 2026-11-07) | Getting-started card at the top of `TodayWorkspace`: the workspace type's items with ticks and links (ONB-003). |
-| `WorkspaceTypePicker` | NEW (owner decision 2026-11-07) | "Which describes you?" choice in the create-workspace form and in `/settings` (ONB-001, ONB-002). |
+| `WorkspaceTypePicker` | NEW (owner decision 2026-11-07) | "Which Describes You?" choice in the create-workspace form and in `/settings` (ONB-001, ONB-002). |
 | `FollowUpQueue` | same name: BP §8.1 | Section of `TodayWorkspace`. |
 | `WorkflowProgress` | NEW · "Render progress/activity state from AG-UI shared state": TS §12 | Import apply progress in `/settings/import`. No Mastra workflow renders it at MVP. |
 | `ImportReport` | NEW | Dry-run validation report and apply results for Airtable and CSV imports. |
@@ -1734,30 +1736,30 @@ Workspace types:
 
 | Type | ICP (TS §14) | Label in the picker | Start page (ONB-005) |
 |---|---|---|---|
-| `songwriter` | ICP-01 Independent singer-songwriter | Songwriter or artist | `/catalog` |
-| `producer` | ICP-02 Producer / co-writer | Producer or co-writer | `/catalog` |
-| `sync_agent` | ICP-03 Sync licensing agent | Sync licensing agent | `/today` |
-| `label` | ICP-04 Independent label operator | Independent label | `/catalog` |
-| `manager` | ICP-05 Artist manager / pitching operator | Artist manager | `/today` |
+| `songwriter` | ICP-01 Independent singer-songwriter | Songwriter or Artist | `/catalog` |
+| `producer` | ICP-02 Producer / co-writer | Producer or Co-Writer | `/catalog` |
+| `sync_agent` | ICP-03 Sync licensing agent | Sync Licensing Agent | `/today` |
+| `label` | ICP-04 Independent label operator | Independent Label | `/catalog` |
+| `manager` | ICP-05 Artist manager / pitching operator | Artist Manager | `/today` |
 
 Checklist items (ONB-004). "Live" means `deleted_at IS NULL` where the table has it.
 
 | Key | Item | Link | Done when | Types |
 |---|---|---|---|---|
-| `first_song` | Add or import your first song (`sync_agent`: "Add the catalog you represent") | `/catalog` | a live composition exists | songwriter, producer, sync_agent, manager |
-| `catalog_import` | Import your catalog from a CSV | `/catalog` | an `import_runs` row with `source_system = 'csv'` and status `succeeded` or `partial` exists, or a live composition exists | label |
-| `writer_splits` | Set the writer splits on a song | `/rights` | a live composition's writer shares total 10000 bp | songwriter, producer |
-| `co_writer` | Add a co-writer to a song | `/rights` | a live composition has two or more `composition_contributors` | producer |
-| `producer_credit` | Add a producer credit to a recording | `/catalog` | a `recording_contributors` row with `role = 'producer'` on a live recording exists | producer |
-| `master_owners` | Set the master owners on a recording | `/rights` | a live recording's master interests total 10000 bp | label |
-| `ready_song` | Get one song ready to pitch | `/rights` | a live recording has no blocking readiness issue (§6.5), the rule behind `TodayWorkspaceDTO.readyToPitch` | sync_agent |
-| `artist_songs` | Add a song by an artist you manage | `/catalog` | a `recording_artists` row with `role = 'primary'` on a live recording exists | manager |
-| `licensing_contact` | Add a licensing agent or music supervisor | `/people` | a live contact has role `licensing_agent` or `music_supervisor` | songwriter, label |
-| `supervisor_contact` | Add a music supervisor | `/people` | a live contact has role `music_supervisor` | sync_agent |
-| `contacts` | Add your contacts | `/people` | a live contact exists | manager |
-| `first_pitch` | Log your first pitch | `/pitches` | a `pitch_items` row exists | songwriter, sync_agent, label, manager |
-| `follow_up` | Set a follow-up date on a pitch | `/pitches` | a pitch has `next_follow_up_at` set | manager |
-| `multi_song_report` | Build a multi-song report | `/reports` | a `generated_reports` row has two or more `generated_report_items` | sync_agent |
+| `first_song` | Add or Import Your First Song (`sync_agent`: "Add the Catalog You Represent") | `/catalog` | a live composition exists | songwriter, producer, sync_agent, manager |
+| `catalog_import` | Import Your Catalog from a CSV | `/catalog` | an `import_runs` row with `source_system = 'csv'` and status `succeeded` or `partial` exists, or a live composition exists | label |
+| `writer_splits` | Set the Writer Splits on a Song | `/rights` | a live composition's writer shares total 10000 bp | songwriter, producer |
+| `co_writer` | Add a Co-Writer to a Song | `/rights` | a live composition has two or more `composition_contributors` | producer |
+| `producer_credit` | Add a Producer Credit to a Recording | `/catalog` | a `recording_contributors` row with `role = 'producer'` on a live recording exists | producer |
+| `master_owners` | Set the Master Owners on a Recording | `/rights` | a live recording's master interests total 10000 bp | label |
+| `ready_song` | Get One Song Ready to Pitch | `/rights` | a live recording has no blocking readiness issue (§6.5), the rule behind `TodayWorkspaceDTO.readyToPitch` | sync_agent |
+| `artist_songs` | Add a Song by an Artist You Manage | `/catalog` | a `recording_artists` row with `role = 'primary'` on a live recording exists | manager |
+| `licensing_contact` | Add a Licensing Agent or Music Supervisor | `/people` | a live contact has role `licensing_agent` or `music_supervisor` | songwriter, label |
+| `supervisor_contact` | Add a Music Supervisor | `/people` | a live contact has role `music_supervisor` | sync_agent |
+| `contacts` | Add Your Contacts | `/people` | a live contact exists | manager |
+| `first_pitch` | Log Your First Pitch | `/pitches` | a `pitch_items` row exists | songwriter, sync_agent, label, manager |
+| `follow_up` | Set a Follow-Up Date on a Pitch | `/pitches` | a pitch has `next_follow_up_at` set | manager |
+| `multi_song_report` | Build a Multi-Song Report | `/reports` | a `generated_reports` row has two or more `generated_report_items` | sync_agent |
 
 Items list in the order of the table, filtered by type. `OnboardingChecklistDTO`: `workspaceType`; `items[]` (`key`, `label`, `href`, `done`); `doneCount`; `total`; `dismissed`. Dismissal is `workspace_member_settings.onboarding_dismissed_at` (§4.1); dismissing first records the member's browser timezone, as P-24 does, so it never pins the row to UTC.
 

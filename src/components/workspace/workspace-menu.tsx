@@ -11,7 +11,7 @@ export function WorkspaceMenu({ title, children }: { title: string; children: Re
     <DialogPrimitive.Root>
       <DialogPrimitive.Trigger render={<Button variant="ghost" size="icon-sm" />}>
         <Menu />
-        <span className="sr-only">Open menu</span>
+        <span className="sr-only">Open Menu</span>
       </DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/20" />

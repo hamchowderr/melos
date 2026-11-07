@@ -53,7 +53,7 @@ export function PitchTable({ cells }: { cells: PitchSummary[] }) {
   }
   return (
     <ToolCard title={title}>
-      <ul aria-label="Pitch list" className="flex flex-col">
+      <ul aria-label="Pitch List" className="flex flex-col">
         {cells.map((cell) => (
           <PitchCard key={cell.pitchItemId} cell={cell} show="both" />
         ))}
@@ -70,7 +70,7 @@ export function PitchDetail({ pitch }: { pitch: PitchDTO }) {
         <p className="font-medium">{pitch.contactName}</p>
         {pitch.subject ? <p className="text-xs text-muted-foreground">{pitch.subject}</p> : null}
       </div>
-      <ul aria-label="Songs in this pitch" className="flex flex-col">
+      <ul aria-label="Songs in This Pitch" className="flex flex-col">
         {pitch.items.map((cell) => (
           <PitchCard key={cell.pitchItemId} cell={cell} show="song" />
         ))}

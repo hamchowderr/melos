@@ -70,7 +70,7 @@ export function RecordingTermsEditor({ recordingId, title, terms }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" className="self-start" />}>
-        Edit terms
+        Edit Terms
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <form

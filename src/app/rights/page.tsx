@@ -27,7 +27,7 @@ export default async function RightsPage({ searchParams }: Props) {
   return (
     <WorkspaceShell workspaceName={workspace.workspaceName} current="rights">
       <PageHeader
-        title="Rights readiness"
+        title="Rights Readiness"
         count={report.ok ? recordingCount(report.value.recordings.length) : undefined}
       >
         {/* A link, so the filter is in the URL and works without client JavaScript. */}
@@ -37,7 +37,7 @@ export default async function RightsPage({ searchParams }: Props) {
           aria-checked={onlyNotReady}
           className={buttonVariants({ variant: onlyNotReady ? 'secondary' : 'outline' })}
         >
-          Only not ready
+          Only Not Ready
         </Link>
       </PageHeader>
       <div className="flex flex-col gap-4 px-4 pt-3 pb-6 md:px-6">

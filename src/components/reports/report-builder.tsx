@@ -125,7 +125,7 @@ export function ReportBuilder({ songs, templates, snapshots, generates }: Props)
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
-          <nav aria-label="Report template" className="flex flex-wrap gap-1">
+          <nav aria-label="Report Template" className="flex flex-wrap gap-1">
             {templates.map((t) => (
               <button
                 key={t.templateId}
@@ -156,7 +156,7 @@ export function ReportBuilder({ songs, templates, snapshots, generates }: Props)
             <span className="text-xs font-medium text-muted-foreground">
               Songs, in report order
             </span>
-            <ol aria-label="Report songs" className="flex flex-col gap-0.5">
+            <ol aria-label="Report Songs" className="flex flex-col gap-0.5">
               {chosen.map((choice, index) => (
                 <li
                   key={choice.key}
@@ -189,11 +189,11 @@ export function ReportBuilder({ songs, templates, snapshots, generates }: Props)
             </ol>
             {chosen.length < MAX_REPORT_ITEMS && left.length > 0 ? (
               <NativeSelect
-                aria-label="Add a song"
+                aria-label="Add a Song"
                 value=""
                 onChange={(event) => add(event.target.value)}
               >
-                <NativeSelectOption value="">Add a song…</NativeSelectOption>
+                <NativeSelectOption value="">Add a Song…</NativeSelectOption>
                 {left.map((c) => (
                   <NativeSelectOption key={c.key} value={c.key}>
                     {c.title}
@@ -204,7 +204,7 @@ export function ReportBuilder({ songs, templates, snapshots, generates }: Props)
           </div>
         </div>
         <section
-          aria-label="Report text"
+          aria-label="Report Text"
           className="flex min-h-64 flex-col gap-2 rounded-lg bg-muted/40 p-3"
         >
           <div className="flex items-center gap-2">
@@ -213,11 +213,11 @@ export function ReportBuilder({ songs, templates, snapshots, generates }: Props)
             </span>
             <div className="ml-auto flex gap-1.5">
               <Button size="sm" variant="ghost" disabled={!text} onClick={copy}>
-                Copy text
+                Copy Text
               </Button>
               {generates ? (
                 <Button size="sm" disabled={!text || saving} onClick={save}>
-                  Save snapshot
+                  Save Snapshot
                 </Button>
               ) : null}
             </div>
@@ -228,9 +228,9 @@ export function ReportBuilder({ songs, templates, snapshots, generates }: Props)
         </section>
       </div>
       <div className="flex flex-col gap-1.5">
-        <h2 className="text-sm font-medium">Saved snapshots</h2>
+        <h2 className="text-sm font-medium">Saved Snapshots</h2>
         <GridFrame>
-          <Table aria-label="Saved snapshots">
+          <Table aria-label="Saved Snapshots">
             <TableHeader>
               <TableRow>
                 <TableHead>Saved</TableHead>

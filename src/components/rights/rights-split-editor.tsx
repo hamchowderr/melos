@@ -65,7 +65,7 @@ export function RightsSplitEditor({ compositionId, beforeHash, writers, people }
     };
     return (
       <Button type="button" variant="outline" className="self-start" onClick={edit}>
-        Edit writers
+        Edit Writers
       </Button>
     );
   }
@@ -104,7 +104,7 @@ export function RightsSplitEditor({ compositionId, beforeHash, writers, people }
 
   return (
     <form
-      aria-label="Edit writers"
+      aria-label="Edit Writers"
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
@@ -180,11 +180,11 @@ export function RightsSplitEditor({ compositionId, beforeHash, writers, people }
           setRows([...rows, { key: nextKey++, partyId: null, roles: ['songwriter'], percent: '' }])
         }
       >
-        Add writer
+        Add Writer
       </Button>
       <div className="flex flex-col gap-1">
         <meter
-          aria-label="Writer total"
+          aria-label="Writer Total"
           className="h-2 w-full"
           min={0}
           max={10_000}

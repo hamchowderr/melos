@@ -46,7 +46,7 @@ export default async function PitchesPage({
     <WorkspaceShell workspaceName={workspace.workspaceName} current="pitches">
       <PageHeader title="Pitches" count={cells.ok ? cellCount(cells.value.length) : undefined} />
       <div className="flex flex-col gap-3 px-4 pt-3 pb-6 md:px-6">
-        <nav aria-label="Filter by status" className="flex flex-wrap gap-1">
+        <nav aria-label="Filter by Status" className="flex flex-wrap gap-1">
           {chip(null, 'All')}
           {PITCH_STATUSES.map((value) => chip(value, PITCH_STATUS_LABELS[value]))}
         </nav>

@@ -76,7 +76,7 @@ export function AgreementForm({ parties }: { parties: Option[] }) {
   return (
     <Dialog open={open} onOpenChange={toggle}>
       <DialogTrigger render={<Button variant="outline" className="self-start" />}>
-        Record agreement
+        Record Agreement
       </DialogTrigger>
       <DialogContent>
         <form
@@ -87,7 +87,7 @@ export function AgreementForm({ parties }: { parties: Option[] }) {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Record agreement</DialogTitle>
+            <DialogTitle>Record Agreement</DialogTitle>
           </DialogHeader>
           <FieldGroup>
             <Field>
@@ -105,7 +105,7 @@ export function AgreementForm({ parties }: { parties: Option[] }) {
               </NativeSelect>
             </Field>
             <Field>
-              <FieldLabel htmlFor="agreement-title">Agreement title</FieldLabel>
+              <FieldLabel htmlFor="agreement-title">Agreement Title</FieldLabel>
               <Input
                 id="agreement-title"
                 required

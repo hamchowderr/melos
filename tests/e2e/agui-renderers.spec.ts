@@ -45,7 +45,7 @@ async function ask(page: Page, prompt: string) {
 
 test('TST-AI-003: AGUIMock drives the song grid', async ({ page }) => {
   await ask(page, 'agui search');
-  const grid = page.getByRole('region', { name: 'Song search results' });
+  const grid = page.getByRole('region', { name: 'Song Search Results' });
   await expect(grid.getByRole('link', { name: 'Harbor Lights' })).toBeVisible();
   await expect(grid).toContainText('Mock Artist · ISWC T-900.000.099-0');
 });
@@ -57,7 +57,7 @@ test('TST-AI-003: AGUIMock drives MusicWorkspaceCard', async ({ page }) => {
   await expect(card).toContainText('Mock Writer 100.00%');
   await expect(card).toContainText('2 pitched');
   await expect(card.getByRole('list', { name: 'Recordings' })).toContainText('US-DMO-26-00099');
-  await expect(card.getByTestId('readiness')).toContainText('Not one-stop ready');
+  await expect(card.getByTestId('readiness')).toContainText('Not One Stop Ready');
 });
 
 test('TST-AI-003: AGUIMock drives RightsPanel', async ({ page }) => {
@@ -79,7 +79,7 @@ test('TST-AI-003: AGUIMock drives RightsPanel', async ({ page }) => {
 
 test('TST-AI-003: AGUIMock drives the readiness checklist', async ({ page }) => {
   await ask(page, 'agui readiness');
-  const card = page.getByRole('region', { name: 'Rights readiness' });
+  const card = page.getByRole('region', { name: 'Rights Readiness' });
   const row = card.getByRole('row', { name: 'Harbor Lights readiness' });
   await expect(row).toContainText('1 blocking');
   await expect(row).toContainText('1 warning');
@@ -87,11 +87,11 @@ test('TST-AI-003: AGUIMock drives the readiness checklist', async ({ page }) => 
 
 test('TST-AI-003: AGUIMock drives the ownership proposal', async ({ page }) => {
   await ask(page, 'agui proposal');
-  const card = page.getByRole('region', { name: 'Proposed ownership' });
+  const card = page.getByRole('region', { name: 'Proposed Ownership' });
   await expect(
-    card.getByRole('list', { name: 'Proposed shares' }).getByRole('listitem'),
+    card.getByRole('list', { name: 'Proposed Shares' }).getByRole('listitem'),
   ).toHaveCount(2);
-  await expect(card.getByRole('list', { name: 'Not proposed' })).toHaveText(
+  await expect(card.getByRole('list', { name: 'Not Proposed' })).toHaveText(
     'Master has no own party set in Settings.',
   );
 });
@@ -99,7 +99,7 @@ test('TST-AI-003: AGUIMock drives the ownership proposal', async ({ page }) => {
 test('TST-AI-003: AGUIMock drives PitchTable', async ({ page }) => {
   await ask(page, 'agui pitches');
   const table = page.getByRole('region', { name: 'Pitches', exact: true });
-  await expect(table.getByRole('list', { name: 'Pitch list' })).toContainText(
+  await expect(table.getByRole('list', { name: 'Pitch List' })).toContainText(
     'Harbor Lights to Mock SupervisorAwaiting reply · follow-up due',
   );
 });
@@ -108,7 +108,7 @@ test('TST-AI-003: AGUIMock drives PitchCard and PitchTimeline', async ({ page })
   await ask(page, 'agui pitch');
   const card = page.getByRole('region', { name: 'Pitch', exact: true });
   await expect(card).toContainText('Mock Supervisor');
-  await expect(card.getByRole('list', { name: 'Songs in this pitch' })).toContainText(
+  await expect(card.getByRole('list', { name: 'Songs in This Pitch' })).toContainText(
     'Harbor LightsAwaiting reply · follow-up due',
   );
   const timeline = card.getByRole('list', { name: 'Timeline' });
@@ -145,21 +145,21 @@ test('TST-AI-003: AGUIMock drives ContactCard', async ({ page }) => {
   await ask(page, 'agui contact card');
   const card = page.getByRole('region', { name: 'Contact', exact: true });
   await expect(card).toContainText('Mock Supervisor');
-  await expect(card.getByRole('list', { name: 'Pitched songs' })).toContainText(
+  await expect(card.getByRole('list', { name: 'Pitched Songs' })).toContainText(
     'Harbor LightsAwaiting reply · follow-up due',
   );
-  await expect(card.getByRole('list', { name: 'Recent messages' })).toContainText(
+  await expect(card.getByRole('list', { name: 'Recent Messages' })).toContainText(
     '2026-09-03 to them Harbor Lights for your show',
   );
 });
 
 test('TST-AI-003: AGUIMock drives the eligibility ContactGrid', async ({ page }) => {
   await ask(page, 'agui eligibility');
-  const grid = page.getByRole('region', { name: "Who hasn't heard Harbor Lights", exact: true });
+  const grid = page.getByRole('region', { name: "Who Hasn't Heard Harbor Lights", exact: true });
   await expect(grid.getByRole('list', { name: 'Planned, not contacted' })).toContainText(
     "Mock Supervisormusic supervisor · Hasn't heard",
   );
-  await expect(grid.getByRole('list', { name: 'Never pitched' })).toContainText(
+  await expect(grid.getByRole('list', { name: 'Never Pitched' })).toContainText(
     'Mock Agentlicensing agent',
   );
 });
@@ -170,10 +170,10 @@ test('TST-AI-003: AGUIMock drives TodayWorkspace with FollowUpQueue', async ({ p
   await expect(today.getByRole('list', { name: 'Follow-up queue' })).toContainText(
     'Harbor Lights to Mock SupervisorAwaiting reply · follow-up due',
   );
-  await expect(today.getByRole('list', { name: 'Recent replies' })).toContainText(
+  await expect(today.getByRole('list', { name: 'Recent Replies' })).toContainText(
     'Mock Agent on Tidewater2026-09-09',
   );
-  await expect(today.getByRole('list', { name: 'Ready to pitch' })).toContainText(
+  await expect(today.getByRole('list', { name: 'Ready to Pitch' })).toContainText(
     'Harbor Lights2 licensing agents have not heard it',
   );
   await expect(today).toContainText('1 recording is not ready to license.');
@@ -182,7 +182,7 @@ test('TST-AI-003: AGUIMock drives TodayWorkspace with FollowUpQueue', async ({ p
 test('TST-AI-003: AGUIMock renders createPitch as its PitchCard', async ({ page }) => {
   await ask(page, 'agui create pitch');
   const card = page.getByRole('region', { name: 'Pitch', exact: true });
-  await expect(card.getByRole('list', { name: 'Songs in this pitch' })).toContainText(
+  await expect(card.getByRole('list', { name: 'Songs in This Pitch' })).toContainText(
     'Harbor LightsDraft',
   );
 });

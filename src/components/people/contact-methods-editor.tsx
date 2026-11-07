@@ -58,10 +58,10 @@ export function ContactMethodsEditor({ party }: { party: PartyDetailDTO }) {
 
   return (
     <Dialog open={open} onOpenChange={toggle}>
-      <DialogTrigger render={<Button variant="outline" />}>Contact methods</DialogTrigger>
+      <DialogTrigger render={<Button variant="outline" />}>Contact Methods</DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Contact methods</DialogTitle>
+          <DialogTitle>Contact Methods</DialogTitle>
         </DialogHeader>
         {rows.map((row, i) => (
           <div key={row.key} className="flex flex-wrap items-center gap-2">
@@ -107,7 +107,7 @@ export function ContactMethodsEditor({ party }: { party: PartyDetailDTO }) {
           className="self-start"
           onClick={() => setRows([...rows, { key: nextKey++, methodType: 'phone', value: '' }])}
         >
-          Add method
+          Add Method
         </Button>
         {error ? (
           <Alert variant="destructive">

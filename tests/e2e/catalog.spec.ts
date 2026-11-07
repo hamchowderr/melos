@@ -21,12 +21,12 @@ test('melos-rpr.2: Jordan opens Catalog: 5 songs with their primary artists', as
   const table = page.getByRole('table');
   const headers = table.getByRole('columnheader');
   await expect(headers).toHaveText([
-    ...['Title', 'Primary artists', 'ISWC', 'ISRC', 'Readiness', 'Recordings'],
+    ...['Title', 'Primary Artists', 'ISWC', 'ISRC', 'Readiness', 'Recordings'],
   ]);
   const rows = table.locator('tbody').getByRole('row');
   // Readiness follows EXPECTED.md §2: Neon Static and Ocean Blue are neither one-stop nor sync ready.
-  const ready = /^One Stop Ready\s*Sync ready$/;
-  const notReady = /^Not one-stop ready\s*Not sync ready$/;
+  const ready = /^One Stop Ready\s*Sync Ready$/;
+  const notReady = /^Not One Stop Ready\s*Not Sync Ready$/;
   const songs: [string | RegExp, string, string, string, RegExp][] = [
     ['Home Again', 'Jordan Taylor', 'T-900.000.004-0', 'US-DMO-26-00004', ready],
     ['Midnight Drive', 'Jordan Taylor', 'T-900.000.001-0', 'US-DMO-26-00001', ready],
@@ -59,7 +59,7 @@ test('melos-rpr.2: Jordan opens Catalog: 5 songs with their primary artists', as
   const panel = page.getByRole('dialog', { name: 'Neon Static' });
   await expect(panel).toContainText('Alex Ramirez');
   await expect(panel).toContainText('US-DMO-26-00003');
-  await panel.getByRole('link', { name: 'Open song' }).click();
+  await panel.getByRole('link', { name: 'Open Song' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Neon Static', AUTH_REDIRECT);
 });
 
@@ -67,7 +67,7 @@ test('melos-rpr.2: a new workspace shows the empty catalog', async ({ page }) =>
   await signUpWithWorkspace(page, 'Blank');
   await page.getByRole('link', { name: 'Catalog' }).click();
   await expect(page).toHaveURL(/\/catalog$/, AUTH_REDIRECT);
-  await expect(page.getByText('No songs yet')).toBeVisible();
+  await expect(page.getByText('No Songs Yet')).toBeVisible();
   await expect(page.getByRole('table')).toHaveCount(0);
 });
 
@@ -88,20 +88,20 @@ test('melos-rpr.43: an unreachable workspace database shows a recoverable error 
   try {
     await page.goto('/catalog');
     await expect(page.getByRole('heading', { name: 'This page could not load' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Switch workspace' })).toHaveAttribute(
+    await expect(page.getByRole('button', { name: 'Try Again' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Switch Workspace' })).toHaveAttribute(
       'href',
       '/workspaces',
     );
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign Out' })).toBeVisible();
     // No database error text reaches the page (§7.2).
     await expect(page.getByText(/SQLITE|WorkspaceConnectionError|unavailable:/)).toHaveCount(0);
   } finally {
     release();
   }
 
-  await page.getByRole('button', { name: 'Try again' }).click();
-  await expect(page.getByText('No songs yet')).toBeVisible();
+  await page.getByRole('button', { name: 'Try Again' }).click();
+  await expect(page.getByText('No Songs Yet')).toBeVisible();
   await expect(page).toHaveURL(/\/catalog$/);
 });
 
@@ -113,17 +113,17 @@ test('melos-rpr.22: Jordan searches the catalog and filters it by readiness', as
   const rows = songs.locator('tbody').getByRole('row');
   const titles = rows.locator('td:first-child a');
 
-  await search.getByLabel('Search songs').fill('Paper Planes');
+  await search.getByLabel('Search Songs').fill('Paper Planes');
   await search.getByRole('button', { name: 'Search' }).click();
   await expect(page).toHaveURL(/\/catalog\?q=Paper\+Planes/);
   await expect(titles).toHaveText(['Paper Planes at 2AM']);
 
-  await search.getByLabel('Search songs').fill('zzzz no such song');
+  await search.getByLabel('Search Songs').fill('zzzz no such song');
   await search.getByRole('button', { name: 'Search' }).click();
-  await expect(songs.getByText('No matching songs')).toBeVisible();
+  await expect(songs.getByText('No Matching Songs')).toBeVisible();
   await expect(rows).toHaveCount(0);
 
-  await search.getByLabel('Search songs').fill('');
+  await search.getByLabel('Search Songs').fill('');
   await search.getByLabel('Readiness').selectOption('not_sync_ready');
   await search.getByRole('button', { name: 'Search' }).click();
   await expect(page).toHaveURL(/readiness=not_sync_ready/);
@@ -141,7 +141,7 @@ test('melos-rpr.48: at phone width Catalog lists each song as a card with no sid
   const cards = page.getByRole('list', { name: 'Songs' }).getByRole('listitem');
   await expect(cards).toHaveCount(5);
   await expect(cards.nth(2)).toHaveText(
-    /^Neon Static\s*Alex Ramirez · 1 recording\s*Not one-stop ready\s*Not sync ready$/,
+    /^Neon Static\s*Alex Ramirez · 1 recording\s*Not One Stop Ready\s*Not Sync Ready$/,
   );
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

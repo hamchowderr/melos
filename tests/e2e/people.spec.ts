@@ -29,7 +29,7 @@ test('melos-rpr.6, melos-rpr.45: Jordan opens People: both tabs, Theo Grant, the
   await openTab('Organizations', 'Blue Lantern Studios');
   await expect(rows).toHaveCount(7);
   await expect(table.getByRole('columnheader')).toHaveText([
-    ...['Name', 'Type', 'People', 'Primary email'],
+    ...['Name', 'Type', 'People', 'Primary Email'],
   ]);
   const organization = (name: string) => rows.filter({ hasText: name });
   // No demo organization has an email.
@@ -41,7 +41,7 @@ test('melos-rpr.6, melos-rpr.45: Jordan opens People: both tabs, Theo Grant, the
   ]);
   await openTab('People', 'Alex Ramirez');
   await expect(table.getByRole('columnheader')).toHaveText([
-    ...['Name', 'Primary email', 'Company', 'Contact roles'],
+    ...['Name', 'Primary Email', 'Company', 'Contact Roles'],
   ]);
   await expect(rows).toHaveCount(7);
   const theo = rows.filter({ hasText: 'Theo Grant' });

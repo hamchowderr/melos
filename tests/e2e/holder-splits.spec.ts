@@ -37,7 +37,7 @@ const edit = (page: Page, name: string) =>
   }).toPass(AUTH_REDIRECT);
 
 async function addHolder(page: Page, n: number, name: string, percent: string) {
-  await page.getByRole('button', { name: 'Add holder' }).click();
+  await page.getByRole('button', { name: 'Add Holder' }).click();
   await page.getByLabel(`Holder ${n} party`).click();
   await page.getByRole('option', { name }).click();
   await page.getByLabel(`Holder ${n} share`).fill(percent);
@@ -50,8 +50,8 @@ test('melos-rpr.31: publishing and master splits save, and territories never mix
   await addSong(page);
   await page.goto(SONG);
 
-  await edit(page, 'Add publishing set');
-  await expect(page.getByLabel('Publishing territory')).toHaveValue('WORLD');
+  await edit(page, 'Add Publishing Set');
+  await expect(page.getByLabel('Publishing Territory')).toHaveValue('WORLD');
   await addHolder(page, 1, 'Riley Stone', '50');
   await addHolder(page, 2, 'Harbor Lane Music', '50');
   await page.getByRole('button', { name: 'Save' }).click();
@@ -60,16 +60,16 @@ test('melos-rpr.31: publishing and master splits save, and territories never mix
   await expect(totalOf(page, 'Publishing WORLD')).toHaveText('100.00%');
 
   // P-05: a country set beside WORLD is refused.
-  await page.getByRole('tab', { name: 'New territory' }).click();
-  await edit(page, 'Add publishing set');
-  await page.getByLabel('Publishing territory').fill('US');
+  await page.getByRole('tab', { name: 'New Territory' }).click();
+  await edit(page, 'Add Publishing Set');
+  await page.getByLabel('Publishing Territory').fill('US');
   await addHolder(page, 1, 'Riley Stone', '100');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Publishing is either WORLD or split by country')).toBeVisible();
   await expect(page.getByRole('table', { name: 'Publishing US' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel' }).click();
 
-  await edit(page, 'Edit master');
+  await edit(page, 'Edit Master');
   await addHolder(page, 1, 'Harbor Lane Music', '100');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(totalOf(page, 'Master')).toHaveText('100.00%');

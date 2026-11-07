@@ -22,10 +22,10 @@ export default function WorkspaceError({ retry }: Props) {
         <div className="flex flex-wrap items-center gap-2">
           {/* retry re-fetches the page from the server, so a recovered database renders it. */}
           <Button type="button" onClick={() => retry()}>
-            Try again
+            Try Again
           </Button>
           <Link href="/workspaces" className={buttonVariants({ variant: 'outline' })}>
-            Switch workspace
+            Switch Workspace
           </Link>
           <SignOutButton variant="ghost" />
         </div>

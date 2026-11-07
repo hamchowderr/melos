@@ -27,8 +27,8 @@ const enabled = (sections: ReportSection[]) =>
 /** ReportTemplateList (§3.3): each template with its enabled sections. */
 export function ReportTemplateList({ templates }: { templates: ReportTemplateSummary[] }) {
   return (
-    <ToolCard title="Report templates">
-      <ul aria-label="Template list" className="flex flex-col">
+    <ToolCard title="Report Templates">
+      <ul aria-label="Template List" className="flex flex-col">
         {templates.map((template) => (
           <li key={template.templateId} className="px-4 py-2 odd:bg-muted/30">
             <p className="font-medium">
@@ -54,7 +54,7 @@ export function ReportPreview({ report }: { report: ReportPreviewDTO | Generated
     setCopied(true);
   };
   return (
-    <ToolCard title={snapshot ? 'Saved report' : 'Report preview'}>
+    <ToolCard title={snapshot ? 'Saved Report' : 'Report Preview'}>
       <div className="flex items-center gap-3 px-4 pb-2 text-xs text-muted-foreground">
         <span className="flex-1">
           {report.items.length === 1 ? '1 song' : `${report.items.length} songs`} ·{' '}
@@ -62,10 +62,10 @@ export function ReportPreview({ report }: { report: ReportPreviewDTO | Generated
           {snapshot ? ` · saved ${report.generatedAt.slice(0, 10)}` : ''}
         </span>
         <Button size="sm" variant="secondary" onClick={copy}>
-          {copied ? 'Copied' : 'Copy text'}
+          {copied ? 'Copied' : 'Copy Text'}
         </Button>
       </div>
-      <section aria-label="Report text" className="mx-4 mb-3">
+      <section aria-label="Report Text" className="mx-4 mb-3">
         <pre className="max-h-96 overflow-auto rounded-lg bg-muted/40 p-3 font-sans text-xs whitespace-pre-wrap">
           {report.text}
         </pre>

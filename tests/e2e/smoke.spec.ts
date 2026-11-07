@@ -26,10 +26,10 @@ test('sign up, sign in, create a workspace, and render the ping tool in chat', a
 
 test('ONB-E2E-001: a workspace cannot be created without choosing a type', async ({ page }) => {
   await signIn(page, await signUp(page, 'NoType'));
-  await page.getByLabel('Workspace name').fill(`NoType Records ${Date.now()}`);
-  await page.getByRole('button', { name: 'Create workspace' }).click();
+  await page.getByLabel('Workspace Name').fill(`NoType Records ${Date.now()}`);
+  await page.getByRole('button', { name: 'Create Workspace' }).click();
   await expect(page).toHaveURL(/\/workspaces\/new$/);
-  const radio = page.getByRole('radio', { name: 'Songwriter or artist' });
+  const radio = page.getByRole('radio', { name: 'Songwriter or Artist' });
   expect(await radio.evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
   await page.screenshot({ path: 'test-results/workspace-type-picker.png', fullPage: true });
 });

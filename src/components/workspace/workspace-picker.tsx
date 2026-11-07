@@ -32,7 +32,7 @@ export function WorkspacePicker({ workspaces }: { workspaces: Workspace[] }) {
   }
 
   return (
-    <PageCard title="Choose a workspace">
+    <PageCard title="Choose a Workspace">
       {/* biome-ignore lint/a11y/noRedundantRoles: Safari drops list semantics from a ul styled without bullets. */}
       <ul role="list" className="flex flex-col gap-2" aria-label="Your workspaces">
         {workspaces.map(({ organizationId, name, role }) => (

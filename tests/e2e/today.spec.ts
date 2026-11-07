@@ -23,9 +23,9 @@ test('CRM-E2E-005: Today lists the follow-ups due in priority order', async ({ p
     0,
   );
 
-  await expect(page.getByRole('region', { name: 'Ready to pitch' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Recent replies' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Readiness issues' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Ready to Pitch' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Recent Replies' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Readiness Issues' })).toBeVisible();
   await queue.getByRole('link', { name: 'Midnight Drive' }).first().click();
   await expect(page).toHaveURL(/\/catalog\/compositions\//);
 });

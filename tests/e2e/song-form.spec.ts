@@ -15,7 +15,7 @@ const open = (page: Page, name: string) =>
 test('melos-rpr.33: an owner creates, edits and deletes a song (CAT-E2E-001)', async ({ page }) => {
   await signUpWithWorkspace(page, 'Songs');
   await page.goto('/catalog');
-  await open(page, 'New song');
+  await open(page, 'New Song');
   await dialog(page).getByLabel('Title', { exact: true }).fill('Test Song');
   await dialog(page).getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Test Song', AUTH_REDIRECT);
@@ -27,7 +27,7 @@ test('melos-rpr.33: an owner creates, edits and deletes a song (CAT-E2E-001)', a
   await songRow(page, 'Test Song').getByRole('link').click();
   await open(page, 'Edit');
   await dialog(page).getByLabel('Title', { exact: true }).fill('Test Song II');
-  await dialog(page).getByLabel('Alternate titles').fill('TS2');
+  await dialog(page).getByLabel('Alternate Titles').fill('TS2');
   await dialog(page).getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Test Song II');
   await page.goto('/catalog');
@@ -52,7 +52,7 @@ test('melos-rpr.33: an owner creates, edits and deletes a song (CAT-E2E-001)', a
 test('melos-rpr.33: a member edits but sees no Delete', async ({ page }) => {
   await signUpWithWorkspace(page, 'Member');
   await page.goto('/catalog');
-  await open(page, 'New song');
+  await open(page, 'New Song');
   await dialog(page).getByLabel('Title', { exact: true }).fill('Kept Song');
   await dialog(page).getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Kept Song', AUTH_REDIRECT);

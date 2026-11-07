@@ -26,13 +26,13 @@ async function addSong(page: Page) {
 /** Opens the editor; a click before hydration retries. */
 const edit = (page: Page) =>
   expect(async () => {
-    await page.getByRole('button', { name: 'Edit writers' }).click();
-    await expect(page.getByRole('form', { name: 'Edit writers' })).toBeVisible({ timeout: 1_000 });
+    await page.getByRole('button', { name: 'Edit Writers' }).click();
+    await expect(page.getByRole('form', { name: 'Edit Writers' })).toBeVisible({ timeout: 1_000 });
   }).toPass(AUTH_REDIRECT);
 
 /** Adds a writer row with `name` and `percent`. */
 async function addWriter(page: Page, n: number, name: string, percent: string) {
-  await page.getByRole('button', { name: 'Add writer' }).click();
+  await page.getByRole('button', { name: 'Add Writer' }).click();
   await page.getByLabel(`Writer ${n} person`).click();
   await page.getByRole('option', { name }).click();
   await share(page, n).fill(percent);
@@ -90,5 +90,5 @@ test('melos-rpr.29: a stale second tab gets a reload notice, and a viewer has no
   await setMemberRole(await activeOrganizationId(page), 'viewer');
   await page.reload();
   await expect(page.getByRole('table', { name: 'Writers' })).toContainText('Sam Park');
-  await expect(page.getByRole('button', { name: 'Edit writers' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit Writers' })).toHaveCount(0);
 });

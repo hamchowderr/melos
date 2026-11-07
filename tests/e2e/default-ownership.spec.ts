@@ -3,7 +3,7 @@ import { AUTH_REDIRECT, insertWorkspaceRows, signUpWithWorkspace } from './suppo
 
 const totalOf = (page: Page, table: string) =>
   page.getByRole('table', { name: table }).getByTestId('share-total');
-const fill = (page: Page) => page.getByRole('button', { name: 'Fill with my ownership' });
+const fill = (page: Page) => page.getByRole('button', { name: 'Fill with My Ownership' });
 
 test('melos-rpr.36: Fill with my ownership fills an empty song (RGT-E2E-008)', async ({ page }) => {
   await signUpWithWorkspace(page, 'Owned');

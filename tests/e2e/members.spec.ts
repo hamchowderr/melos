@@ -45,14 +45,14 @@ test('AUTH-E2E-002: an owner invites a member, changes their role and removes th
   const inviteForm = page.locator('form');
   await inviteForm.getByLabel('Email').fill(invitee.email);
   await inviteForm.getByLabel('Role').selectOption('viewer');
-  await inviteForm.getByRole('button', { name: 'Send invitation' }).click();
+  await inviteForm.getByRole('button', { name: 'Send Invitation' }).click();
   await expect(page.getByRole('status')).toHaveText(`Invitation sent to ${invitee.email}.`);
 
   await inviteePage.goto(readOutboxLink('verify-email', invitee.email));
   await expect(inviteePage).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
   await signIn(inviteePage, invitee);
   await inviteePage.goto(readOutboxLink('invitation', invitee.email));
-  await inviteePage.getByRole('button', { name: 'Accept invitation' }).click();
+  await inviteePage.getByRole('button', { name: 'Accept Invitation' }).click();
   const inviteeWorkspace = inviteePage.getByTestId('active-workspace-name');
   await expect(inviteeWorkspace).toHaveText(workspaceName, AUTH_REDIRECT);
 
@@ -84,10 +84,10 @@ test('AUTH-E2E-002: an owner sees a pending invitation and cancels it', async ({
   const inviteForm = page.locator('form');
   await inviteForm.getByLabel('Email').fill(email);
   await inviteForm.getByLabel('Role').selectOption('admin');
-  await inviteForm.getByRole('button', { name: 'Send invitation' }).click();
+  await inviteForm.getByRole('button', { name: 'Send Invitation' }).click();
   await expect(page.getByRole('status')).toHaveText(`Invitation sent to ${email}.`);
 
-  const invitations = page.getByRole('list', { name: 'Pending invitations' });
+  const invitations = page.getByRole('list', { name: 'Pending Invitations' });
   const row = invitations.getByRole('listitem').filter({ hasText: email });
   await expect(row).toContainText(`invited by ${owner.email}, expires `);
   await expect(row).toContainText('admin');

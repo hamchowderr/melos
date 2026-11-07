@@ -42,24 +42,24 @@ async function ask(page: Page, prompt: string) {
 
 test('TST-AI-003: AGUIMock drives ReportTemplateList', async ({ page }) => {
   await ask(page, 'agui templates');
-  const list = page.getByRole('region', { name: 'Report templates' }).getByRole('list');
+  const list = page.getByRole('region', { name: 'Report Templates' }).getByRole('list');
   await expect(list).toContainText('Fullpreset');
   await expect(list).toContainText('Sans lyrics');
 });
 
 test('TST-AI-003: AGUIMock drives ReportPreview, text first with copy', async ({ page }) => {
   await ask(page, 'agui report');
-  const preview = page.getByRole('region', { name: 'Report preview', exact: true });
-  await expect(preview.getByRole('region', { name: 'Report text' })).toContainText(
+  const preview = page.getByRole('region', { name: 'Report Preview', exact: true });
+  await expect(preview.getByRole('region', { name: 'Report Text' })).toContainText(
     'Writers: Mock Writer 100%',
   );
   await expect(preview).toContainText('1 song · core, rights');
   await expect(preview).not.toContainText('lyrics');
-  await expect(preview.getByRole('button', { name: 'Copy text' })).toBeVisible();
+  await expect(preview.getByRole('button', { name: 'Copy Text' })).toBeVisible();
 });
 
 test('TST-AI-003: AGUIMock renders a generateReport snapshot', async ({ page }) => {
   await ask(page, 'agui saved report');
-  const saved = page.getByRole('region', { name: 'Saved report', exact: true });
+  const saved = page.getByRole('region', { name: 'Saved Report', exact: true });
   await expect(saved).toContainText('saved 2026-09-10');
 });

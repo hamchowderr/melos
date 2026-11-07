@@ -43,7 +43,7 @@ export function WorkspaceNotReady({ status }: { status: Status }) {
         {/* A member stuck on this workspace can open another one or sign out. */}
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/workspaces" className={buttonVariants({ variant: 'outline' })}>
-            Switch workspace
+            Switch Workspace
           </Link>
           <SignOutButton variant="ghost" />
         </div>

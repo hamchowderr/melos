@@ -23,7 +23,7 @@ test('melos-rpr.38: an owner adds a single with its track (CAT-007, D-1)', async
   await expect(releases(page).getByText('This song is not on a release yet.')).toBeVisible();
 
   // A bad check digit is refused (D-1) and the dialog stays open.
-  await open(page, page.getByRole('button', { name: 'Add release' }));
+  await open(page, page.getByRole('button', { name: 'Add Release' }));
   await dialog(page).getByLabel('Title', { exact: true }).fill('Glow Line');
   await dialog(page).getByLabel('UPC/EAN').fill('012345678901');
   await dialog(page).getByRole('button', { name: 'Save' }).click();

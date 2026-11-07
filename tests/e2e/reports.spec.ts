@@ -13,13 +13,13 @@ async function openReports(page: Page) {
 }
 
 const template = (page: Page, name: string) =>
-  page.getByRole('navigation', { name: 'Report template' }).getByRole('button', { name });
+  page.getByRole('navigation', { name: 'Report Template' }).getByRole('button', { name });
 
 test('RPT-E2E-001: a full report previews live and a section toggles off', async ({ page }) => {
   await openReports(page);
   await template(page, 'Full report').click();
-  await page.getByRole('combobox', { name: 'Add a song' }).selectOption({ label: 'Ocean Blue' });
-  const text = page.getByRole('region', { name: 'Report text' });
+  await page.getByRole('combobox', { name: 'Add a Song' }).selectOption({ label: 'Ocean Blue' });
+  const text = page.getByRole('region', { name: 'Report Text' });
   await expect(text).toContainText('Ocean Blue');
   await expect(text).toContainText('ISWC: T9000000020');
   await expect(text).toContainText('Salt on the window');
@@ -31,8 +31,8 @@ test('RPT-E2E-001: a full report previews live and a section toggles off', async
 
 test('RPT-E2E-002: the no-lyrics and lyrics-only presets', async ({ page }) => {
   await openReports(page);
-  await page.getByRole('combobox', { name: 'Add a song' }).selectOption({ label: 'Ocean Blue' });
-  const text = page.getByRole('region', { name: 'Report text' });
+  await page.getByRole('combobox', { name: 'Add a Song' }).selectOption({ label: 'Ocean Blue' });
+  const text = page.getByRole('region', { name: 'Report Text' });
 
   await template(page, 'Report without lyrics').click();
   await expect(text).toContainText('Rights');
@@ -47,20 +47,20 @@ test('RPT-E2E-002: the no-lyrics and lyrics-only presets', async ({ page }) => {
 // The one write: an insert-only snapshot, which no other spec or EXPECTED row counts.
 test('RPT-E2E-005: a multi-song report keeps its order and saves a snapshot', async ({ page }) => {
   await openReports(page);
-  const add = page.getByRole('combobox', { name: 'Add a song' });
+  const add = page.getByRole('combobox', { name: 'Add a Song' });
   await add.selectOption({ label: 'Midnight Drive' });
   await add.selectOption({ label: 'Ocean Blue' });
   await page.getByRole('button', { name: 'Move Ocean Blue up' }).click();
-  await expect(page.getByRole('list', { name: 'Report songs' }).getByRole('listitem')).toHaveText([
+  await expect(page.getByRole('list', { name: 'Report Songs' }).getByRole('listitem')).toHaveText([
     /Ocean Blue/,
     /Midnight Drive/,
   ]);
-  const text = page.getByRole('region', { name: 'Report text' });
+  const text = page.getByRole('region', { name: 'Report Text' });
   await expect(text.locator('pre')).toHaveText(/^Ocean Blue[\s\S]*\nMidnight Drive\n/);
 
-  await page.getByRole('button', { name: 'Save snapshot' }).click();
+  await page.getByRole('button', { name: 'Save Snapshot' }).click();
   await expect(text).toContainText('Snapshot saved.');
-  const snapshots = page.getByRole('table', { name: 'Saved snapshots' });
+  const snapshots = page.getByRole('table', { name: 'Saved Snapshots' });
   await expect(snapshots.getByRole('row', { name: /^Snapshot / }).first()).toContainText('2 songs');
   await snapshots
     .getByRole('row', { name: /^Snapshot / })

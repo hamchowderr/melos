@@ -44,7 +44,7 @@ export function RepresentationControls({ interestType, holder, agreements = [] }
           value={agreementId}
           onChange={(event) => setAgreementId(event.target.value)}
         >
-          <NativeSelectOption value="">No agreement</NativeSelectOption>
+          <NativeSelectOption value="">No Agreement</NativeSelectOption>
           {agreements.map(({ value, label }) => (
             <NativeSelectOption key={value} value={value}>
               {label}

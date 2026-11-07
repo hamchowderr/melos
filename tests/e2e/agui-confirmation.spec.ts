@@ -78,7 +78,7 @@ async function ask(page: Page, approved: boolean) {
   await expect(input).toBeVisible({ timeout: 30_000 });
   await input.fill(fixture.message);
   await input.press('Enter');
-  const card = page.getByRole('region', { name: 'Approve this change' });
+  const card = page.getByRole('region', { name: 'Approve This Change' });
   await expect(card).toContainText('Change the writer split on Harbor Lights');
   await expect(card.getByRole('list', { name: 'Before' })).toContainText(/Mock Writer.*50\.00%/);
   await expect(card.getByRole('list', { name: 'After' })).toContainText(/Mock Writer.*60\.00%/);

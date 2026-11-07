@@ -31,7 +31,7 @@ type Props = {
 };
 
 /**
- * "Fill with my ownership" (RGT-008): shows the workspace's own parties at 100% for the song's
+ * "Fill with My Ownership" (RGT-008): shows the workspace's own parties at 100% for the song's
  * empty share sets for review, and Save stores them through the normal share actions. Sides that
  * already have rows are never in the proposal, so nothing is overwritten.
  */
@@ -92,11 +92,11 @@ export function FillOwnership({ compositionId, proposal, writerHash, emptyHash, 
       <DialogTrigger
         render={<Button variant="outline" className="self-start" disabled={!lines.length} />}
       >
-        Fill with my ownership
+        Fill with My Ownership
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Fill with my ownership</DialogTitle>
+          <DialogTitle>Fill with My Ownership</DialogTitle>
           <DialogDescription>
             These empty share sets get your workspace's own parties. Sets that already have rows
             stay as they are.

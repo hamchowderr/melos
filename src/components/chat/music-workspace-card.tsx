@@ -44,7 +44,7 @@ export function MusicWorkspaceCard({ workspace }: { workspace: MusicWorkspaceDTO
           href={workspaceHref(workspace)}
           className="shrink-0 rounded-md bg-muted px-2.5 py-1 text-xs font-medium hover:bg-muted/70"
         >
-          Open song
+          Open Song
         </Link>
       </div>
       <dl className="flex flex-col gap-1 px-4 pb-3 text-sm">

@@ -9,7 +9,7 @@ import {
 
 const SONG = '/catalog/compositions/cmp_TIDE';
 const dialog = (page: Page) => page.getByRole('dialog');
-const record = (page: Page) => page.getByRole('button', { name: 'Record agreement' });
+const record = (page: Page) => page.getByRole('button', { name: 'Record Agreement' });
 
 /** Setup rows (D-9): the self party and Harbor Lane Music each hold half of the publishing. */
 async function addSong(page: Page) {
@@ -45,7 +45,7 @@ test('melos-rpr.47: an owner records an agreement and attests a share backed by 
     await record(page).click();
     await expect(dialog(page)).toBeVisible({ timeout: 1_000 });
   }).toPass(AUTH_REDIRECT);
-  await dialog(page).getByLabel('Agreement title').fill('Harbor admin deal');
+  await dialog(page).getByLabel('Agreement Title').fill('Harbor admin deal');
   await dialog(page).getByLabel('Counterparty').selectOption({ label: 'Harbor Lane Music' });
   await dialog(page).getByLabel('Effective on').fill('2026-09-01');
   await dialog(page).getByLabel('Expires on').fill('2026-08-01');

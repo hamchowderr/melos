@@ -26,9 +26,9 @@ type Props = {
 
 const LABELS: Record<Readiness, string> = {
   one_stop_ready: 'One Stop Ready',
-  not_one_stop_ready: 'Not one-stop ready',
-  sync_ready: 'Sync ready',
-  not_sync_ready: 'Not sync ready',
+  not_one_stop_ready: 'Not One Stop Ready',
+  sync_ready: 'Sync Ready',
+  not_sync_ready: 'Not Sync Ready',
 };
 
 /** The /catalog search box: a GET form, so a search is a shareable URL and works without script. */
@@ -41,7 +41,7 @@ function SearchForm({ query, readiness }: Pick<Props, 'query' | 'readiness'>) {
           name="q"
           defaultValue={query}
           maxLength={200}
-          aria-label="Search songs"
+          aria-label="Search Songs"
           placeholder="Title, artist, writer or lyric"
           className="min-w-48 flex-1 sm:max-w-sm"
         />
@@ -51,7 +51,7 @@ function SearchForm({ query, readiness }: Pick<Props, 'query' | 'readiness'>) {
           aria-label="Readiness"
           className="w-auto"
         >
-          <NativeSelectOption value="">Any readiness</NativeSelectOption>
+          <NativeSelectOption value="">Any Readiness</NativeSelectOption>
           {READINESS_FILTERS.map((filter) => (
             <NativeSelectOption key={filter} value={filter}>
               {LABELS[filter]}
@@ -76,7 +76,7 @@ function ReleaseList({ releases }: { releases: ReleaseListItem[] }) {
           <TableRow>
             <TableHead>Title</TableHead>
             <TableHead>Type</TableHead>
-            <TableHead>Release date</TableHead>
+            <TableHead>Release Date</TableHead>
             <TableHead className="text-right">Tracks</TableHead>
           </TableRow>
         </TableHeader>
@@ -111,7 +111,7 @@ export function SearchResults({ query, readiness, songs, releases }: Props) {
         {searching && songs.length === 0 ? (
           <Empty className="border">
             <EmptyHeader>
-              <EmptyTitle>No matching songs</EmptyTitle>
+              <EmptyTitle>No Matching Songs</EmptyTitle>
               <EmptyDescription>Try another title, name or readiness.</EmptyDescription>
             </EmptyHeader>
           </Empty>

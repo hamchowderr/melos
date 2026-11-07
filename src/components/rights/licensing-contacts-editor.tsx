@@ -50,7 +50,7 @@ export function LicensingContactsEditor({ target, contacts, parties }: Props) {
     };
     return (
       <Button type="button" variant="outline" className="self-start" onClick={edit}>
-        Edit licensing contacts
+        Edit Licensing Contacts
       </Button>
     );
   }
@@ -69,7 +69,7 @@ export function LicensingContactsEditor({ target, contacts, parties }: Props) {
 
   return (
     <form
-      aria-label="Edit licensing contacts"
+      aria-label="Edit Licensing Contacts"
       className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();
@@ -114,7 +114,7 @@ export function LicensingContactsEditor({ target, contacts, parties }: Props) {
         className="self-start"
         onClick={() => setRows([...rows, { key: nextKey++, partyId: null }])}
       >
-        Add contact
+        Add Contact
       </Button>
       {error ? (
         <Alert variant="destructive">

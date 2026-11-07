@@ -37,9 +37,9 @@ export function OwnershipProposal({ proposal }: { proposal: DefaultOwnershipProp
   ];
 
   return (
-    <ToolCard title="Proposed ownership">
+    <ToolCard title="Proposed Ownership">
       {rows.length > 0 ? (
-        <ul aria-label="Proposed shares" className="flex flex-col">
+        <ul aria-label="Proposed Shares" className="flex flex-col">
           {rows.map((row) => (
             <li
               key={`${row.side} ${row.name}`}
@@ -61,7 +61,7 @@ export function OwnershipProposal({ proposal }: { proposal: DefaultOwnershipProp
       ) : null}
       {blockedReasons.length > 0 ? (
         <ul
-          aria-label="Not proposed"
+          aria-label="Not Proposed"
           className="flex flex-col gap-0.5 px-4 pt-2 text-muted-foreground"
         >
           {blockedReasons.map(({ side, code }) => (

@@ -86,10 +86,10 @@ test('melos-rpr.16: Ocean Blue shows publishing WORLD at 85.00% with its readine
     ...NORTHSTAR_WARNINGS,
   ]);
   await expect(
-    rights.getByRole('heading', { name: 'Licensing contacts' }).locator('..'),
+    rights.getByRole('heading', { name: 'Licensing Contacts' }).locator('..'),
   ).toContainText('None');
   const recording = page.getByRole('region', { name: 'Ocean Blue', exact: true });
-  await expect(recording.getByTestId('readiness')).toContainText('Not one-stop ready');
+  await expect(recording.getByTestId('readiness')).toContainText('Not One Stop Ready');
 });
 
 test('melos-rpr.16: Midnight Drive is One Stop Ready with Silverline Songs as implicit contact', async ({
@@ -99,7 +99,7 @@ test('melos-rpr.16: Midnight Drive is One Stop Ready with Silverline Songs as im
   const recording = page.getByRole('region', { name: 'Midnight Drive', exact: true });
   await expect(recording.getByTestId('readiness')).toContainText('One Stop Ready');
   const rights = page.getByRole('region', { name: 'Rights' });
-  const contacts = rights.getByRole('list', { name: 'Licensing contacts' }).getByRole('listitem');
+  const contacts = rights.getByRole('list', { name: 'Licensing Contacts' }).getByRole('listitem');
   await expect(contacts).toHaveText([/^Silverline Songs\s*Implicit$/]);
   // Nothing blocks; only the warnings every demo song carries (EXPECTED.md §2).
   const issues = rights.getByRole('list', { name: 'Issues' }).getByRole('listitem');
@@ -138,12 +138,12 @@ test('melos-rpr.16: /rights lists Ocean Blue and Neon Static as not ready', asyn
   await panel.getByRole('button', { name: 'Close' }).click();
   await expect(panel).toHaveCount(0);
 
-  const filter = page.getByRole('switch', { name: 'Only not ready' });
+  const filter = page.getByRole('switch', { name: 'Only Not Ready' });
   await expect(filter).toHaveAttribute('aria-checked', 'true');
   await filter.click();
   await expect(page).toHaveURL(/\/rights\?all=1$/);
   await expect(titles).toHaveCount(5);
-  await expect(page.getByRole('switch', { name: 'Only not ready' })).toHaveAttribute(
+  await expect(page.getByRole('switch', { name: 'Only Not Ready' })).toHaveAttribute(
     'aria-checked',
     'false',
   );

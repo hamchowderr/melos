@@ -27,7 +27,7 @@ export function ReleaseSection({ releases, recordings }: Props) {
                 details={[
                   ['Type', track.releaseType],
                   ['UPC/EAN', track.upcEan],
-                  ['Release date', track.releaseDate],
+                  ['Release Date', track.releaseDate],
                   // Which recording a release carries matters once the song has more than one.
                   ['Recording', recordings.length > 1 ? titles.get(track.recordingId) : null],
                   ['Disc', track.discNumber],
