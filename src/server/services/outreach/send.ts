@@ -137,12 +137,10 @@ async function settle(
 }
 
 /**
- * sendMessage (§3.3, §7.5, OUT-002, OUT-004). The approval transaction re-checks `expected` (the
- * hashes the approval bound) and moves the draft to queued, with its `from` address; a mismatch
- * writes nothing and returns STATE_CHANGED. Only a queued message goes to the transport, with its
- * id as the idempotency key; the outcome is stored with its pitch events, and on success the
- * cells move and the follow-up is scheduled. A message already sent or failed returns its stored
- * result and sends nothing. outreach:send; no `to` recipient is VALIDATION.
+ * sendMessage (§3.3, §7.5, OUT-002, OUT-004). The approval transaction re-checks `expected` and
+ * queues the draft (a mismatch is STATE_CHANGED); only a queued message reaches the transport,
+ * keyed by its id, and the outcome is stored with its pitch effects. A sent or failed message
+ * returns its stored result. outreach:send; no `to` recipient is VALIDATION.
  */
 export async function sendMessage(
   tenant: TenantContext,
@@ -194,26 +192,17 @@ export async function sendMessage(
   if (!queued.ok) return queued;
   if (queued.value.stored) return success(queued.value.stored);
   const { message } = queued.value;
-  const addresses = (type: string) =>
+  const [to, cc, bcc] = ['to', 'cc', 'bcc'].map((type) =>
     message.recipients
-      .filter((recipient) => recipient.recipientType === type)
-      .map((recipient) => recipient.addressSnapshot);
+      .filter((row) => row.recipientType === type)
+      .map((row) => row.addressSnapshot),
+  );
+  const { id: messageId, subject, bodyText, bodyHtml, pitchId } = message;
   let outcome: Parameters<typeof settle>[3];
   try {
     const receipt = await transport.send({
-      ...{
-        messageId: message.id,
-        from,
-        to: addresses('to'),
-        cc: addresses('cc'),
-        bcc: addresses('bcc'),
-      },
-      ...{
-        subject: message.subject ?? '',
-        bodyText: message.bodyText ?? '',
-        bodyHtml: message.bodyHtml ?? undefined,
-      },
-      ...{ pitchId: message.pitchId, workspaceId: tenant.workspaceId },
+      ...{ messageId, from, to, cc, bcc, subject: subject ?? '', bodyText: bodyText ?? '' },
+      ...{ bodyHtml: bodyHtml ?? undefined, pitchId, workspaceId: tenant.workspaceId },
     });
     outcome = { provider: transport.provider, ...receipt, at: receipt.acceptedAt };
   } catch (error) {
