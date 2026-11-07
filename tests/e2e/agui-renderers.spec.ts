@@ -187,6 +187,24 @@ test('TST-AI-003: AGUIMock renders createPitch as its PitchCard', async ({ page 
   );
 });
 
+test('TST-AI-003: AGUIMock drives MessageDraftCard', async ({ page }) => {
+  await ask(page, 'agui draft');
+  const card = page.getByRole('region', { name: 'Email draft', exact: true });
+  await expect(card).toContainText('To supervisor@mock.example');
+  await expect(card.getByRole('textbox', { name: 'Subject' })).toHaveValue(
+    'Harbor Lights, following up',
+  );
+  await expect(card.getByRole('textbox', { name: 'Body' })).toHaveValue(
+    'Checking in on Harbor Lights.',
+  );
+  await expect(card.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+  await card.getByRole('textbox', { name: 'Subject' }).fill('Harbor Lights, one more time');
+  await expect(card.getByRole('button', { name: 'Save draft' })).toBeEnabled();
+  await expect(card.getByRole('complementary', { name: 'Drafted from' })).toContainText(
+    'Harbor Lights · https://example.com/harbor',
+  );
+});
+
 test('TST-AI-003: a refusal renders a plain sentence, not a card', async ({ page }) => {
   await ask(page, 'agui not found');
   const alert = page.locator('[data-error-code="NOT_FOUND"]');

@@ -6,6 +6,7 @@ import type { z } from 'zod';
 import { ContactCard } from '@/components/chat/contact-card';
 import { ContactGrid, EligibilityGrid } from '@/components/chat/contact-grid';
 import { FocusOn } from '@/components/chat/focus-context';
+import { MessageDraftCard } from '@/components/chat/message-draft-card';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
@@ -42,6 +43,12 @@ import {
   searchPitchEligibilityInputSchema,
 } from '@/lib/agent/crm-tools';
 import {
+  DRAFT_PITCH_MESSAGE_TOOL_NAME,
+  draftPitchMessageInputSchema,
+  UPDATE_MESSAGE_DRAFT_TOOL_NAME,
+  updateMessageDraftInputSchema,
+} from '@/lib/agent/outreach-tools';
+import {
   GET_MESSAGE_THREAD_TOOL_NAME,
   GET_PITCH_TOOL_NAME,
   GET_TODAY_WORKSPACE_TOOL_NAME,
@@ -77,7 +84,7 @@ import {
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
 import type { ContactDetailDTO, ContactSummary } from '@/lib/dto/contacts';
-import type { MessageThreadDTO } from '@/lib/dto/outreach';
+import type { MessageDraftDTO, MessageThreadDTO } from '@/lib/dto/outreach';
 import type {
   PitchDTO,
   PitchEligibilityDTO,
@@ -303,6 +310,26 @@ export function useMelosToolRenderers() {
       render: renderResult<PitchDTO>('Updating the pitch...', (pitch) => (
         <PitchDetail pitch={pitch} />
       )),
+    },
+    [],
+  );
+  // The key remounts the card when a later call returns a newer version of the draft.
+  const drafted = renderResult<MessageDraftDTO>('Writing the draft...', (draft) => (
+    <MessageDraftCard key={draft.contentHash} draft={draft} />
+  ));
+  useRenderTool(
+    {
+      name: DRAFT_PITCH_MESSAGE_TOOL_NAME,
+      parameters: draftPitchMessageInputSchema,
+      render: drafted,
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: UPDATE_MESSAGE_DRAFT_TOOL_NAME,
+      parameters: updateMessageDraftInputSchema,
+      render: drafted,
     },
     [],
   );

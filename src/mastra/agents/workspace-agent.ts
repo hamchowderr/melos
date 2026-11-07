@@ -5,6 +5,7 @@ import { focusInstruction } from '../focus';
 import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
 import { getContactTool, searchContactsTool, searchPitchEligibilityTool } from '../tools/contacts';
+import { draftPitchMessageTool, updateMessageDraftTool } from '../tools/outreach';
 import { pingTool } from '../tools/ping';
 import {
   addPitchItemTool,
@@ -51,6 +52,7 @@ export const WORKSPACE_AGENT_INSTRUCTIONS = [
   'proposeDefaultOwnership only proposes; never say a proposal was saved.',
   'Reports: you see only their length, so never quote or summarize report text; the member reads it in the card.',
   'createPitch records a planned pitch and sends nothing; say so, and never say a pitch was sent.',
+  'Write email drafts from the pitch facts (song titles, links, the contact name) and never invent facts; a draft is not sent.',
   'Marking a pitch won, lost or archived waits for the member to approve it; never say it changed before the result says so.',
   'Rights changes (shares, representation, licensing contacts) always wait for the member to approve them on a confirmation card: call the tool with the full proposed set and never say a change was saved before its result says so.',
   'To change one share in a writer, publishing or master set: read the rights first; with exactly one other holder, give that holder 10000 minus the new share; with two or more other holders, ask how to rebalance.',
@@ -84,6 +86,8 @@ export const WORKSPACE_AGENT_TOOLS = {
   addPitchItem: addPitchItemTool,
   addPitchNote: addPitchNoteTool,
   transitionPitchStatus: transitionPitchStatusTool,
+  draftPitchMessage: draftPitchMessageTool,
+  updateMessageDraft: updateMessageDraftTool,
   updateWriterShares: updateWriterSharesTool,
   updatePublishingShares: updatePublishingSharesTool,
   updateMasterShares: updateMasterSharesTool,
