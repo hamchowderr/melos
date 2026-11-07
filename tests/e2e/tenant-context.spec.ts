@@ -94,9 +94,9 @@ test('melos-2lm: a member of two workspaces picks one after signing in and reach
   await signOut(page);
   await page.goto('/sign-in');
   await signIn(page, user, /\/workspaces$/);
-  const workspaces = page.getByRole('list', { name: 'Your workspaces' }).getByRole('button');
+  const workspaces = page.getByRole('list', { name: 'Your Workspaces' }).getByRole('button');
   await expect(workspaces).toContainText([north, south]);
-  await expect(workspaces.getByText('owner', { exact: true })).toHaveCount(2);
+  await expect(workspaces.getByText('Owner', { exact: true })).toHaveCount(2);
 
   // A new session starts with no active workspace, whichever was active before; the ping below
   // proves the pick opened North.
@@ -126,7 +126,7 @@ async function signUpWithTwoWorkspaces(page: Page, user: string, labels: [string
 }
 
 const workspaceButtons = (page: Page) =>
-  page.getByRole('list', { name: 'Your workspaces' }).getByRole('button');
+  page.getByRole('list', { name: 'Your Workspaces' }).getByRole('button');
 
 test('melos-g4u: a signed-in user signs out from the workspace header', async ({ page }) => {
   await signUpWithWorkspace(page, 'Leave');

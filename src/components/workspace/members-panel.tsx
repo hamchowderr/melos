@@ -43,8 +43,11 @@ type Props = {
 
 const org = authClient.organization;
 // Exactly the four workspace roles; a member holds one (P-30). A native select, so forms submit it.
+const roleLabel = (role: string) => role.charAt(0).toUpperCase() + role.slice(1);
 const ROLE_OPTIONS = Object.keys(roles).map((role) => (
-  <NativeSelectOption key={role}>{role}</NativeSelectOption>
+  <NativeSelectOption key={role} value={role}>
+    {roleLabel(role)}
+  </NativeSelectOption>
 ));
 
 /** Controls a role may not use are hidden for clarity only; Better Auth enforces (AUTH-004). */
@@ -123,7 +126,7 @@ export function MembersPanel({
                     {ROLE_OPTIONS}
                   </NativeSelect>
                 ) : (
-                  <Badge variant="secondary">{role}</Badge>
+                  <Badge variant="secondary">{roleLabel(role)}</Badge>
                 )}
               </TableCell>
               {canRemove ? (
@@ -154,7 +157,7 @@ export function MembersPanel({
                   <strong className="font-medium text-foreground">{email}</strong> invited by{' '}
                   {invitedBy}, expires {expires}
                 </span>
-                <Badge variant="secondary">{role}</Badge>
+                <Badge variant="secondary">{roleLabel(role)}</Badge>
                 {canInvite ? (
                   <Button
                     type="button"

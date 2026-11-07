@@ -34,7 +34,7 @@ export function WorkspacePicker({ workspaces }: { workspaces: Workspace[] }) {
   return (
     <PageCard title="Choose a Workspace">
       {/* biome-ignore lint/a11y/noRedundantRoles: Safari drops list semantics from a ul styled without bullets. */}
-      <ul role="list" className="flex flex-col gap-2" aria-label="Your workspaces">
+      <ul role="list" className="flex flex-col gap-2" aria-label="Your Workspaces">
         {workspaces.map(({ organizationId, name, role }) => (
           <li key={organizationId}>
             <Button
@@ -49,7 +49,7 @@ export function WorkspacePicker({ workspaces }: { workspaces: Workspace[] }) {
               {pendingId === organizationId ? (
                 <span className="text-muted-foreground">Opening...</span>
               ) : (
-                <Badge variant="secondary">{role}</Badge>
+                <Badge variant="secondary">{role.charAt(0).toUpperCase() + role.slice(1)}</Badge>
               )}
             </Button>
           </li>
