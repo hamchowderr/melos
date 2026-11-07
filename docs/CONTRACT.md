@@ -547,6 +547,7 @@ CREATE TABLE workspace_member_settings (
   organization_id  TEXT NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
   user_id          TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   timezone         TEXT NOT NULL DEFAULT 'UTC',
+  onboarding_dismissed_at TEXT,   -- ONB-003: set when the member dismisses the checklist
   updated_at       TEXT NOT NULL,
   PRIMARY KEY (organization_id, user_id)
 );
@@ -1758,7 +1759,7 @@ Checklist items (ONB-004). "Live" means `deleted_at IS NULL` where the table has
 | `follow_up` | Set a follow-up date on a pitch | `/pitches` | a pitch has `next_follow_up_at` set | manager |
 | `multi_song_report` | Build a multi-song report | `/reports` | a `generated_reports` row has two or more `generated_report_items` | sync_agent |
 
-Items list in the order of the table, filtered by type. `OnboardingChecklistDTO`: `workspaceType`; `items[]` (`key`, `label`, `href`, `done`); `doneCount`; `total`; `dismissed`. The `workspace_member_settings.onboarding_dismissed_at` column and its migration land with `melos-1z5.5`, which updates §4.1 in the same change.
+Items list in the order of the table, filtered by type. `OnboardingChecklistDTO`: `workspaceType`; `items[]` (`key`, `label`, `href`, `done`); `doneCount`; `total`; `dismissed`. Dismissal is `workspace_member_settings.onboarding_dismissed_at` (§4.1); dismissing first records the member's browser timezone, as P-24 does, so it never pins the row to UTC.
 
 ## 6. Conflict resolutions
 

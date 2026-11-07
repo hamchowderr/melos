@@ -48,3 +48,41 @@ export async function recordMemberTimezone(
     return timezone;
   });
 }
+
+/** ONB-003: whether the member dismissed the getting-started checklist in this workspace. */
+export async function isOnboardingDismissed(
+  tenant: Pick<TenantContext, 'organizationId' | 'userId'>,
+): Promise<boolean> {
+  const [row] = await controlDb
+    .select({ dismissedAt: workspaceMemberSettings.onboardingDismissedAt })
+    .from(workspaceMemberSettings)
+    .where(
+      and(
+        eq(workspaceMemberSettings.organizationId, tenant.organizationId),
+        eq(workspaceMemberSettings.userId, tenant.userId),
+      ),
+    );
+  return Boolean(row?.dismissedAt);
+}
+
+/**
+ * ONB-003: hides the getting-started checklist for this member. The member's row is created first
+ * from the browser timezone, as recordMemberTimezone does, so dismissing never pins it to UTC.
+ */
+export async function dismissOnboarding(
+  tenant: Pick<TenantContext, 'organizationId' | 'userId'>,
+  browserTimezone: string | null | undefined,
+): Promise<void> {
+  await recordMemberTimezone(tenant, browserTimezone);
+  const at = new Date().toISOString();
+  const member = eq(workspaceMemberSettings.userId, tenant.userId);
+  const key = and(eq(workspaceMemberSettings.organizationId, tenant.organizationId), member);
+  await controlDb.transaction((tx) =>
+    guard.update(
+      tx,
+      workspaceMemberSettings,
+      { onboardingDismissedAt: at, updatedAt: at },
+      key ?? member,
+    ),
+  );
+}

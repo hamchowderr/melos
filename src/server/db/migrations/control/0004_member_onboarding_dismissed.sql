@@ -1,0 +1,1 @@
+ALTER TABLE `workspace_member_settings` ADD `onboarding_dismissed_at` text;
