@@ -33,12 +33,6 @@ import {
   pingResultSchema,
 } from '@/lib/agent/contract';
 import {
-  GET_PITCH_TOOL_NAME,
-  getPitchInputSchema,
-  SEARCH_PITCHES_TOOL_NAME,
-  searchPitchesInputSchema,
-} from '@/lib/agent/pitch-tools';
-
   GET_CONTACT_TOOL_NAME,
   getContactInputSchema,
   SEARCH_CONTACTS_TOOL_NAME,
@@ -46,6 +40,12 @@ import {
   searchContactsInputSchema,
   searchPitchEligibilityInputSchema,
 } from '@/lib/agent/crm-tools';
+import {
+  GET_PITCH_TOOL_NAME,
+  getPitchInputSchema,
+  SEARCH_PITCHES_TOOL_NAME,
+  searchPitchesInputSchema,
+} from '@/lib/agent/pitch-tools';
 
 import {
   ATTEST_REPRESENTATION_TOOL_NAME,
