@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { authClient } from '@/lib/auth/client';
-import { isWorkspaceType } from '@/lib/workspace-type';
+import { isWorkspaceType, WORKSPACE_TYPE_INFO } from '@/lib/workspace-type';
 
 function toSlug(name: string): string {
   const base =
@@ -55,7 +55,8 @@ export function CreateWorkspaceForm() {
       setError(active?.error?.message ?? 'Could not open the workspace.');
       return;
     }
-    window.location.assign('/');
+    // ONB-005: a new workspace opens its type's start page; later sign-ins still open Chat.
+    window.location.assign(WORKSPACE_TYPE_INFO[workspaceType].startPath);
   }
 
   return (
