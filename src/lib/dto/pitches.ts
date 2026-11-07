@@ -231,3 +231,11 @@ export type PitchNoteInput = {
   pitchItemId?: string | null;
   nextFollowUpAt?: string | null;
 };
+
+/** Cells counted open for ContactSummary.openItemCount: not passed, won, lost or archived. */
+export const CLOSED_STATUSES: readonly PitchStatus[] = [
+  'passed',
+  'closed_won',
+  'closed_lost',
+  'archived',
+];

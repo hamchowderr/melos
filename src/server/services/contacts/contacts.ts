@@ -1,10 +1,23 @@
-import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import type { WorkspacePermissions } from '../../../lib/auth/permissions';
-import type { ContactDetailDTO, ContactInput, ContactPatch } from '../../../lib/dto/contacts';
-import { contactRoles, contacts, parties } from '../../db/schema/workspace.generated';
+import type {
+  ContactDetailDTO,
+  ContactInput,
+  ContactMessageDTO,
+  ContactPatch,
+} from '../../../lib/dto/contacts';
+import { CLOSED_STATUSES, PITCH_STATUSES } from '../../../lib/dto/pitches';
+import {
+  contactRoles,
+  contacts,
+  messages,
+  parties,
+  pitches,
+} from '../../db/schema/workspace.generated';
 import { workspaceIntegrityGuard as guard } from '../integrity-guard';
 import { requirePermission } from '../permissions';
+import { searchPitches } from '../pitches/read';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
 import { getWorkspaceDatabase, sanitized } from '../workspace-connections';
@@ -64,8 +77,34 @@ async function replaceRoles(tx: WorkspaceTransaction, contactId: string, roles: 
     );
 }
 
+/** The 10 most recent messages on the contact's pitches, newest first, without bodies (§3.4). */
+async function recentMessagesOf(
+  tenant: TenantContext,
+  contactId: string,
+): Promise<ContactMessageDTO[]> {
+  const rows = await sanitized(tenant.workspaceId, async () => {
+    const database = await getWorkspaceDatabase(tenant.workspaceId);
+    const on = sql`coalesce(${messages.sentAt}, ${messages.receivedAt}, ${messages.createdAt})`;
+    return database
+      .select()
+      .from(messages)
+      .innerJoin(pitches, eq(pitches.id, messages.pitchId))
+      .where(eq(pitches.contactId, contactId))
+      .orderBy(desc(on), desc(messages.id))
+      .limit(10);
+  });
+  return rows.map(({ messages: message }) => ({
+    ...{ messageId: message.id, pitchId: message.pitchId ?? '', subject: message.subject },
+    direction: message.direction as ContactMessageDTO['direction'],
+    purpose: message.purpose as ContactMessageDTO['purpose'],
+    status: message.status as ContactMessageDTO['status'],
+    ...{ inReplyToMessageId: message.inReplyToMessageId, sentAt: message.sentAt },
+    ...{ receivedAt: message.receivedAt, createdAt: message.createdAt },
+  }));
+}
+
 /**
- * ContactDetailDTO for a live contact (§3.4), for contact:read. A refused role never opens the
+ * ContactDetailDTO for a live contact (§3.4), for contact:read, with its cells and recent messages. A refused role never opens the
  * database; an id with no live contact in the tenant's own database is NOT_FOUND.
  */
 export async function getContact(
@@ -84,15 +123,20 @@ export async function getContact(
   if (!row) return failure('NOT_FOUND');
   const party = await getParty(tenant, row.partyId);
   if (!party.ok) return party;
+  const cells = await searchPitches(tenant, { contactId, statuses: [...PITCH_STATUSES] });
+  if (!cells.ok) return cells;
+  const recentMessages = await recentMessagesOf(tenant, contactId);
   const { displayName, contact, methods } = party.value;
   const email = methods.find((method) => method.methodType === 'email' && method.isPrimary);
   return success({
     ...{ contactId, partyId: row.partyId, displayName },
     organizationPartyId: contact?.organizationPartyId ?? null,
     organizationName: contact?.organizationName ?? null,
-    ...{ roles: contact?.roles ?? [], primaryEmail: email?.value ?? null, openItemCount: 0 },
+    ...{ roles: contact?.roles ?? [], primaryEmail: email?.value ?? null },
+    openItemCount: cells.value.filter((cell) => !CLOSED_STATUSES.includes(cell.currentStatus))
+      .length,
     ...{ relationshipNotes: row.relationshipNotes, active: row.active === 1, methods },
-    ...{ pitchItems: [], recentMessages: [] },
+    ...{ pitchItems: cells.value, recentMessages },
   });
 }
 

@@ -1,3 +1,5 @@
+import type { PitchMessageDTO, PitchSummary } from './pitches';
+
 /**
  * Party DTOs for ContactService reads (docs/CONTRACT.md §2.3 /people, §4.2; D-12). Types only, with
  * no server import, so client components can import them.
@@ -151,10 +153,10 @@ export type SocietyAffiliationInput = {
 };
 
 /**
- * ContactDetailDTO (§3.4): the ContactSummary fields, the party's methods, and its pitch items and
- * recent messages, which stay empty until phase 8 (PROPOSED, melos-rpr.27); so does openItemCount.
+ * ContactSummary (§3.4): a live contact with its company, roles, primary email and the number of
+ * its open cells, those not passed, won, lost or archived.
  */
-export type ContactDetailDTO = {
+export type ContactSummary = {
   contactId: string;
   partyId: string;
   displayName: string;
@@ -163,11 +165,33 @@ export type ContactDetailDTO = {
   roles: string[];
   primaryEmail: string | null;
   openItemCount: number;
+};
+
+/** A recent message on one of the contact's pitches, without its body. */
+export type ContactMessageDTO = PitchMessageDTO & { pitchId: string };
+
+/**
+ * ContactDetailDTO (§3.4): the ContactSummary fields, the party's methods, every pitch cell of the
+ * contact (archived ones included) and its 10 most recent messages, newest first.
+ */
+export type ContactDetailDTO = ContactSummary & {
   relationshipNotes: string | null;
   active: boolean;
   methods: ContactMethodDTO[];
-  pitchItems: never[];
-  recentMessages: never[];
+  pitchItems: PitchSummary[];
+  recentMessages: ContactMessageDTO[];
+};
+
+/**
+ * searchContacts filters (§3.3): `query` is a case-insensitive substring of the display name, the
+ * company name or any email address; `roles` keeps contacts with any of them; `hasPitchFor` keeps
+ * contacts with a cell on that song (a composition covers its recordings). Default limit 50.
+ */
+export type ContactSearch = {
+  query?: string;
+  roles?: string[];
+  hasPitchFor?: { itemType: 'composition' | 'recording'; itemId: string };
+  limit?: number;
 };
 
 /** createContact input (§3.3): exactly one of an existing `partyId` or a new `party`. */
