@@ -133,6 +133,21 @@ test('TST-AI-003: AGUIMock drives the getMessageThread PitchTimeline', async ({ 
   );
 });
 
+test('TST-AI-003: AGUIMock drives TodayWorkspace with FollowUpQueue', async ({ page }) => {
+  await ask(page, 'agui today');
+  const today = page.getByRole('region', { name: 'Today, 2026-09-10', exact: true });
+  await expect(today.getByRole('list', { name: 'Follow-up queue' })).toContainText(
+    'Harbor Lights to Mock SupervisorAwaiting reply · follow-up due',
+  );
+  await expect(today.getByRole('list', { name: 'Recent replies' })).toContainText(
+    'Mock Agent on Tidewater2026-09-09',
+  );
+  await expect(today.getByRole('list', { name: 'Ready to pitch' })).toContainText(
+    'Harbor Lights2 licensing agents have not heard it',
+  );
+  await expect(today).toContainText('1 recording is not ready to license.');
+});
+
 test('TST-AI-003: a refusal renders a plain sentence, not a card', async ({ page }) => {
   await ask(page, 'agui not found');
   const alert = page.locator('[data-error-code="NOT_FOUND"]');

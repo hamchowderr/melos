@@ -441,6 +441,85 @@
           ]
         }
       }
+    },
+    {
+      "message": "agui today",
+      "toolName": "getTodayWorkspace",
+      "args": {
+        "date": "2026-09-10"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "date": "2026-09-10",
+          "timezone": "America/New_York",
+          "followUpsDue": [
+            {
+              "pitchId": "pit_AGUI1",
+              "pitchItemId": "pti_AGUI1",
+              "contactId": "con_AGUI1",
+              "contactName": "Mock Supervisor",
+              "contactRoles": ["music_supervisor"],
+              "itemType": "composition",
+              "itemId": "cmp_AGUI1",
+              "itemTitle": "Harbor Lights",
+              "currentStatus": "awaiting_reply",
+              "nextFollowUpAt": "2026-09-10T17:00:00.000Z",
+              "followUpDue": true,
+              "lastContactedAt": "2026-09-03T17:00:00.000Z",
+              "lastOutboundMessageId": "msg_AGUI1",
+              "priorityRank": 1
+            }
+          ],
+          "recentReplies": [
+            {
+              "pitchId": "pit_AGUI2",
+              "pitchItemId": "pti_AGUI2",
+              "contactId": "con_AGUI1",
+              "contactName": "Mock Agent",
+              "contactRoles": ["music_supervisor"],
+              "itemType": "composition",
+              "itemId": "cmp_AGUI1",
+              "itemTitle": "Tidewater",
+              "currentStatus": "responded",
+              "nextFollowUpAt": null,
+              "followUpDue": false,
+              "lastContactedAt": "2026-09-03T17:00:00.000Z",
+              "lastOutboundMessageId": "msg_AGUI1",
+              "priorityRank": null,
+              "receivedAt": "2026-09-09T12:00:00.000Z"
+            }
+          ],
+          "readinessIssues": {
+            "generatedAt": "2026-09-10T12:00:00.000Z",
+            "recordings": [
+              {
+                "recordingId": "rec_AGUI3",
+                "compositionId": "cmp_AGUI3",
+                "title": "Low Tide",
+                "oneStopReady": false,
+                "syncReady": false,
+                "issues": [
+                  {
+                    "code": "MISSING_ISRC",
+                    "severity": "blocking",
+                    "recordingId": "rec_AGUI3",
+                    "compositionId": "cmp_AGUI3",
+                    "detail": null
+                  }
+                ]
+              }
+            ]
+          },
+          "readyToPitch": [
+            {
+              "recordingId": "rec_AGUI1",
+              "title": "Harbor Lights",
+              "neverPitchedLicensingAgentCount": 2
+            }
+          ]
+        }
+      }
     }
   ]
 }
