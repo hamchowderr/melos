@@ -1,7 +1,8 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import type {
   GeneratedReportDTO,
+  GeneratedReportSummary,
   GenerateReportInput,
   ReportItemDTO,
   ReportSection,
@@ -107,4 +108,27 @@ export async function getGeneratedReport(
     ]);
   });
   return row[0] ? success(dtoOf(row[0], items)) : failure('NOT_FOUND');
+}
+
+/** The workspace's latest snapshots, newest first (RPT-003). report:read. */
+export async function listGeneratedReports(
+  tenant: TenantContext,
+  limit = 20,
+): Promise<ServiceResult<GeneratedReportSummary[]>> {
+  if (!requirePermission(tenant, { report: ['read'] }).ok) return failure('FORBIDDEN');
+  const rows = await sanitized(tenant.workspaceId, async () => {
+    const database = await getWorkspaceDatabase(tenant.workspaceId);
+    return database
+      .select()
+      .from(generatedReports)
+      .orderBy(desc(generatedReports.generatedAt), desc(generatedReports.id))
+      .limit(limit);
+  });
+  return success(
+    rows.map((row) => ({
+      ...{ reportId: row.id, templateId: row.templateId, generatedAt: row.generatedAt },
+      songCount: (JSON.parse(row.contentJson) as { items: unknown[] }).items.length,
+      text: row.contentText,
+    })),
+  );
 }
