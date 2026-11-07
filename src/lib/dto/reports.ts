@@ -71,12 +71,3 @@ export type GeneratedReportDTO = {
   text: string;
   pdfAssetId: string | null;
 };
-
-/** A past snapshot in the /reports list (RPT-003): newest first, with its stored text. */
-export type GeneratedReportSummary = {
-  reportId: string;
-  templateId: string;
-  generatedAt: string;
-  songCount: number;
-  text: string;
-};

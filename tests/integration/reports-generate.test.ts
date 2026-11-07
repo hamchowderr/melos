@@ -112,19 +112,4 @@ describe('melos-ajt.11: generateReport snapshots (RPT-003, RPT-005)', () => {
     );
     expect(await rowCount()).toBe(before);
   });
-
-  it('lists snapshots newest first with their song count and text (RPT-003)', async () => {
-    const first = accepted(await reports.generateReport(owner, input));
-    const second = accepted(
-      await reports.generateReport(owner, { ...input, items: [{ compositionId: k.cmp_OCEAN }] }),
-    );
-    const listed = accepted(await reports.listGeneratedReports(owner));
-    expect(listed.slice(0, 2)).toEqual([
-      expect.objectContaining({ reportId: second.reportId, songCount: 1, text: second.text }),
-      expect.objectContaining({ reportId: first.reportId, songCount: 2, text: first.text }),
-    ]);
-    expect(await reports.listGeneratedReports(withRole(owner, 'viewer'))).toMatchObject({
-      ok: true,
-    });
-  });
 });

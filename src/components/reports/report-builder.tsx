@@ -5,20 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { previewReportText, saveReportSnapshot } from '@/app/reports/actions';
 import { Button } from '@/components/ui/button';
-import { GridFrame } from '@/components/ui/grid-frame';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import type { SongListItem } from '@/lib/dto/catalog';
 import {
-  type GeneratedReportSummary,
   MAX_REPORT_ITEMS,
   type ReportItemInput,
   type ReportSection,
@@ -30,7 +19,6 @@ import { cn } from '@/lib/utils';
 type Props = {
   songs: SongListItem[];
   templates: ReportTemplateSummary[];
-  snapshots: GeneratedReportSummary[];
   generates: boolean;
 };
 
@@ -60,8 +48,8 @@ const choiceOf = (song: SongListItem): Choice | null => {
 
 const songCount = (count: number) => (count === 1 ? '1 song' : `${count} songs`);
 
-/** ReportPreview (§2.3): songs in order, a template, section toggles, live text and snapshots. */
-export function ReportBuilder({ songs, templates, snapshots, generates }: Props) {
+/** ReportPreview (§2.3): songs in order, a template, section toggles, live text and a snapshot. */
+export function ReportBuilder({ songs, templates, generates }: Props) {
   const router = useRouter();
   const choices = songs.flatMap((song) => choiceOf(song) ?? []);
   const [templateId, setTemplateId] = useState(templates[0]?.templateId ?? '');
@@ -70,9 +58,7 @@ export function ReportBuilder({ songs, templates, snapshots, generates }: Props)
   const [text, setText] = useState('');
   const [note, setNote] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
-  const [open, setOpen] = useState<GeneratedReportSummary | null>(null);
   const latest = useRef(0);
-  const names = new Map(templates.map((t) => [t.templateId, t.name]));
 
   const input = () => ({
     templateId,
@@ -227,51 +213,6 @@ export function ReportBuilder({ songs, templates, snapshots, generates }: Props)
           </pre>
         </section>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <h2 className="text-sm font-medium">Saved snapshots</h2>
-        <GridFrame>
-          <Table aria-label="Saved snapshots">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Saved</TableHead>
-                <TableHead>Template</TableHead>
-                <TableHead>Songs</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {snapshots.map((s) => (
-                <TableRow
-                  key={s.reportId}
-                  aria-label={`Snapshot ${s.generatedAt.slice(0, 16).replace('T', ' ')}`}
-                  className="cursor-pointer"
-                  onClick={() => setOpen(s)}
-                >
-                  <TableCell className="tabular-nums">
-                    {s.generatedAt.slice(0, 16).replace('T', ' ')}
-                  </TableCell>
-                  <TableCell>{names.get(s.templateId) ?? 'Template'}</TableCell>
-                  <TableCell>{songCount(s.songCount)}</TableCell>
-                </TableRow>
-              ))}
-              {snapshots.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-muted-foreground">
-                    No snapshots yet.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </GridFrame>
-      </div>
-      <Sheet open={open !== null} onOpenChange={(next) => !next && setOpen(null)}>
-        <SheetContent className="overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{open ? (names.get(open.templateId) ?? 'Snapshot') : ''}</SheetTitle>
-          </SheetHeader>
-          <pre className="px-4 pb-4 text-sm leading-relaxed whitespace-pre-wrap">{open?.text}</pre>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
