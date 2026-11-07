@@ -53,3 +53,21 @@ export type ReportPreviewDTO = {
 
 /** A report holds at most this many songs (§7.7, RPT-005). */
 export const MAX_REPORT_ITEMS = 50;
+
+/** generateReport input (§3.3): previewReport's, plus `format` and an optional pitch. */
+export type GenerateReportInput = ReportPreviewInput & {
+  format?: 'text' | 'text_and_pdf';
+  pitchId?: string | null;
+};
+
+/** An immutable snapshot (§3.4, RPT-003). `pdfAssetId` is null until PDF output lands. */
+export type GeneratedReportDTO = {
+  reportId: string;
+  templateId: string;
+  pitchId: string | null;
+  items: ReportItemDTO[];
+  sections: ReportSection[];
+  generatedAt: string;
+  text: string;
+  pdfAssetId: string | null;
+};
