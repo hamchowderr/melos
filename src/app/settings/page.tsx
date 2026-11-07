@@ -1,11 +1,13 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { resolveWorkspacePage } from '@/app/workspace-page';
+import { WorkspaceTypePanel } from '@/components/onboarding/workspace-type-panel';
 import { MembersPanel } from '@/components/workspace/members-panel';
 import { WorkspaceShell } from '@/components/workspace/workspace-shell';
 import type { WorkspacePermissions } from '@/lib/auth/permissions';
 import { auth } from '@/server/auth/auth';
 import { getServerEnv } from '@/server/env';
+import { getWorkspaceType } from '@/server/services/onboarding/workspace-type';
 import { requirePermission } from '@/server/services/permissions';
 import { SettingsNav } from './settings-nav';
 
@@ -27,9 +29,10 @@ export default async function SettingsPage() {
   // Membership lives only in Better Auth (docs/CONTRACT.md §6.1), which checks the caller.
   const requestHeaders = await headers();
   const query = { organizationId: tenant.organizationId };
-  const [list, invitations] = await Promise.all([
+  const [list, invitations, workspaceType] = await Promise.all([
     auth.api.listMembers({ headers: requestHeaders, query }).catch(() => null),
     auth.api.listInvitations({ headers: requestHeaders, query }).catch(() => null),
+    getWorkspaceType(tenant),
   ]);
   if (!list || !invitations) redirect('/workspaces/new');
 
@@ -53,6 +56,10 @@ export default async function SettingsPage() {
     <WorkspaceShell workspaceName={workspace.workspaceName} current="settings">
       <div className="flex flex-col items-center gap-4 px-4 py-6">
         <SettingsNav current="members" />
+        <WorkspaceTypePanel
+          workspaceType={workspaceType}
+          canEdit={can({ organization: ['update'] })}
+        />
         <MembersPanel
           members={list.members}
           invitations={pending}
