@@ -27,3 +27,4 @@ playwright-report/
 
 # Vercel bypass cookie from the preview specs
 tests/preview/.auth/
+.claude/skills/impeccable/scripts/bin/
