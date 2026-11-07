@@ -88,7 +88,7 @@ export function ReadinessChecklist({ recordings, onlyNotReady }: Props) {
   const [open, setOpen] = useState<Recording | null>(null);
   if (recordings.length === 0) {
     return (
-      <Empty className="border">
+      <Empty className="bg-muted/40">
         <EmptyHeader>
           <EmptyTitle>{onlyNotReady ? 'Every Recording Is Ready' : 'No Recordings Yet'}</EmptyTitle>
           <EmptyDescription>

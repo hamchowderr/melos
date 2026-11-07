@@ -140,7 +140,7 @@ export function PartyTable({ parties, noun }: Props) {
   const [open, setOpen] = useState<PartyListItem | null>(null);
   if (parties.length === 0) {
     return (
-      <Empty className="border">
+      <Empty className="bg-muted/40">
         <EmptyHeader>
           <EmptyTitle>No {noun} yet</EmptyTitle>
           <EmptyDescription>The {noun} in this workspace are listed here.</EmptyDescription>
@@ -158,7 +158,7 @@ export function PartyTable({ parties, noun }: Props) {
         className="flex flex-col gap-2 sm:hidden"
       >
         {parties.map((party) => (
-          <li key={party.partyId} className="rounded-lg border p-3">
+          <li key={party.partyId} className="rounded-lg bg-muted/40 p-3">
             {name.cell(party)}
             <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
               {details.map(({ heading, cell }) => (
