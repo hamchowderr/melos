@@ -278,7 +278,7 @@ The same React components render in chat (tool rendering) and in full-page views
 | `FollowUpQueue` | same name: BP §8.1 | Section of `TodayWorkspace`. |
 | `WorkflowProgress` | NEW · "Render progress/activity state from AG-UI shared state": TS §12 | Import apply progress in `/settings/import`. No Mastra workflow renders it at MVP. |
 | `ImportReport` | NEW | Dry-run validation report and apply results for Airtable and CSV imports. |
-| Area `/today` | "Home / Today": BP §10 | Default landing page for the primary persona. |
+| Area `/today` | "Home / Today": BP §10 | The daily follow-up queue. Sign-in lands on Chat (`/`), not Today (owner decision 2026-11-07). |
 | Area `/catalog` | "Catalog": BP §10 | |
 | Area `/people` | "People & Organizations": BP §10 | |
 | Area `/rights` | "Rights": BP §10 | |
