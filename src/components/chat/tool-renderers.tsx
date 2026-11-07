@@ -9,6 +9,7 @@ import { FocusOn } from '@/components/chat/focus-context';
 import { MusicWorkspaceCard } from '@/components/chat/music-workspace-card';
 import { OwnershipProposal } from '@/components/chat/ownership-proposal';
 import { PingCard } from '@/components/chat/ping-card';
+import { MessageThread, PitchDetail, PitchTable } from '@/components/chat/pitch-table';
 import { useReportToolRenderers } from '@/components/chat/report-renderers';
 import { SongResults } from '@/components/chat/song-results';
 import { ToolCard, ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
@@ -40,6 +41,15 @@ import {
   searchPitchEligibilityInputSchema,
 } from '@/lib/agent/crm-tools';
 import {
+  GET_MESSAGE_THREAD_TOOL_NAME,
+  GET_PITCH_TOOL_NAME,
+  getMessageThreadInputSchema,
+  getPitchInputSchema,
+  SEARCH_PITCHES_TOOL_NAME,
+  searchPitchesInputSchema,
+} from '@/lib/agent/pitch-tools';
+
+import {
   ATTEST_REPRESENTATION_TOOL_NAME,
   licensingContactsInputSchema,
   masterSharesInputSchema,
@@ -54,7 +64,8 @@ import {
 import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
 import type { ContactDetailDTO, ContactSummary } from '@/lib/dto/contacts';
-import type { PitchEligibilityDTO } from '@/lib/dto/pitches';
+import type { MessageThreadDTO } from '@/lib/dto/outreach';
+import type { PitchDTO, PitchEligibilityDTO, PitchSummary } from '@/lib/dto/pitches';
 import type {
   DefaultOwnershipProposal,
   ReadinessReportDTO,
@@ -182,6 +193,26 @@ export function useMelosToolRenderers() {
   );
   useRenderTool(
     {
+      name: SEARCH_PITCHES_TOOL_NAME,
+      parameters: searchPitchesInputSchema,
+      render: renderResult<PitchSummary[]>('Searching pitches...', (cells) => (
+        <PitchTable cells={cells} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_PITCH_TOOL_NAME,
+      parameters: getPitchInputSchema,
+      render: renderResult<PitchDTO>('Opening the pitch...', (pitch) => (
+        <PitchDetail pitch={pitch} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
       name: SEARCH_CONTACTS_TOOL_NAME,
       parameters: searchContactsInputSchema,
       render: renderResult<ContactSummary[]>('Searching contacts...', (contacts) => (
@@ -206,6 +237,16 @@ export function useMelosToolRenderers() {
       parameters: searchPitchEligibilityInputSchema,
       render: renderResult<PitchEligibilityDTO>('Checking who has heard it...', (eligibility) => (
         <EligibilityGrid eligibility={eligibility} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_MESSAGE_THREAD_TOOL_NAME,
+      parameters: getMessageThreadInputSchema,
+      render: renderResult<MessageThreadDTO>('Reading the messages...', (thread) => (
+        <MessageThread thread={thread} />
       )),
     },
     [],

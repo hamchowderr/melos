@@ -47,6 +47,7 @@ Document abbreviations used in alias columns:
 | 2026-09-12 | The primary persona is the independent sync artist: a songwriter/producer pitching their own catalog through licensing agents and music supervisors. Demo persona: Jordan Taylor (FX ICP-01). Defaults and UX priorities in this contract follow this persona. |
 | 2026-09-13 | Model calls go through the Vercel AI Gateway, not a direct provider key or the Mastra Gateway. Mastra stays the agent framework (ADR-034). |
 | 2026-10-30 | Catalog import and song codes (plan "Artist catalog import and licensing codes", approved in the project thread of that name). (1) MVP import adds presets for distributor earnings statements and The MLC catalog export on the CSV pipeline; DDEX feeds and live distributor connections stay out of scope (IMP-014, IMP-015). (2) Missing song details are suggested by ISRC from MusicBrainz and Deezer and saved only when the user accepts; Spotify is not used (IMP-016). (3) A log of issued licenses comes after the MVP exit gate (phase 12). (4) Each song records where it is registered and the code each registry returned, and readiness warns about gaps (CAT-010 to CAT-012, RGT-009, RGT-010). |
+| 2026-11-07 | Onboarding is plain screens, not AI (thread "Check onboarding for each ICP type", epic `melos-1z5`). A new workspace records which of the five ICP types (TS §14) describes its owner, shows a getting-started checklist for that type on `/today`, and opens that type's start page right after creation. Chat stays available but is not part of onboarding. Requirements ONB-001 to ONB-006, §5.10. |
 
 ### 1.2.1 Origin research used by this contract
 
@@ -275,6 +276,8 @@ The same React components render in chat (tool rendering) and in full-page views
 | `ReportPreview` | same name: BP §8.1, §9.2; TS §8 RPT-001, RPT-002, §11, §16 DEMO-009 | Text first, with a copy action; PDF export is secondary. |
 | `ReportTemplateList` | NEW | Renderer for `listReportTemplates`. |
 | `TodayWorkspace` | same name: BP §9.1, §9.2 | |
+| `OnboardingChecklist` | NEW (owner decision 2026-11-07) | Getting-started card at the top of `TodayWorkspace`: the workspace type's items with ticks and links (ONB-003). |
+| `WorkspaceTypePicker` | NEW (owner decision 2026-11-07) | "Which describes you?" choice in the create-workspace form and in `/settings` (ONB-001, ONB-002). |
 | `FollowUpQueue` | same name: BP §8.1 | Section of `TodayWorkspace`. |
 | `WorkflowProgress` | NEW · "Render progress/activity state from AG-UI shared state": TS §12 | Import apply progress in `/settings/import`. No Mastra workflow renders it at MVP. |
 | `ImportReport` | NEW | Dry-run validation report and apply results for Airtable and CSV imports. |
@@ -300,6 +303,7 @@ The same React components render in chat (tool rendering) and in full-page views
 | `ReportService` | same name: TS §8 · "Report engine": BP §13 | Templates, previews, snapshots, PDF rendering. |
 | `ImportService` | NEW | Airtable and CSV import pipeline. |
 | `CatalogLookupService` | NEW (owner decision 2026-10-30) | ISRC lookups on MusicBrainz and Deezer that return suggestions only; it writes nothing (IMP-016). |
+| `OnboardingService` | NEW (owner decision 2026-11-07) | Workspace type, the per-type checklist derived from workspace data, and the member's checklist dismissal (§5.10). It writes no workspace data. |
 | `AuditWriter` | NEW | `audit_log` rows inside service transactions. |
 | `TenantContextResolver` | "request-scoped workspace DB resolver": BP §16 Phase 1 | Session to workspace context (§7.1). |
 | `WorkspaceProvisioner` | "workspace provisioning": BP §16 Phase 1; TS TEN-004 | Creates, migrates and deletes workspace databases. |
@@ -332,6 +336,7 @@ The same React components render in chat (tool rendering) and in full-page views
 | `ReportPreviewDTO` | same name: BP App B |
 | `GeneratedReportDTO` | same name: BP App B |
 | `DefaultOwnershipProposal` | NEW |
+| `OnboardingChecklistDTO` | NEW |
 | `ApprovalRequest`, `ApprovalDecision` | NEW |
 
 ### 2.6 Demo fixture field map
@@ -1711,6 +1716,50 @@ Frontend AGUIMock fixtures emit tool-call and result events per renderer (TS §1
 | ADR-034 NEW | Model calls go through the Vercel AI Gateway; Mastra (`@mastra/core` 1.66.0) stays the agent framework. `toModelConfig` (`src/mastra/model.ts`) gives the agent an AI SDK model from `createGateway` in `@ai-sdk/gateway` 3.0.193, a `LanguageModelV3` that `MastraModelConfig` accepts, not a `vercel/` model router string: the router's `ModelsDevGateway.getApiKey` throws without `AI_GATEWAY_API_KEY`, so a router string cannot use an OIDC token. On Vercel the credential is the deployment's OIDC token, which the provider reads on each request from the `x-vercel-oidc-token` header through `@vercel/oidc`; startup refuses any `AI_GATEWAY_API_KEY` there, even a blank one, because the provider reads a present key from the environment and prefers it over the token, and `toModelConfig` passes `apiKey: ''`, so the provider does not read the variable and sends the token. Off Vercel a real model requires a non-blank `AI_GATEWAY_API_KEY`; an unset or blank key does not stop operator scripts or the AIMock endpoint. The chat model and its key are checked by `requireChatModel` where the model is resolved, at app startup (`src/instrumentation.ts`) and in `src/mastra/index.ts`, so operator scripts, which call no model, do not need them. Operator commands drop `AI_GATEWAY_API_KEY` in `withControl` (`scripts/operator.ts`) before the environment is validated, because they never call a model. `MELOS_CHAT_MODEL` is an AI Gateway model id such as `anthropic/claude-haiku-4.5`; Mastra router spellings are refused: a `mastra/` prefix, a `vercel/<creator>/` prefix, an upper-case creator, and Anthropic ids with a hyphenated version such as `anthropic/claude-haiku-4-5`. No direct provider key (`ANTHROPIC_API_KEY`) or `mastra/` model is accepted: the Mastra Gateway was dropped on 2026-09-12 when it ran out of credits, and one credential path keeps startup validation exact. Tests keep the AIMock endpoint through `MELOS_LLM_BASE_URL`, which is refused on Vercel | Accepted; the OIDC path is unproven until a preview deploy runs the chat | Owner decision 2026-09-13; package source: `@mastra/core` 1.66.0 `dist/models-dev-*.js`, `@ai-sdk/gateway` 3.0.193 `getGatewayAuthToken` |
 | ADR-035 NEW | R2 configuration (U-27). Each environment has one private bucket (`melos-preview` for Vercel previews) on the Otaku Solutions Cloudflare account, reached through the S3 API with region `auto` and the account endpoint. The credentials are an R2 API token scoped to that bucket alone with Object Read & Write; its S3 key pair (the token id, and the SHA-256 of the token value) is stored as Sensitive Vercel variables for the environment and in Infisical `otaku-internal`, `dev`, `/melos`. The bucket's CORS rule allows `GET` and `PUT` from `https://*-otaku-solutions.vercel.app` with the `Content-Type` header, exposes `ETag`, and caches preflights for 3600 seconds; the single wildcard origin works for browser PUTs. An expired presigned GET answers 403, which `AudioPlayer` treats as the cue to re-sign once (§7.5). | Accepted | AST-E2E-002 on the preview deploy `melos-7r1kls18k-otaku-solutions.vercel.app` (branch `feature/r2-preview`, `df922e4`) on 2026-10-30; [SRC-099] |
 
+### 5.10 Onboarding (owner decision 2026-11-07)
+
+Onboarding uses ordinary screens and data checks; no item calls the model. Epic `melos-1z5`.
+
+| ID | Requirement | DB | Service | UI | Test |
+|---|---|---|---|---|---|
+| ONB-001 NEW | The create-workspace form requires a workspace type, stored as `{"workspaceType": "<type>"}` in ctl `organization.metadata`. The server refuses create or update metadata holding any other key or an unknown type; a create without metadata (API callers, the demo seed) is read by ONB-006. | ctl `organization.metadata` | `OnboardingService` (Better Auth `organizationHooks` before create and update) | `/workspaces/new`, `WorkspaceTypePicker` | ONB-INT-001; ONB-E2E-001: the form does not submit without a type |
+| ONB-002 NEW | Owners and admins change the workspace type in `/settings`; members and viewers see it read-only. A change appends `workspace.type_changed` to `control_audit_log` with the old and new type, and changes only the checklist and start page. | ctl `organization.metadata`, `control_audit_log` | `OnboardingService` | `/settings`, `WorkspaceTypePicker` | ONB-INT-002: member and viewer are refused |
+| ONB-003 NEW | `/today` shows the checklist for the workspace type at the top of the page, each item with a tick and a link. It hides when every item is done or when the member dismisses it. | ctl `workspace_member_settings.onboarding_dismissed_at` | `OnboardingService` | `OnboardingChecklist` | ONB-E2E-003 |
+| ONB-004 NEW | Each item's done state is derived on every read from live workspace rows by the rules below. Nothing stores a tick. | ws (read only) | `OnboardingService` | `OnboardingChecklist` | ONB-INT-004: each type against an empty workspace (no item done) and the Northstar seed |
+| ONB-005 NEW | Right after creating a workspace, the user opens the start page for its type. Signing in later still opens Chat. | — | — | `/workspaces/new` | ONB-E2E-005: one case per type |
+| ONB-006 NEW | A workspace with no type, or a type the code no longer knows, is read as `songwriter`, the primary persona (§1.2, 2026-09-12). | ctl `organization.metadata` | `OnboardingService` | all | ONB-UNIT-006 |
+
+Workspace types:
+
+| Type | ICP (TS §14) | Label in the picker | Start page (ONB-005) |
+|---|---|---|---|
+| `songwriter` | ICP-01 Independent singer-songwriter | Songwriter or artist | `/catalog` |
+| `producer` | ICP-02 Producer / co-writer | Producer or co-writer | `/catalog` |
+| `sync_agent` | ICP-03 Sync licensing agent | Sync licensing agent | `/today` |
+| `label` | ICP-04 Independent label operator | Independent label | `/catalog` |
+| `manager` | ICP-05 Artist manager / pitching operator | Artist manager | `/today` |
+
+Checklist items (ONB-004). "Live" means `deleted_at IS NULL` where the table has it.
+
+| Key | Item | Link | Done when | Types |
+|---|---|---|---|---|
+| `first_song` | Add or import your first song (`sync_agent`: "Add the catalog you represent") | `/catalog` | a live composition exists | songwriter, producer, sync_agent, manager |
+| `catalog_import` | Import your catalog from a CSV | `/catalog` | an `import_runs` row with `source_system = 'csv'` and status `succeeded` or `partial` exists, or a live composition exists | label |
+| `writer_splits` | Set the writer splits on a song | `/rights` | a live composition's writer shares total 10000 bp | songwriter, producer |
+| `co_writer` | Add a co-writer to a song | `/rights` | a live composition has two or more `composition_contributors` | producer |
+| `producer_credit` | Add a producer credit to a recording | `/catalog` | a `recording_contributors` row with `role = 'producer'` on a live recording exists | producer |
+| `master_owners` | Set the master owners on a recording | `/rights` | a live recording's master interests total 10000 bp | label |
+| `ready_song` | Get one song ready to pitch | `/rights` | a live recording has no blocking readiness issue (§6.5), the rule behind `TodayWorkspaceDTO.readyToPitch` | sync_agent |
+| `artist_songs` | Add a song by an artist you manage | `/catalog` | a `recording_artists` row with `role = 'primary'` on a live recording exists | manager |
+| `licensing_contact` | Add a licensing agent or music supervisor | `/people` | a live contact has role `licensing_agent` or `music_supervisor` | songwriter, label |
+| `supervisor_contact` | Add a music supervisor | `/people` | a live contact has role `music_supervisor` | sync_agent |
+| `contacts` | Add your contacts | `/people` | a live contact exists | manager |
+| `first_pitch` | Log your first pitch | `/pitches` | a `pitch_items` row exists | songwriter, sync_agent, label, manager |
+| `follow_up` | Set a follow-up date on a pitch | `/pitches` | a pitch has `next_follow_up_at` set | manager |
+| `multi_song_report` | Build a multi-song report | `/reports` | a `generated_reports` row has two or more `generated_report_items` | sync_agent |
+
+Items list in the order of the table, filtered by type. `OnboardingChecklistDTO`: `workspaceType`; `items[]` (`key`, `label`, `href`, `done`); `doneCount`; `total`; `dismissed`. The `workspace_member_settings.onboarding_dismissed_at` column and its migration land with `melos-1z5.5`, which updates §4.1 in the same change.
+
 ## 6. Conflict resolutions
 
 ### 6.1 Authentication baseline
@@ -2269,6 +2318,8 @@ Each phase ends when its exit gate passes. Requirement IDs refer to §5; gates A
 | 12 | Post-MVP: production reply ingestion (U-29), CopilotKit Channels, A2UI surfaces (BP §16 phases 9–10), production hardening. | External integration tests and a threat review pass. |
 
 Owner decisions 2026-10-30 place CAT-010 to CAT-012, RGT-009 and RGT-010 in epic `melos-9b6`, which depends only on phase 4 services and gates phase 11. IMP-014 to IMP-016 join phase 10. The issued-license log joins phase 12. Each `melos-9b6` task changes the §4.2 and §4.3 DDL, the §6.5 code tables and the §6.6 action vocabulary in the same change as its migration or service, because TEN-004, the readiness unit test and AUD-001 compare them with the code.
+
+Owner decision 2026-11-07 places ONB-001 to ONB-006 (§5.10) in epic `melos-1z5`, which depends only on phase 4 and phase 8 services and does not gate phase 11.
 
 ## 9. Unified source register
 
