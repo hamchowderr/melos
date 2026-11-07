@@ -89,3 +89,15 @@ export type ThreadMessageDTO = {
 
 /** MessageThreadDTO (§3.4, OUT-003): a pitch's messages in time order. */
 export type MessageThreadDTO = { pitchId: string; messages: ThreadMessageDTO[] };
+
+/** One outbound message on /outreach (§2.3): its pitch's contact and that party's email methods. */
+export type OutboxMessageDTO = {
+  messageId: string;
+  pitchId: string;
+  contactName: string;
+  emails: { contactMethodId: string; address: string }[];
+  purpose: MessagePurpose | null;
+  status: ThreadMessageDTO['status'];
+  subject: string | null;
+  at: string;
+};
