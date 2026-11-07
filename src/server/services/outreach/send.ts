@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
-import { ulid } from 'ulid';
+import { monotonicFactory } from 'ulid';
 import type { WorkspacePermissions } from '../../../lib/auth/permissions';
 import type { SendResultDTO } from '../../../lib/dto/outreach';
 import { controlDb } from '../../db/client';
@@ -23,6 +23,8 @@ import { type EmailTransport, getEmailTransport } from './email-transport';
 
 const SEND: WorkspacePermissions = { outreach: ['send'] };
 const DAY_MS = 86_400_000;
+// Events written in one millisecond keep their write order (§4.3 id order breaks time ties).
+const nextUlid = monotonicFactory();
 
 type Message = NonNullable<Awaited<ReturnType<typeof loadMessage>>>;
 
@@ -86,7 +88,7 @@ async function settle(
     row: Pick<typeof pitchEvents.$inferInsert, 'eventType'> &
       Partial<typeof pitchEvents.$inferInsert>,
   ) => ({
-    ...{ id: `pev_${ulid()}`, pitchId, actorType: 'system', occurredAt: at, ...row },
+    ...{ id: `pev_${nextUlid()}`, pitchId, actorType: 'system', occurredAt: at, ...row },
   });
   const metadataJson = JSON.stringify({ messageId: message.id });
   if (!sent) {
