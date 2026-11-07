@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
+import type { ApprovalRow } from '../../../lib/agent/approval';
 import type { WorkspacePermissions } from '../../../lib/auth/permissions';
 import {
+  PITCH_STATUS_LABELS,
   PITCH_STATUSES,
   PITCH_TRANSITIONS,
   type PitchDTO,
@@ -9,14 +12,76 @@ import {
   type TransitionInput,
 } from '../../../lib/dto/pitches';
 import { pitchEvents, pitches, pitchItems } from '../../db/schema/workspace.generated';
+import { canonicalJson } from '../audit-writer';
 import { workspaceIntegrityGuard as guard } from '../integrity-guard';
+import { requirePermission } from '../permissions';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
+import { getWorkspaceDatabase, sanitized } from '../workspace-connections';
 import { runWorkspaceWrite, type WorkspaceTransaction, type WriteOrigin } from '../workspace-write';
 import { getPitch } from './read';
 import { event, followUpOf, loadPitch, noteOf, refuse, touch } from './write';
 
 const UPDATE: WorkspacePermissions = { pitch: ['update'] };
+
+type Cell = typeof pitchItems.$inferSelect;
+
+/** The §7.4 beforeHash of one cell: what a terminal move's approval binds to. */
+const cellHash = (cell: Cell) =>
+  createHash('sha256')
+    .update(
+      canonicalJson({ id: cell.id, currentStatus: cell.currentStatus, updatedAt: cell.updatedAt }),
+    )
+    .digest('hex');
+
+/**
+ * What a terminal transitionPitchStatus shows before it asks (§3.3, P-07): the cell's status now
+ * and after, and its beforeHash. pitch:update; an unknown cell is NOT_FOUND and a move the §6.4
+ * table refuses is VALIDATION, so no approval is asked for a move that cannot run. Writes nothing.
+ */
+export async function previewTransition(
+  tenant: TenantContext,
+  input: TransitionInput,
+): Promise<
+  ServiceResult<{
+    target: { entityType: 'pitch_item'; entityId: string };
+    before: ApprovalRow[];
+    after: ApprovalRow[];
+    beforeHash: string;
+    pitchId: string;
+  }>
+> {
+  if (!requirePermission(tenant, UPDATE).ok) return failure('FORBIDDEN');
+  if (!PITCH_STATUSES.includes(input.toStatus)) return refuse('toStatus', 'unknown_status');
+  const cell = await sanitized(tenant.workspaceId, async () => {
+    const database = await getWorkspaceDatabase(tenant.workspaceId);
+    const [row] = await database
+      .select()
+      .from(pitchItems)
+      .where(eq(pitchItems.id, input.pitchItemId));
+    return row ?? null;
+  });
+  if (!cell) return failure('NOT_FOUND');
+  const from = cell.currentStatus as PitchStatus;
+  if (from !== 'archived' && !PITCH_TRANSITIONS[from].includes(input.toStatus))
+    return refuse('toStatus', 'transition_not_allowed');
+  const pitch = await getPitch(tenant, cell.pitchId);
+  if (!pitch.ok) return pitch;
+  const song = pitch.value.items.find((item) => item.pitchItemId === cell.id);
+  const label = `${song?.itemTitle ?? 'Song'} to ${pitch.value.contactName}`;
+  const row = (status: PitchStatus) => ({
+    id: cell.id,
+    label,
+    detail: PITCH_STATUS_LABELS[status],
+  });
+  return success({
+    target: { entityType: 'pitch_item', entityId: cell.id },
+    before: [row(from)],
+    after: [row(input.toStatus)],
+    beforeHash: cellHash(cell),
+    pitchId: cell.pitchId,
+  });
+}
 
 /**
  * Sets the pitch's next follow-up and writes follow_up_scheduled, unless `at` is not later than
@@ -66,11 +131,12 @@ async function beforeArchive(tx: WorkspaceTransaction, pitchItemId: string) {
  * transitionPitchStatus (§3.3, CRM-004): moves one cell along the §6.4 table, or unarchives it to
  * the status it held before, and appends its status_changed event in the same transaction. An
  * explicit `nextFollowUpAt` also schedules the pitch's follow-up. Any other move is VALIDATION
- * `transition_not_allowed`; nothing is written.
+ * `transition_not_allowed`; nothing is written. With `expectedBeforeHash` (an approved terminal
+ * move, §7.4), a cell changed since its preview is STATE_CHANGED.
  */
 export async function transitionPitchStatus(
   tenant: TenantContext,
-  input: TransitionInput,
+  input: TransitionInput & { expectedBeforeHash?: string },
   origin: WriteOrigin = { type: 'user' },
 ): Promise<ServiceResult<PitchDTO>> {
   if (!PITCH_STATUSES.includes(input.toStatus)) return refuse('toStatus', 'unknown_status');
@@ -84,6 +150,8 @@ export async function transitionPitchStatus(
     async (tx) => {
       const [cell] = await tx.select().from(pitchItems).where(eq(pitchItems.id, input.pitchItemId));
       if (!cell) return failure('NOT_FOUND');
+      if (input.expectedBeforeHash !== undefined && cellHash(cell) !== input.expectedBeforeHash)
+        return failure('STATE_CHANGED');
       const from = cell.currentStatus as PitchStatus;
       const allowed =
         from === 'archived'

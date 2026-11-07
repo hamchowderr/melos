@@ -59,6 +59,8 @@ import {
   addPitchNoteInputSchema,
   CREATE_PITCH_TOOL_NAME,
   createPitchInputSchema,
+  TRANSITION_PITCH_STATUS_TOOL_NAME,
+  transitionPitchStatusInputSchema,
 } from '@/lib/agent/pitch-write-tools';
 import {
   ATTEST_REPRESENTATION_TOOL_NAME,
@@ -291,6 +293,17 @@ export function useMelosToolRenderers() {
   );
   useRenderTool(
     { name: ADD_PITCH_NOTE_TOOL_NAME, parameters: addPitchNoteInputSchema, render: pitchWritten },
+    [],
+  );
+  // A terminal move waits on ConfirmationCard with no result; other moves save at once.
+  useRenderTool(
+    {
+      name: TRANSITION_PITCH_STATUS_TOOL_NAME,
+      parameters: transitionPitchStatusInputSchema,
+      render: renderResult<PitchDTO>('Updating the pitch...', (pitch) => (
+        <PitchDetail pitch={pitch} />
+      )),
+    },
     [],
   );
   // While a write is suspended it has no result; ConfirmationCard asks (melos-qlw.3).
