@@ -12,6 +12,7 @@ import { PingCard } from '@/components/chat/ping-card';
 import { MessageThread, PitchDetail, PitchTable } from '@/components/chat/pitch-table';
 import { useReportToolRenderers } from '@/components/chat/report-renderers';
 import { SongResults } from '@/components/chat/song-results';
+import { TodayWorkspace } from '@/components/chat/today-workspace';
 import { ToolCard, ToolErrorNotice, ToolPending } from '@/components/chat/tool-card';
 import { ReadinessChecklist } from '@/components/rights/readiness-checklist';
 import { RightsPanel } from '@/components/rights/rights-panel';
@@ -43,8 +44,10 @@ import {
 import {
   GET_MESSAGE_THREAD_TOOL_NAME,
   GET_PITCH_TOOL_NAME,
+  GET_TODAY_WORKSPACE_TOOL_NAME,
   getMessageThreadInputSchema,
   getPitchInputSchema,
+  getTodayWorkspaceInputSchema,
   SEARCH_PITCHES_TOOL_NAME,
   searchPitchesInputSchema,
 } from '@/lib/agent/pitch-tools';
@@ -65,7 +68,12 @@ import { parseToolResult } from '@/lib/agent/tool-result';
 import type { MusicSearchResult, MusicWorkspaceDTO } from '@/lib/dto/catalog';
 import type { ContactDetailDTO, ContactSummary } from '@/lib/dto/contacts';
 import type { MessageThreadDTO } from '@/lib/dto/outreach';
-import type { PitchDTO, PitchEligibilityDTO, PitchSummary } from '@/lib/dto/pitches';
+import type {
+  PitchDTO,
+  PitchEligibilityDTO,
+  PitchSummary,
+  TodayWorkspaceDTO,
+} from '@/lib/dto/pitches';
 import type {
   DefaultOwnershipProposal,
   ReadinessReportDTO,
@@ -247,6 +255,16 @@ export function useMelosToolRenderers() {
       parameters: getMessageThreadInputSchema,
       render: renderResult<MessageThreadDTO>('Reading the messages...', (thread) => (
         <MessageThread thread={thread} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GET_TODAY_WORKSPACE_TOOL_NAME,
+      parameters: getTodayWorkspaceInputSchema,
+      render: renderResult<TodayWorkspaceDTO>('Opening today...', (today) => (
+        <TodayWorkspace today={today} />
       )),
     },
     [],
