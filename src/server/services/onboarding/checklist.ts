@@ -1,13 +1,12 @@
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import type { OnboardingChecklistDTO } from '../../../lib/dto/onboarding';
-import { readWorkspaceType, type WorkspaceType } from '../../../lib/workspace-type';
-import { controlDb } from '../../db/client';
-import { organization } from '../../db/schema/auth';
+import type { WorkspaceType } from '../../../lib/workspace-type';
 import { requirePermission } from '../permissions';
 import { getReadinessIssues } from '../rights/read';
 import { failure, type ServiceResult, success } from '../service-result';
 import type { TenantContext } from '../tenant-context';
 import { getWorkspaceDatabase, sanitized } from '../workspace-connections';
+import { getWorkspaceType } from './workspace-type';
 
 /** Checks answered by one SQL query; `ready_song` reads the readiness service instead. */
 const CHECKS = {
@@ -139,17 +138,6 @@ const ITEMS: ItemRule[] = [
     done: (facts) => facts.multi_song_report,
   },
 ];
-
-/** ONB-006: the active workspace's type from ctl `organization.metadata`. */
-export async function getWorkspaceType(
-  tenant: Pick<TenantContext, 'organizationId'>,
-): Promise<WorkspaceType> {
-  const [row] = await controlDb
-    .select({ metadata: organization.metadata })
-    .from(organization)
-    .where(eq(organization.id, tenant.organizationId));
-  return readWorkspaceType(row?.metadata);
-}
 
 async function readFacts(
   tenant: TenantContext,
