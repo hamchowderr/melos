@@ -201,6 +201,7 @@
         "organization_id": "01KZ45MY006S4C0G56MS3VRSJN",
         "user_id": "usr_01KZ45MY00TXFX4TCHNE00EFC4",
         "timezone": "America/Los_Angeles",
+        "onboarding_dismissed_at": null,
         "updated_at": "2026-08-03T16:00:00.000Z"
       }
     ]
