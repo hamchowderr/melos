@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { getServerEnv } from '../env';
+import { ResendEmailTransport } from '../services/outreach/resend-transport';
 
 /** An email Better Auth asks Melos to deliver. `link` is the action the recipient takes. */
 export type AuthEmail = {
@@ -20,14 +21,22 @@ export function readMemoryOutbox(): readonly AuthEmail[] {
 
 /**
  * The one auth mailer, mirroring SandboxEmailTransport (docs/CONTRACT.md §7.5): no network call,
- * JSON files under .data/auth-outbox/ in development, memory in tests. `disabled` sends and writes
- * nothing; production startup accepts only it (env.ts) until phase 8 points this at Resend. It
- * never logs a body or a link.
+ * JSON files under .data/auth-outbox/ in development, memory in tests. `resend` sends through
+ * ResendEmailTransport from MELOS_EMAIL_FROM; `disabled` sends and writes nothing. Production
+ * startup accepts only those two (env.ts). It never logs a body or a link.
  */
 export async function sendAuthEmail(email: AuthEmail): Promise<void> {
-  const { authMailer } = getServerEnv();
+  const { authMailer, resend } = getServerEnv();
   // Better Auth only logs this; auth.ts refuses the requests that would reach it.
   if (authMailer === 'disabled') throw new Error('Auth email is off (MELOS_AUTH_MAILER=disabled)');
+  if (authMailer === 'resend' && resend) {
+    const { to, subject, text } = email;
+    await new ResendEmailTransport(resend).deliver({
+      ...{ messageId: `auth_${randomUUID()}`, from: resend.from, to: [to], cc: [], bcc: [] },
+      ...{ subject, bodyText: text },
+    });
+    return;
+  }
   if (authMailer === 'memory') {
     memoryOutbox.push(email);
     return;
