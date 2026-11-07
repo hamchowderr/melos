@@ -1,5 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import {
+  GENERATE_REPORT_TOOL_NAME,
+  generateReportInputSchema,
   LIST_REPORT_TEMPLATES_TOOL_NAME,
   listReportTemplatesInputSchema,
   PREVIEW_REPORT_TOOL_NAME,
@@ -12,10 +14,12 @@ import type {
   ReportSection,
   ReportTemplateSummary,
 } from '../../lib/dto/reports';
+import { generateReport } from '../../server/services/reports/generate';
 import { previewReport } from '../../server/services/reports/preview';
 import { listReportTemplates } from '../../server/services/reports/templates';
 import { modelOutput, runTool } from './run-tool';
 
+const AGENT = { type: 'agent' as const };
 const enabledOf = (sections: ReportSection[]) =>
   sections.filter((section) => section.enabled).map((section) => section.id);
 
@@ -49,5 +53,15 @@ export const previewReportTool = createTool({
   inputSchema: previewReportInputSchema,
   outputSchema: toolResultSchema<ReportPreviewDTO>(),
   execute: (input, context) => runTool(context, (tenant) => previewReport(tenant, input)),
+  toModelOutput: modelOutput(summarizeReport),
+});
+
+export const generateReportTool = createTool({
+  id: GENERATE_REPORT_TOOL_NAME,
+  description:
+    'Save a report as an unchanging snapshot, optionally for a pitch, so a draft email can attach it by reportId.',
+  inputSchema: generateReportInputSchema,
+  outputSchema: toolResultSchema<GeneratedReportDTO>(),
+  execute: (input, context) => runTool(context, (tenant) => generateReport(tenant, input, AGENT)),
   toModelOutput: modelOutput(summarizeReport),
 });

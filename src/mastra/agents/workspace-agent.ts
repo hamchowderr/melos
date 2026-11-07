@@ -5,7 +5,7 @@ import { focusInstruction } from '../focus';
 import { createAgentMemory } from '../memory';
 import { getMusicWorkspaceTool, searchMusicTool } from '../tools/catalog';
 import { pingTool } from '../tools/ping';
-import { listReportTemplatesTool, previewReportTool } from '../tools/reports';
+import { generateReportTool, listReportTemplatesTool, previewReportTool } from '../tools/reports';
 import {
   attestRepresentationTool,
   updateLicensingContactsTool,
@@ -55,6 +55,7 @@ export const WORKSPACE_AGENT_TOOLS = {
   proposeDefaultOwnership: proposeDefaultOwnershipTool,
   listReportTemplates: listReportTemplatesTool,
   previewReport: previewReportTool,
+  generateReport: generateReportTool,
   updateWriterShares: updateWriterSharesTool,
   updatePublishingShares: updatePublishingSharesTool,
   updateMasterShares: updateMasterSharesTool,

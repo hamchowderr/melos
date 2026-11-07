@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { ReportPreviewDTO } from '../../src/lib/dto/reports';
+import type { GeneratedReportDTO, ReportPreviewDTO } from '../../src/lib/dto/reports';
 import { summarizeReport, summarizeTemplates } from '../../src/mastra/tools/reports';
 
 const { fixtures } = JSON.parse(readFileSync('fixtures/agui/reports.json', 'utf8')) as {
@@ -22,7 +22,10 @@ describe('melos-ajt.16: report tools model output (§3.6)', () => {
     });
   });
 
-  it('listReportTemplates gives id, name and preset', () => {
+  it('generateReport adds the reportId; templates give id, name and preset', () => {
+    const saved = summarizeReport(value('generateReport') as GeneratedReportDTO);
+    expect(saved).toMatchObject({ reportId: 'rpt_AGUI1', templateId: 'tpl_AGUI_SANS' });
+    expect(JSON.stringify(saved)).not.toContain('Harbor');
     expect(summarizeTemplates(value('listReportTemplates') as never)[0]).toEqual({
       templateId: 'tpl_AGUI_FULL',
       name: 'Full',

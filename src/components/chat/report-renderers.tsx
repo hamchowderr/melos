@@ -6,6 +6,8 @@ import { ToolCard } from '@/components/chat/tool-card';
 import { renderResult } from '@/components/chat/tool-renderers';
 import { Button } from '@/components/ui/button';
 import {
+  GENERATE_REPORT_TOOL_NAME,
+  generateReportInputSchema,
   LIST_REPORT_TEMPLATES_TOOL_NAME,
   listReportTemplatesInputSchema,
   PREVIEW_REPORT_TOOL_NAME,
@@ -89,6 +91,16 @@ export function useReportToolRenderers() {
       name: PREVIEW_REPORT_TOOL_NAME,
       parameters: previewReportInputSchema,
       render: renderResult<ReportPreviewDTO>('Building the report...', (report) => (
+        <ReportPreview report={report} />
+      )),
+    },
+    [],
+  );
+  useRenderTool(
+    {
+      name: GENERATE_REPORT_TOOL_NAME,
+      parameters: generateReportInputSchema,
+      render: renderResult<GeneratedReportDTO>('Saving the report...', (report) => (
         <ReportPreview report={report} />
       )),
     },
