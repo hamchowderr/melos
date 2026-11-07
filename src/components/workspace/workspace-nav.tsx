@@ -1,14 +1,15 @@
-import { BookOpen, MessageSquare, Scale, Settings, Users } from 'lucide-react';
+import { BookOpen, Mail, MessageSquare, Scale, Settings, Users } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
-export type WorkspaceSection = 'chat' | 'catalog' | 'rights' | 'people' | 'settings';
+export type WorkspaceSection = 'chat' | 'catalog' | 'rights' | 'people' | 'outreach' | 'settings';
 
 const SECTIONS = [
   { section: 'chat', href: '/', label: 'Chat', Icon: MessageSquare },
   { section: 'catalog', href: '/catalog', label: 'Catalog', Icon: BookOpen },
   { section: 'rights', href: '/rights', label: 'Rights', Icon: Scale },
   { section: 'people', href: '/people', label: 'People', Icon: Users },
+  { section: 'outreach', href: '/outreach', label: 'Outreach', Icon: Mail },
   { section: 'settings', href: '/settings', label: 'Settings', Icon: Settings },
 ] as const;
 
