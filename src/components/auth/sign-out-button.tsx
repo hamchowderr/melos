@@ -28,7 +28,7 @@ export function SignOutButton(props: Props) {
   return (
     <>
       <Button type="button" disabled={pending} onClick={signOut} {...props}>
-        {pending ? 'Signing out...' : 'Sign out'}
+        {pending ? 'Signing out...' : 'Sign Out'}
       </Button>
       {error ? (
         <span role="alert" className="text-sm text-destructive">

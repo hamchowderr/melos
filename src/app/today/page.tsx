@@ -41,9 +41,9 @@ export default async function TodayPage() {
               <FollowUpQueue cells={today.value.followUpsDue} />
               <TodaySide today={today.value} />
             </div>
-            <section aria-label="Readiness issues" className="flex flex-col gap-1.5">
+            <section aria-label="Readiness Issues" className="flex flex-col gap-1.5">
               <h2 className="text-sm font-medium">
-                Readiness issues{' '}
+                Readiness Issues{' '}
                 <span className="font-normal text-muted-foreground">
                   {today.value.readinessIssues.recordings.length}
                 </span>

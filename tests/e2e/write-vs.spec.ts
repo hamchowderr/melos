@@ -73,7 +73,7 @@ test('WRITE-VS-001: the DEMO-008 split waits for approval, then saves and audits
   await addOceanBlue(page);
   await ask(page, 'change alex split on ocean blue to 40%');
 
-  const card = page.getByRole('region', { name: 'Approve this change' });
+  const card = page.getByRole('region', { name: 'Approve This Change' });
   await expect(card).toBeVisible({ timeout: 60_000 });
   await expect(card.getByRole('list', { name: 'Before' })).toContainText(/Alex Ramirez.*50\.00%/);
   await expect(card.getByRole('list', { name: 'After' })).toContainText(/Alex Ramirez.*40\.00%/);

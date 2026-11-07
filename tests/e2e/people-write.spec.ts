@@ -34,7 +34,7 @@ test('melos-rpr.30: an owner creates, renames and reaches people and organizatio
   page,
 }) => {
   await signUpWithWorkspace(page, 'People');
-  const riley = await create(page, 'New person', 'Riley Stone', 'riley@example.test');
+  const riley = await create(page, 'New Person', 'Riley Stone', 'riley@example.test');
   await expect(detail(page, 'Email')).toHaveText('riley@example.test');
 
   await open(page, 'Edit');
@@ -45,8 +45,8 @@ test('melos-rpr.30: an owner creates, renames and reaches people and organizatio
   await page.reload();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Riley Stone-Hart');
 
-  await open(page, 'Contact methods');
-  await dialog(page).getByRole('button', { name: 'Add method' }).click();
+  await open(page, 'Contact Methods');
+  await dialog(page).getByRole('button', { name: 'Add Method' }).click();
   await dialog(page).getByLabel('Method 2 value').fill('+1 555 0100');
   await dialog(page).getByRole('checkbox').nth(1).check();
   await dialog(page).getByRole('button', { name: 'Save' }).click();
@@ -55,12 +55,12 @@ test('melos-rpr.30: an owner creates, renames and reaches people and organizatio
   await expect(detail(page, 'Phone')).toHaveText('+1 555 0100');
   await expect(detail(page, 'Email')).toHaveText('riley@example.test');
 
-  await create(page, 'New organization', 'Harbor Lane Music');
+  await create(page, 'New Organization', 'Harbor Lane Music');
   await expect(detail(page, 'Kind')).toHaveText('Organization');
 
   // §6.15: the same name, any case, is a possible duplicate, which never blocks the save.
   await page.goto('/people');
-  await open(page, 'New person');
+  await open(page, 'New Person');
   await dialog(page).getByLabel('Name').fill('riley stone-hart');
   await dialog(page).getByLabel('Email').focus();
   await expect(dialog(page).getByText('Possible duplicate:')).toBeVisible();
@@ -74,7 +74,7 @@ test('melos-rpr.30: deleting a writer shows the block, and controls follow the r
   page,
 }) => {
   await signUpWithWorkspace(page, 'Writer');
-  const sam = await create(page, 'New person', 'Sam Park');
+  const sam = await create(page, 'New Person', 'Sam Park');
   const at = new Date().toISOString();
   await insertWorkspaceRows(page, {
     compositions: [{ id: 'cmp_TIDE', title: 'Tide Song', created_at: at, updated_at: at }],
@@ -92,13 +92,13 @@ test('melos-rpr.30: deleting a writer shows the block, and controls follow the r
   const organizationId = await activeOrganizationId(page);
   await setMemberRole(organizationId, 'member');
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Contact methods' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Contact Methods' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
   await setMemberRole(organizationId, 'viewer');
   await page.reload();
   await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Contact methods' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Contact Methods' })).toHaveCount(0);
   await page.goto('/people');
   await expect(page.getByRole('table')).toContainText('Sam Park');
-  await expect(page.getByRole('button', { name: 'New person' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New Person' })).toHaveCount(0);
 });

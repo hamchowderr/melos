@@ -8,7 +8,7 @@ type Props = {
   required?: boolean;
 };
 
-/** "Which describes you?" (ONB-001, ONB-002): the five workspace types as one radio group. */
+/** "Which Describes You?" (ONB-001, ONB-002): the five workspace types as one radio group. */
 export function WorkspaceTypePicker({
   name = 'workspaceType',
   defaultValue,
@@ -21,7 +21,7 @@ export function WorkspaceTypePicker({
       disabled={disabled}
       data-testid="workspace-type-picker"
     >
-      <legend className="mb-1.5 font-medium text-sm">Which describes you?</legend>
+      <legend className="mb-1.5 font-medium text-sm">Which Describes You?</legend>
       {WORKSPACE_TYPES.map((type) => {
         const info = WORKSPACE_TYPE_INFO[type];
         return (
@@ -29,7 +29,7 @@ export function WorkspaceTypePicker({
             key={type}
             className={cn(
               'flex cursor-pointer items-start gap-3 rounded-lg bg-muted/50 px-3 py-2.5 transition-colors',
-              'hover:bg-muted has-[:checked]:bg-primary/10 has-[:checked]:ring-1 has-[:checked]:ring-primary/40',
+              'hover:bg-muted has-[:checked]:bg-primary/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50',
               'has-[:disabled]:cursor-default has-[:disabled]:opacity-70',
             )}
           >

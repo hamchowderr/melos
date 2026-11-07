@@ -23,7 +23,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ id:
       {invitation ? (
         <InvitationResponse invitation={invitation} />
       ) : (
-        <PageCard title="Workspace invitation">
+        <PageCard title="Workspace Invitation">
           <p className="text-muted-foreground">
             {session.user.emailVerified
               ? 'This invitation has expired, was already answered, or was sent to another address.'

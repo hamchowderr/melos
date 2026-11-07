@@ -23,15 +23,15 @@ test('melos-rpr.35: a primary link with a 0:30 start shows on the song page (CAT
   });
   await page.goto('/catalog/compositions/cmp_TIDE');
 
-  await open(page, 'Edit recording');
-  await dialog(page).getByLabel('Preview start').fill('0:30');
+  await open(page, 'Edit Recording');
+  await dialog(page).getByLabel('Preview Start').fill('0:30');
   await dialog(page).getByRole('button', { name: 'Save' }).click();
   await expect(dialog(page)).toHaveCount(0);
 
-  await open(page, 'Edit links');
-  await dialog(page).getByRole('button', { name: 'Add link' }).click();
+  await open(page, 'Edit Links');
+  await dialog(page).getByRole('button', { name: 'Add Link' }).click();
   await dialog(page).getByLabel('Link 1 URL').fill('https://player.example.test/tide');
-  await dialog(page).getByRole('button', { name: 'Add link' }).click();
+  await dialog(page).getByRole('button', { name: 'Add Link' }).click();
   await dialog(page).getByLabel('Link 2 URL').fill('https://files.example.test/tide.wav');
   await dialog(page).getByLabel('Link 2 type').selectOption('cloud_file');
   await dialog(page).getByLabel('Link 2 label').fill('Stems');

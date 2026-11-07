@@ -104,7 +104,7 @@ export function ReleaseForm({ recordings, organizations }: Props) {
   return (
     <Dialog open={open} onOpenChange={toggle}>
       <DialogTrigger render={<Button variant="outline" className="self-start" />}>
-        Add release
+        Add Release
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <form
@@ -115,7 +115,7 @@ export function ReleaseForm({ recordings, organizations }: Props) {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Add release</DialogTitle>
+            <DialogTitle>Add Release</DialogTitle>
           </DialogHeader>
           <FieldGroup>
             <Field>
@@ -153,7 +153,7 @@ export function ReleaseForm({ recordings, organizations }: Props) {
             {picker('label', 'Label')}
             {picker('distributor', 'Distributor')}
             <Field>
-              <FieldLabel htmlFor="release-date">Release date</FieldLabel>
+              <FieldLabel htmlFor="release-date">Release Date</FieldLabel>
               <Input
                 id="release-date"
                 type="date"
@@ -167,7 +167,7 @@ export function ReleaseForm({ recordings, organizations }: Props) {
               key={row.key}
               className="flex flex-wrap items-center gap-2 rounded-md border p-2"
             >
-              <legend className="px-1 text-sm font-medium">{`Track row ${i + 1}`}</legend>
+              <legend className="px-1 text-sm font-medium">{`Track Row ${i + 1}`}</legend>
               <NativeSelect
                 aria-label={`Track row ${i + 1} recording`}
                 value={row.recordingId}
@@ -213,7 +213,7 @@ export function ReleaseForm({ recordings, organizations }: Props) {
               ])
             }
           >
-            Add track
+            Add Track
           </Button>
           {error ? (
             <Alert variant="destructive">

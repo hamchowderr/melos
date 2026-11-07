@@ -23,7 +23,7 @@ export async function signUp(page: Page, label: string): Promise<TestUser> {
   await page.getByLabel('Name').fill(`${label} Test`);
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Create account' }).click();
+  await page.getByRole('button', { name: 'Create Account' }).click();
   await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
   return { email, password };
 }
@@ -36,7 +36,7 @@ export async function signIn(
 ): Promise<void> {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign In' }).click();
   await expect(page).toHaveURL(landing, AUTH_REDIRECT);
 }
 
@@ -73,11 +73,11 @@ export async function signUpWithWorkspace(page: Page, label: string): Promise<st
 export async function createWorkspace(
   page: Page,
   workspaceName: string,
-  typeLabel = 'Songwriter or artist',
+  typeLabel = 'Songwriter or Artist',
 ): Promise<void> {
-  await page.getByLabel('Workspace name').fill(workspaceName);
+  await page.getByLabel('Workspace Name').fill(workspaceName);
   await page.getByRole('radio', { name: typeLabel }).check();
-  await page.getByRole('button', { name: 'Create workspace' }).click();
+  await page.getByRole('button', { name: 'Create Workspace' }).click();
   const origin = new URL(page.url()).origin;
   // ONB-005: the type's start page first; callers then work from Chat, as a later sign-in does.
   await expect(page).toHaveURL(new RegExp(`^${origin}/(catalog|today)$`), AUTH_REDIRECT);

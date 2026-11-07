@@ -70,7 +70,7 @@ function DraftEditor({
   return (
     <div className="flex flex-col gap-3 px-4 pb-4">
       <NativeSelect aria-label="To" value={to} onChange={(event) => setTo(event.target.value)}>
-        <NativeSelectOption value="">No recipient</NativeSelectOption>
+        <NativeSelectOption value="">No Recipient</NativeSelectOption>
         {row.emails.map((email) => (
           <NativeSelectOption key={email.contactMethodId} value={email.contactMethodId}>
             {`${row.contactName} <${email.address}>`}
@@ -86,7 +86,7 @@ function DraftEditor({
       />
       <div className="flex items-center gap-2">
         <Button size="sm" variant="outline" disabled={busy} onClick={onSave}>
-          Save draft
+          Save Draft
         </Button>
         <AlertDialog>
           <AlertDialogTrigger render={<Button size="sm" disabled={busy || !address} />}>
@@ -145,7 +145,7 @@ function NewDraft({ pitches, onDone }: { pitches: PitchOption[]; onDone: () => v
           disabled={busy || !pitchId || !subject.trim() || !body.trim()}
           onClick={create}
         >
-          Create draft
+          Create Draft
         </Button>
         {error ? <span className="text-xs text-destructive">{error}</span> : null}
       </div>
@@ -191,7 +191,7 @@ export function OutreachBoard({
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <Button size="sm" onClick={() => setOpen('new')}>
-          New draft
+          New Draft
         </Button>
         {note ? (
           <span role="status" className="text-xs text-muted-foreground">
@@ -239,7 +239,7 @@ export function OutreachBoard({
         <SheetContent className="overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
-              {row ? (row.status === 'draft' ? 'Email draft' : 'Email') : 'New draft'}
+              {row ? (row.status === 'draft' ? 'Email Draft' : 'Email') : 'New Draft'}
             </SheetTitle>
           </SheetHeader>
           {open === 'new' ? (

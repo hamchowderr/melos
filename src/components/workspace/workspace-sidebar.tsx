@@ -16,7 +16,7 @@ export function WorkspaceSidebarContent({ workspaceName, current, menu }: Worksp
     <div className="flex h-full flex-col gap-3 p-2">
       <Link
         href="/workspaces"
-        aria-label="Switch workspace"
+        aria-label="Switch Workspace"
         className="flex items-center gap-2 rounded-md p-1.5 hover:bg-sidebar-accent"
       >
         <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">

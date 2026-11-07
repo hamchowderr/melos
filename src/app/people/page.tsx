@@ -27,13 +27,13 @@ export default async function PeoplePage() {
   return (
     <WorkspaceShell workspaceName={workspace.workspaceName} current="people">
       <PageHeader
-        title="People and organizations"
+        title="People and Organizations"
         count={parties.ok ? partyCount(parties.value.length) : undefined}
       >
         {creates ? (
           <>
-            <PartyForm kind="person" label="New person" />
-            <PartyForm kind="organization" label="New organization" />
+            <PartyForm kind="person" label="New Person" />
+            <PartyForm kind="organization" label="New Organization" />
           </>
         ) : null}
       </PageHeader>

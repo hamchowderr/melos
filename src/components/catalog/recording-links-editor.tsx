@@ -72,7 +72,7 @@ export function RecordingLinksEditor({ recordingId, title, links }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" className="self-start" />}>
-        Edit links
+        Edit Links
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <form
@@ -145,7 +145,7 @@ export function RecordingLinksEditor({ recordingId, title, links }: Props) {
               setRows([...rows, { key: nextKey++, url: '', linkType: 'private_player', label: '' }])
             }
           >
-            Add link
+            Add Link
           </Button>
           {error ? (
             <Alert variant="destructive">

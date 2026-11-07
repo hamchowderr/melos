@@ -30,7 +30,7 @@ export function InvitationResponse({ invitation }: { invitation: Invitation }) {
   }
 
   return (
-    <PageCard title="Workspace invitation">
+    <PageCard title="Workspace Invitation">
       <p className="text-muted-foreground">
         {invitation.inviterEmail} invited you to{' '}
         <strong className="font-medium text-foreground" data-testid="invitation-workspace-name">
@@ -49,7 +49,7 @@ export function InvitationResponse({ invitation }: { invitation: Invitation }) {
       ) : null}
       <div className="flex flex-col gap-2">
         <Button type="button" disabled={pending} onClick={() => respond(true)}>
-          Accept invitation
+          Accept Invitation
         </Button>
         <Button type="button" variant="outline" disabled={pending} onClick={() => respond(false)}>
           Decline

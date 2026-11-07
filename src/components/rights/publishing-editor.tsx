@@ -24,7 +24,7 @@ export function PublishingEditor({ compositionId, publishing, hashes, ...options
             {territory}
           </TabsTrigger>
         ))}
-        <TabsTrigger value="new">New territory</TabsTrigger>
+        <TabsTrigger value="new">New Territory</TabsTrigger>
       </TabsList>
       {publishing.map(({ territory, holders }) => (
         <TabsContent key={territory} value={territory} className="flex flex-col pt-2">
@@ -41,7 +41,7 @@ export function PublishingEditor({ compositionId, publishing, hashes, ...options
         <HolderSplitEditor
           {...options}
           target={{ side: 'publishing', compositionId, territory: null }}
-          label="Add publishing set"
+          label="Add Publishing Set"
           beforeHash={hashes.empty}
           holders={[]}
         />

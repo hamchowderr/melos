@@ -60,17 +60,17 @@ export function CreateWorkspaceForm() {
   }
 
   return (
-    <PageCard title="Create a workspace">
+    <PageCard title="Create a Workspace">
       <form onSubmit={onSubmit}>
         <FieldGroup>
           <Field>
-            <FieldLabel htmlFor="name">Workspace name</FieldLabel>
+            <FieldLabel htmlFor="name">Workspace Name</FieldLabel>
             <Input id="name" name="name" autoComplete="organization" required maxLength={80} />
           </Field>
           <WorkspaceTypePicker required />
           <FieldError>{error}</FieldError>
           <Button type="submit" disabled={pending}>
-            {pending ? 'Creating workspace...' : 'Create workspace'}
+            {pending ? 'Creating workspace...' : 'Create Workspace'}
           </Button>
         </FieldGroup>
       </form>

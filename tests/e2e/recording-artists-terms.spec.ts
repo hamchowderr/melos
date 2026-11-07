@@ -36,10 +36,10 @@ test('melos-rpr.39: an owner credits a featured artist and tags a genre (CAT-003
   });
   await page.goto('/catalog/compositions/cmp_DUSK');
 
-  await open(page, 'Edit artists');
-  await dialog(page).getByRole('button', { name: 'Add artist' }).click();
+  await open(page, 'Edit Artists');
+  await dialog(page).getByRole('button', { name: 'Add Artist' }).click();
   await dialog(page).getByLabel('Artist 1 party').selectOption({ label: 'Riley Stone' });
-  await dialog(page).getByRole('button', { name: 'Add artist' }).click();
+  await dialog(page).getByRole('button', { name: 'Add Artist' }).click();
   await dialog(page).getByLabel('Artist 2 party').selectOption({ label: 'Alex Ramirez' });
   await dialog(page).getByLabel('Artist 2 role').selectOption('featured');
   await dialog(page).getByLabel('Artist 2 alias').selectOption({ label: 'DJ Alex' });
@@ -48,7 +48,7 @@ test('melos-rpr.39: an owner credits a featured artist and tags a genre (CAT-003
   const chips = page.getByRole('list', { name: 'Artists' }).getByRole('listitem');
   await expect(chips).toHaveText(['Riley Stone', 'feat. DJ Alex']);
 
-  await open(page, 'Edit terms');
+  await open(page, 'Edit Terms');
   await dialog(page).getByLabel('Genre').fill('Synth Pop, Electronic');
   await dialog(page).getByRole('button', { name: 'Save' }).click();
   await expect(dialog(page)).toHaveCount(0);

@@ -10,7 +10,7 @@ async function newDraft(page: Page, subject: string) {
     .getByRole('link', { name: 'Outreach' })
     .click();
   await expect(page.getByRole('heading', { name: 'Outreach' })).toBeVisible();
-  await page.getByRole('button', { name: 'New draft' }).click();
+  await page.getByRole('button', { name: 'New Draft' }).click();
   const sheet = page.getByRole('dialog');
   const pitch = sheet.getByRole('combobox', { name: 'Pitch' });
   const value = await pitch
@@ -19,7 +19,7 @@ async function newDraft(page: Page, subject: string) {
   await pitch.selectOption(value ?? '');
   await sheet.getByRole('textbox', { name: 'Subject' }).fill(subject);
   await sheet.getByRole('textbox', { name: 'Body' }).fill('Checking in on Neon Static.');
-  await sheet.getByRole('button', { name: 'Create draft' }).click();
+  await sheet.getByRole('button', { name: 'Create Draft' }).click();
   const row = page.getByRole('row', { name: `${subject} to Malik Johnson` });
   await expect(row).toContainText('Draft');
   return row;
@@ -31,7 +31,7 @@ test('OUT-E2E-001: a draft is created from a pitch and its edits are saved', asy
   const sheet = page.getByRole('dialog');
   await expect(sheet.getByRole('combobox', { name: 'To' })).toContainText('Malik Johnson <');
   await sheet.getByRole('textbox', { name: 'Subject' }).fill('Neon Static, one more listen');
-  await sheet.getByRole('button', { name: 'Save draft' }).click();
+  await sheet.getByRole('button', { name: 'Save Draft' }).click();
   await expect(sheet).toContainText('Draft saved.');
   await page.keyboard.press('Escape');
   await page.reload();

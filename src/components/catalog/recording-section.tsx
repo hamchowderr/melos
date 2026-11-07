@@ -78,7 +78,7 @@ export function RecordingSection({ recording, readiness, editor, media }: Props)
               ['Key', recording.musicalKey],
               ['Contributors', credits.join(', ')],
               ...terms,
-              ['Other links', others.length === 0 ? null : otherLinks],
+              ['Other Links', others.length === 0 ? null : otherLinks],
             ]}
           />
         </CardContent>

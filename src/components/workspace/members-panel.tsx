@@ -146,8 +146,8 @@ export function MembersPanel({
       </Table>
       {invitations.length > 0 ? (
         <section className="flex flex-col gap-2">
-          <h2 className="font-medium">Pending invitations</h2>
-          <ul className="divide-y border-y" aria-label="Pending invitations">
+          <h2 className="font-medium">Pending Invitations</h2>
+          <ul className="divide-y border-y" aria-label="Pending Invitations">
             {invitations.map(({ id, email, role, expires, invitedBy }) => (
               <li key={id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
                 <span className="min-w-0 flex-1 text-muted-foreground">
@@ -194,7 +194,7 @@ export function MembersPanel({
               </Field>
             </div>
             <Button type="submit" className="self-start" disabled={pending}>
-              Send invitation
+              Send Invitation
             </Button>
           </FieldGroup>
         </form>

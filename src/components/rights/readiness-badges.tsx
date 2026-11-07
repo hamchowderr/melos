@@ -12,10 +12,10 @@ export function ReadinessBadges({ oneStopReady, syncReady }: Props) {
   return (
     <span className="inline-flex flex-wrap gap-1" data-testid="readiness">
       <Badge variant="secondary" className={oneStopReady ? READY : NOT_READY}>
-        {oneStopReady ? 'One Stop Ready' : 'Not one-stop ready'}
+        {oneStopReady ? 'One Stop Ready' : 'Not One Stop Ready'}
       </Badge>
       <Badge variant="secondary" className={syncReady ? READY : NOT_READY}>
-        {syncReady ? 'Sync ready' : 'Not sync ready'}
+        {syncReady ? 'Sync Ready' : 'Not Sync Ready'}
       </Badge>
     </span>
   );

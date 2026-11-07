@@ -31,7 +31,7 @@ export function FollowUpQueue({ cells }: { cells: PitchSummary[] }) {
               <TableHead>Song</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Last contact</TableHead>
+              <TableHead>Last Contact</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -98,7 +98,7 @@ function SideList({
 export function TodaySide({ today }: { today: TodayWorkspaceDTO }) {
   return (
     <div className="flex flex-col gap-4">
-      <SideList title="Recent replies" empty="No replies this week.">
+      <SideList title="Recent Replies" empty="No replies this week.">
         {today.recentReplies.map((cell) => (
           <li key={cell.pitchItemId} className="flex items-center gap-2 rounded-md px-2 py-1.5">
             <Link href={songHref(cell)} className="min-w-0 flex-1 truncate hover:underline">
@@ -111,7 +111,7 @@ export function TodaySide({ today }: { today: TodayWorkspaceDTO }) {
           </li>
         ))}
       </SideList>
-      <SideList title="Ready to pitch" empty="No one-stop-ready song is waiting.">
+      <SideList title="Ready to Pitch" empty="No one-stop-ready song is waiting.">
         {today.readyToPitch.map((song) => (
           <li key={song.recordingId} className="flex items-center gap-2 rounded-md px-2 py-1.5">
             <Link

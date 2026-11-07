@@ -124,7 +124,7 @@ function SongPanel({ song, onClose }: { song: SongListItem | null; onClose: () =
               </dd>
               <dt className="text-muted-foreground">ISWC</dt>
               <dd className="tabular-nums">{song.iswc ? formatIswc(song.iswc) : '—'}</dd>
-              <dt className="text-muted-foreground">Also known as</dt>
+              <dt className="text-muted-foreground">Also Known As</dt>
               <dd>{song.altTitles.join(', ') || '—'}</dd>
               <dt className="text-muted-foreground">Recordings</dt>
               <dd>
@@ -143,7 +143,7 @@ function SongPanel({ song, onClose }: { song: SongListItem | null; onClose: () =
             </dl>
             <SheetFooter className="border-t">
               <Link href={songHref(song)} className={buttonVariants()}>
-                Open song
+                Open Song
               </Link>
             </SheetFooter>
           </>
@@ -161,7 +161,7 @@ export function SongGrid({ songs }: { songs: SongListItem[] }) {
     return (
       <Empty className="border">
         <EmptyHeader>
-          <EmptyTitle>No songs yet</EmptyTitle>
+          <EmptyTitle>No Songs Yet</EmptyTitle>
           <EmptyDescription>Songs in this workspace are listed here.</EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -196,7 +196,7 @@ export function SongGrid({ songs }: { songs: SongListItem[] }) {
           <TableHeader>
             <TableRow>
               <SortHead label="Title" column="title" sort={sort} onSort={setSort} />
-              <SortHead label="Primary artists" column="artists" sort={sort} onSort={setSort} />
+              <SortHead label="Primary Artists" column="artists" sort={sort} onSort={setSort} />
               <TableHead>ISWC</TableHead>
               <TableHead>ISRC</TableHead>
               <TableHead>Readiness</TableHead>

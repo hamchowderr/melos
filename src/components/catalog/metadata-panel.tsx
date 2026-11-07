@@ -30,10 +30,10 @@ export const REFUSED: Record<string, string> = {
 
 const FIELDS = [
   ['title', 'Title'],
-  ['altTitles', 'Alternate titles'],
+  ['altTitles', 'Alternate Titles'],
   ['iswc', 'ISWC'],
-  ['copyrightRegistrationNumber', 'Copyright registration'],
-  ['copyrightDate', 'Copyright date'],
+  ['copyrightRegistrationNumber', 'Copyright Registration'],
+  ['copyrightDate', 'Copyright Date'],
   ['description', 'Description'],
   ['lyrics', 'Lyrics'],
 ] as const;
@@ -85,7 +85,7 @@ export function MetadataPanel({ composition }: { composition?: CompositionDTO })
   const [matches, setMatches] = useState<CompositionDuplicate[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const label = composition ? 'Edit' : 'New song';
+  const label = composition ? 'Edit' : 'New Song';
 
   const check = () => {
     if (composition) return;
@@ -120,7 +120,7 @@ export function MetadataPanel({ composition }: { composition?: CompositionDTO })
           }}
         >
           <DialogHeader>
-            <DialogTitle>{composition ? 'Edit song' : 'New song'}</DialogTitle>
+            <DialogTitle>{composition ? 'Edit Song' : 'New Song'}</DialogTitle>
           </DialogHeader>
           <FieldGroup>
             {FIELDS.map(([key, name]) => {

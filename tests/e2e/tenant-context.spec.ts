@@ -111,7 +111,7 @@ test('melos-2lm: a user with no workspace is still sent to /workspaces/new', asy
   await signIn(page, await signUp(page, 'Empty'));
   await page.goto('/workspaces');
   await expect(page).toHaveURL(/\/workspaces\/new$/);
-  await expect(page.getByRole('heading', { name: 'Create a workspace' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Create a Workspace' })).toBeVisible();
 });
 
 /** Signs up a user who owns two workspaces, named with `labels`; the second is active. */
@@ -131,8 +131,8 @@ const workspaceButtons = (page: Page) =>
 test('melos-g4u: a signed-in user signs out from the workspace header', async ({ page }) => {
   await signUpWithWorkspace(page, 'Leave');
   await page.goto('/settings');
-  await expect(page.getByRole('link', { name: 'Switch workspace' })).toBeVisible();
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page.getByRole('link', { name: 'Switch Workspace' })).toBeVisible();
+  await page.getByRole('button', { name: 'Sign Out' }).click();
   await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
   await page.goto('/');
   await expect(page).toHaveURL(/\/sign-in$/);
@@ -142,7 +142,7 @@ test('melos-g4u: a member of two workspaces switches from the workspace header',
   page,
 }) => {
   const { names, firstId } = await signUpWithTwoWorkspaces(page, 'Header', ['North', 'South']);
-  await page.getByRole('link', { name: 'Switch workspace' }).click();
+  await page.getByRole('link', { name: 'Switch Workspace' }).click();
   await expect(page).toHaveURL(/\/workspaces$/);
 
   // Holds set-active so the chosen button's pending text can be seen.
@@ -176,16 +176,16 @@ test('melos-g4u: a member stuck on a failed workspace switches or signs out from
 
   await page.reload();
   await expect(notReady).toHaveAttribute('data-status', 'failed');
-  await page.getByRole('link', { name: 'Switch workspace' }).click();
+  await page.getByRole('link', { name: 'Switch Workspace' }).click();
   await workspaceButtons(page).filter({ hasText: names[0] }).click();
   await expect(page).toHaveURL(home, AUTH_REDIRECT);
   await expect(page.getByTestId('active-workspace-name')).toHaveText(names[0]);
   await expectPing(page, firstId);
 
-  await page.getByRole('link', { name: 'Switch workspace' }).click();
+  await page.getByRole('link', { name: 'Switch Workspace' }).click();
   await workspaceButtons(page).filter({ hasText: names[1] }).click();
   await expect(notReady).toHaveAttribute('data-status', 'failed', AUTH_REDIRECT);
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('button', { name: 'Sign Out' }).click();
   await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
   await page.goto('/');
   await expect(page).toHaveURL(/\/sign-in$/);
@@ -204,13 +204,13 @@ test('melos-g4u: a member whose active workspace has an invalid role picks from 
     await expect(workspaceButtons(page)).toHaveCount(1);
     await expect(workspaceButtons(page)).toContainText(names[0]);
   }
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('button', { name: 'Sign Out' }).click();
   await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
 });
 
 test('melos-g4u: a user with no workspace signs out from /workspaces/new', async ({ page }) => {
   await signIn(page, await signUp(page, 'Nowhere'));
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('button', { name: 'Sign Out' }).click();
   await expect(page).toHaveURL(/\/sign-in$/, AUTH_REDIRECT);
   await page.goto('/workspaces/new');
   await expect(page).toHaveURL(/\/sign-in$/);
@@ -223,7 +223,7 @@ test('melos-g4u: a sign-out that fails on the network shows its error and can be
   page,
 }) => {
   await signUpWithWorkspace(page, 'Offline');
-  const signOut = page.getByRole('button', { name: 'Sign out' });
+  const signOut = page.getByRole('button', { name: 'Sign Out' });
   // An aborted request makes the auth client throw instead of returning an error.
   await page.route('**/api/auth/sign-out', (route) => route.abort());
   await signOut.click();
@@ -242,15 +242,15 @@ test('melos-g4u: on a phone, the workspace menu fits, with or without a sign-out
   const workspaceName = await signUpWithWorkspace(page, 'Phone');
   await page.route('**/api/auth/sign-out', (route) => route.abort());
   // Below md the sidebar is a drawer behind the top bar's menu button.
-  await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.getByRole('button', { name: 'Open Menu' }).click();
   const menu = page.getByRole('dialog', { name: workspaceName });
-  const signOut = menu.getByRole('button', { name: 'Sign out' });
+  const signOut = menu.getByRole('button', { name: 'Sign Out' });
 
   for (const failed of [false, true]) {
     if (failed) await signOut.click();
     if (failed) await expect(signOutError(page)).toBeInViewport({ ratio: 1 });
     await expect(menu.getByRole('navigation', { name: 'Workspace' })).toBeInViewport();
-    await expect(menu.getByRole('link', { name: 'Switch workspace' })).toBeInViewport({ ratio: 1 });
+    await expect(menu.getByRole('link', { name: 'Switch Workspace' })).toBeInViewport({ ratio: 1 });
     await expect(signOut).toBeInViewport({ ratio: 1 });
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

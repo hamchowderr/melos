@@ -9,6 +9,6 @@ test('melos-ajt.1: the owner sees the North Star by week', async ({ page }) => {
     .getByRole('navigation', { name: 'Settings' })
     .getByRole('link', { name: 'North Star' })
     .click();
-  const weeks = page.getByRole('table', { name: 'North Star by week' });
+  const weeks = page.getByRole('table', { name: 'North Star by Week' });
   await expect(weeks.getByRole('row', { name: /^Week of \d/ })).toHaveCount(4);
 });

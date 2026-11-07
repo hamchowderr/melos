@@ -23,11 +23,11 @@ export function ContactCard({ contact }: { contact: ContactDetailDTO }) {
           href={`/people/${contact.partyId}`}
           className="shrink-0 rounded-md bg-muted px-2.5 py-1 text-xs font-medium hover:bg-muted/70"
         >
-          Open contact
+          Open Contact
         </Link>
       </div>
       {contact.methods.length > 0 ? (
-        <ul aria-label="Contact methods" className="flex flex-col gap-0.5 px-4 pb-2 text-xs">
+        <ul aria-label="Contact Methods" className="flex flex-col gap-0.5 px-4 pb-2 text-xs">
           {contact.methods.map((method) => (
             <li key={method.id}>
               <span className="text-muted-foreground">{method.label ?? method.methodType}</span>{' '}
@@ -36,7 +36,7 @@ export function ContactCard({ contact }: { contact: ContactDetailDTO }) {
           ))}
         </ul>
       ) : null}
-      <ul aria-label="Pitched songs" className="flex flex-col">
+      <ul aria-label="Pitched Songs" className="flex flex-col">
         {contact.pitchItems.length === 0 ? (
           <li className="px-4 pb-3 text-muted-foreground">Nothing pitched yet.</li>
         ) : (
@@ -55,7 +55,7 @@ export function ContactCard({ contact }: { contact: ContactDetailDTO }) {
         )}
       </ul>
       {contact.recentMessages.length > 0 ? (
-        <ul aria-label="Recent messages" className="flex flex-col gap-0.5 px-4 py-2 text-xs">
+        <ul aria-label="Recent Messages" className="flex flex-col gap-0.5 px-4 py-2 text-xs">
           {contact.recentMessages.map((message) => (
             <li key={message.messageId} className="truncate">
               <span className="text-muted-foreground">

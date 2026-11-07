@@ -28,13 +28,13 @@ export function PartyDetails({ party }: { party: PartyDetailDTO }) {
   const organizationType = organization?.organizationType;
   const details: [string, ReactNode][] = [
     ['Kind', party.partyKind === 'person' ? 'Person' : 'Organization'],
-    ['Legal name', (person ?? organization)?.legalName],
-    ['Given name', person?.givenName],
-    ['Family name', person?.familyName],
-    ['Organization type', organizationType ? words(organizationType) : null],
+    ['Legal Name', (person ?? organization)?.legalName],
+    ['Given Name', person?.givenName],
+    ['Family Name', person?.familyName],
+    ['Organization Type', organizationType ? words(organizationType) : null],
     ['Website', organization?.websiteUrl],
     ['Company', company],
-    ['Contact roles', roles],
+    ['Contact Roles', roles],
     ...METHOD_TERMS.map(([type, term]): [string, ReactNode] => [term, join(methodsOf(type))]),
     ['Aliases', join(party.aliases.map(({ aliasName }) => aliasName))],
     [

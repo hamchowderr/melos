@@ -7,7 +7,7 @@ import { formatIswc } from '@/lib/identifiers';
 
 /** searchMusic's SongGrid (§3.3): one row per song with its artists, ISWC and readiness. */
 export function SongResults({ results }: { results: MusicSearchResult[] }) {
-  const title = 'Song search results';
+  const title = 'Song Search Results';
   if (results.length === 0) {
     return (
       <ToolCard title={title}>

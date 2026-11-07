@@ -73,7 +73,7 @@ function IssuesPanel({ recording, onClose }: { recording: Recording | null; onCl
             </ul>
             <SheetFooter>
               <Link href={songHref(recording)} className={buttonVariants()}>
-                Open song
+                Open Song
               </Link>
             </SheetFooter>
           </>
@@ -90,7 +90,7 @@ export function ReadinessChecklist({ recordings, onlyNotReady }: Props) {
     return (
       <Empty className="border">
         <EmptyHeader>
-          <EmptyTitle>{onlyNotReady ? 'Every recording is ready' : 'No recordings yet'}</EmptyTitle>
+          <EmptyTitle>{onlyNotReady ? 'Every Recording Is Ready' : 'No Recordings Yet'}</EmptyTitle>
           <EmptyDescription>
             {onlyNotReady
               ? 'No recording has a blocking issue.'

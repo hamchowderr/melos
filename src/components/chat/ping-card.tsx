@@ -2,7 +2,7 @@ import type { PingResult } from '@/lib/agent/contract';
 
 export function PingCard({ result }: { result: PingResult }) {
   return (
-    <section className="ping-card" data-testid="ping-card" aria-label="Workspace ping result">
+    <section className="ping-card" data-testid="ping-card" aria-label="Workspace Ping Result">
       <p>Workspace connected</p>
       <dl>
         <dt>Organization</dt>

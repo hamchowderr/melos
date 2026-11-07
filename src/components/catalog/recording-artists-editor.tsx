@@ -74,7 +74,7 @@ export function RecordingArtistsEditor({ recordingId, title, artists, parties, a
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" className="self-start" />}>
-        Edit artists
+        Edit Artists
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <form
@@ -99,7 +99,7 @@ export function RecordingArtistsEditor({ recordingId, title, artists, parties, a
                 value={row.partyId}
                 onChange={(event) => change(row.key, { partyId: event.target.value, aliasId: '' })}
               >
-                <NativeSelectOption value="">Choose a party</NativeSelectOption>
+                <NativeSelectOption value="">Choose a Party</NativeSelectOption>
                 {parties.map(({ value, label }) => (
                   <NativeSelectOption key={value} value={value}>
                     {label}
@@ -122,7 +122,7 @@ export function RecordingArtistsEditor({ recordingId, title, artists, parties, a
                 value={row.aliasId}
                 onChange={(event) => change(row.key, { aliasId: event.target.value })}
               >
-                <NativeSelectOption value="">No alias</NativeSelectOption>
+                <NativeSelectOption value="">No Alias</NativeSelectOption>
                 {aliases
                   .filter(({ partyId }) => partyId === row.partyId)
                   .map(({ id, aliasName }) => (
@@ -153,7 +153,7 @@ export function RecordingArtistsEditor({ recordingId, title, artists, parties, a
               setRows([...rows, { key: nextKey++, partyId: '', role: 'primary', aliasId: '' }])
             }
           >
-            Add artist
+            Add Artist
           </Button>
           {error ? (
             <Alert variant="destructive">

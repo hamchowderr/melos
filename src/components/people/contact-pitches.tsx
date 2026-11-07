@@ -46,7 +46,7 @@ export function ContactPitches({
   create: ReactNode;
 }) {
   return (
-    <section aria-label="Pitch history" className="flex flex-col gap-2">
+    <section aria-label="Pitch History" className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-auto text-sm font-medium">
           Pitches{' '}
@@ -55,13 +55,13 @@ export function ContactPitches({
         {create}
       </div>
       <GridFrame>
-        <Table aria-label="Pitched songs">
+        <Table aria-label="Pitched Songs">
           <TableHeader>
             <TableRow>
               <TableHead>Song</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Follow up</TableHead>
-              <TableHead>Last contact</TableHead>
+              <TableHead>Follow-Up</TableHead>
+              <TableHead>Last Contact</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -89,9 +89,9 @@ export function ContactPitches({
           </TableBody>
         </Table>
       </GridFrame>
-      <h2 className="mt-2 text-sm font-medium">Recent messages</h2>
+      <h2 className="mt-2 text-sm font-medium">Recent Messages</h2>
       <ul
-        aria-label="Recent messages"
+        aria-label="Recent Messages"
         className="flex flex-col gap-0.5 rounded-lg bg-muted/40 p-1.5 text-sm"
       >
         {contact.recentMessages.map((message) => (
@@ -113,18 +113,18 @@ export function ContactPitches({
   );
 }
 
-/** "Who hasn't heard this" on a song page (§2.3 ContactGrid, CRM-006, P-36). */
+/** "Who Hasn't Heard This" on a song page (§2.3 ContactGrid, CRM-006, P-36). */
 export function WhoHasntHeard({ eligibility }: { eligibility: PitchEligibilityDTO }) {
   const lists = [
     ['Planned, not contacted', eligibility.plannedNotContacted],
-    ['Never pitched', eligibility.neverPitched],
+    ['Never Pitched', eligibility.neverPitched],
   ] as const;
   return (
     <section
-      aria-label="Who hasn't heard this"
+      aria-label="Who Hasn't Heard This"
       className="flex flex-col gap-2 rounded-lg bg-muted/40 p-3"
     >
-      <h2 className="text-sm font-medium">Who hasn't heard this</h2>
+      <h2 className="text-sm font-medium">Who Hasn't Heard This</h2>
       {lists.map(([title, contacts]) => (
         <div key={title} className="flex flex-col gap-1">
           <h3 className="text-xs text-muted-foreground">{title}</h3>

@@ -20,27 +20,27 @@ export const WORKSPACE_TYPE_INFO: Record<
   { label: string; description: string; startPath: string }
 > = {
   songwriter: {
-    label: 'Songwriter or artist',
+    label: 'Songwriter or Artist',
     description: 'You write or perform your own songs and pitch them for sync.',
     startPath: '/catalog',
   },
   producer: {
-    label: 'Producer or co-writer',
+    label: 'Producer or Co-Writer',
     description: 'You produce and co-write across several artists.',
     startPath: '/catalog',
   },
   sync_agent: {
-    label: 'Sync licensing agent',
+    label: 'Sync Licensing Agent',
     description: 'You represent catalogs and pitch them to music supervisors.',
     startPath: '/today',
   },
   label: {
-    label: 'Independent label',
+    label: 'Independent Label',
     description: 'You run a label: artists, masters and releases.',
     startPath: '/catalog',
   },
   manager: {
-    label: 'Artist manager',
+    label: 'Artist Manager',
     description: 'You manage artists and run their pitching and follow-ups.',
     startPath: '/today',
   },

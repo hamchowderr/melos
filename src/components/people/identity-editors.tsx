@@ -168,7 +168,7 @@ const text = (value: Value) => String(value).trim() || null;
 export function IdentityEditors({ party }: { party: PartyDetailDTO }) {
   const { partyId, aliases, identifiers, societyAffiliations } = party;
   const aliasOptions: [string, string][] = [
-    ['', 'No alias'],
+    ['', 'No Alias'],
     ...aliases.map(({ id, aliasName }): [string, string] => [id, aliasName]),
   ];
   return (
@@ -237,7 +237,7 @@ export function IdentityEditors({ party }: { party: PartyDetailDTO }) {
           {
             name: 'role',
             label: 'role',
-            options: [['', 'Any role'], ...choices(['writer', 'publisher'])],
+            options: [['', 'Any Role'], ...choices(['writer', 'publisher'])],
           },
           { name: 'startsOn', label: 'start', type: 'date' },
           { name: 'endsOn', label: 'end', type: 'date' },

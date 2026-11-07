@@ -90,7 +90,7 @@ function StatusChange({ cell, onDone }: { cell: PitchSummary; onDone: (pitch: Pi
           setConfirming(false);
         }}
       >
-        <NativeSelectOption value="">Change status</NativeSelectOption>
+        <NativeSelectOption value="">Change Status</NativeSelectOption>
         {moves.map((status) => (
           <NativeSelectOption key={status} value={status}>
             {PITCH_STATUS_LABELS[status]}
@@ -127,7 +127,7 @@ function PitchPanel({
     });
   return (
     <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-4">
-      <ul aria-label="Songs in this pitch" className="flex flex-col gap-3">
+      <ul aria-label="Songs in This Pitch" className="flex flex-col gap-3">
         {pitch.items.map((cell) => (
           <li key={cell.pitchItemId} className="flex flex-col gap-1.5 rounded-lg bg-muted/40 p-3">
             <div className="flex items-center gap-2">
@@ -152,7 +152,7 @@ function PitchPanel({
             disabled={!note.trim() || saving}
             onClick={addNote}
           >
-            Add note
+            Add Note
           </Button>
         </div>
       ) : null}
@@ -181,16 +181,16 @@ export function PitchGrid({ cells, updates }: { cells: PitchSummary[]; updates: 
       {cells.length === 0 ? (
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>No pitches</EmptyTitle>
+            <EmptyTitle>No Pitches</EmptyTitle>
             <EmptyDescription>No song has been pitched with this status.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
         <GridFrame>
-          <Table aria-label="Pitch list">
+          <Table aria-label="Pitch List">
             <TableHeader>
               <TableRow>
-                {['Song', 'Contact', 'Status', 'Follow up', 'Last contact'].map((heading) => (
+                {['Song', 'Contact', 'Status', 'Follow-Up', 'Last Contact'].map((heading) => (
                   <TableHead key={heading}>{heading}</TableHead>
                 ))}
               </TableRow>

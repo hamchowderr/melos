@@ -28,13 +28,13 @@ export function OnboardingChecklist({ checklist }: { checklist: OnboardingCheckl
 
   return (
     <section
-      aria-label="Getting started"
+      aria-label="Getting Started"
       className="flex flex-col gap-2 rounded-xl bg-muted/50 p-3"
       data-testid="onboarding-checklist"
     >
       <div className="flex items-center gap-2">
         <h2 className="text-sm font-medium">
-          Getting started{' '}
+          Getting Started{' '}
           <span className="font-normal text-muted-foreground">
             {checklist.doneCount} of {checklist.total}
           </span>

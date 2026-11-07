@@ -18,10 +18,10 @@ export function CompositionSection({ composition }: { composition: CompositionDT
           {description ? <p>{description}</p> : null}
           <DetailList
             details={[
-              ['Also known as', composition.altTitles.join(', ')],
+              ['Also Known As', composition.altTitles.join(', ')],
               ['ISWC', iswc && formatIswc(iswc)],
-              ['Copyright registration', composition.copyrightRegistrationNumber],
-              ['Copyright date', composition.copyrightDate],
+              ['Copyright Registration', composition.copyrightRegistrationNumber],
+              ['Copyright Date', composition.copyrightDate],
               ['Lyrics', composition.hasLyrics ? 'On file' : null],
             ]}
           />

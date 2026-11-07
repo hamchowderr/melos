@@ -37,7 +37,7 @@ const FIELDS = [
   ['duration', 'Duration'],
   ['bpm', 'BPM'],
   ['musicalKey', 'Key'],
-  ['previewStart', 'Preview start'],
+  ['previewStart', 'Preview Start'],
 ] as const;
 
 type Key = (typeof FIELDS)[number][0];
@@ -115,7 +115,7 @@ export function RecordingPanel({ compositionId, songTitle, recording }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" className="self-start" />}>
-        {recording ? 'Edit recording' : 'Add recording'}
+        {recording ? 'Edit Recording' : 'Add Recording'}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <form
@@ -126,7 +126,7 @@ export function RecordingPanel({ compositionId, songTitle, recording }: Props) {
           }}
         >
           <DialogHeader>
-            <DialogTitle>{recording ? 'Edit recording' : 'Add recording'}</DialogTitle>
+            <DialogTitle>{recording ? 'Edit Recording' : 'Add Recording'}</DialogTitle>
           </DialogHeader>
           <FieldGroup>
             {FIELDS.map(([key, name]) => (

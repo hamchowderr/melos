@@ -31,7 +31,7 @@ export function SignInForm() {
   }
 
   return (
-    <PageCard title="Sign in">
+    <PageCard title="Sign In">
       <form onSubmit={onSubmit}>
         <FieldGroup>
           <Field>
@@ -51,7 +51,7 @@ export function SignInForm() {
           <FieldError>{error}</FieldError>
           <Field>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Signing in...' : 'Sign in'}
+              {pending ? 'Signing in...' : 'Sign In'}
             </Button>
             <FieldDescription className="text-center">
               New to Melos? <Link href="/sign-up">Create an account</Link>

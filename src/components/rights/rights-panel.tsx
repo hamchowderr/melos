@@ -179,11 +179,11 @@ export function RightsPanel(props: Props) {
             );
           })}
           <div className="flex flex-col gap-2">
-            <h3 className="font-medium">Licensing contacts</h3>
+            <h3 className="font-medium">Licensing Contacts</h3>
             {rights.licensingContacts.length === 0 ? (
               <p className="text-muted-foreground">None</p>
             ) : (
-              <ul aria-label="Licensing contacts" className="flex flex-col gap-1">
+              <ul aria-label="Licensing Contacts" className="flex flex-col gap-1">
                 {rights.licensingContacts.map(({ partyId, displayName, implicit }) => (
                   <li key={partyId} className="flex items-center gap-2">
                     {displayName}
