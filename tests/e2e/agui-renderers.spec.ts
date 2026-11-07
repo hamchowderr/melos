@@ -116,6 +116,17 @@ test('TST-AI-003: AGUIMock drives ContactCard', async ({ page }) => {
   );
 });
 
+test('TST-AI-003: AGUIMock drives the eligibility ContactGrid', async ({ page }) => {
+  await ask(page, 'agui eligibility');
+  const grid = page.getByRole('region', { name: "Who hasn't heard Harbor Lights", exact: true });
+  await expect(grid.getByRole('list', { name: 'Planned, not contacted' })).toContainText(
+    "Mock Supervisormusic supervisor · Hasn't heard",
+  );
+  await expect(grid.getByRole('list', { name: 'Never pitched' })).toContainText(
+    'Mock Agentlicensing agent',
+  );
+});
+
 test('TST-AI-003: a refusal renders a plain sentence, not a card', async ({ page }) => {
   await ask(page, 'agui not found');
   const alert = page.locator('[data-error-code="NOT_FOUND"]');

@@ -3,12 +3,16 @@ import {
   GET_CONTACT_TOOL_NAME,
   getContactInputSchema,
   SEARCH_CONTACTS_TOOL_NAME,
+  SEARCH_PITCH_ELIGIBILITY_TOOL_NAME,
   searchContactsInputSchema,
+  searchPitchEligibilityInputSchema,
 } from '../../lib/agent/crm-tools';
 import { toolResultSchema } from '../../lib/agent/tool-result';
 import type { ContactDetailDTO, ContactSummary } from '../../lib/dto/contacts';
+import type { PitchEligibilityDTO } from '../../lib/dto/pitches';
 import { getContact } from '../../server/services/contacts/contacts';
 import { searchContacts } from '../../server/services/contacts/search';
+import { searchPitchEligibility } from '../../server/services/pitches/eligibility';
 import { modelOutput, runTool } from './run-tool';
 
 /** searchContacts's §3.6 model fields. Email addresses and phone numbers stay in the UI. */
@@ -50,4 +54,39 @@ export const getContactTool = createTool({
   outputSchema: toolResultSchema<ContactDetailDTO>(),
   execute: ({ contactId }, context) => runTool(context, (tenant) => getContact(tenant, contactId)),
   toModelOutput: modelOutput(summarizeContact),
+});
+
+/** searchPitchEligibility's §3.6 model fields: the song, then each contact with its list name. */
+export const summarizeEligibility = ({
+  item,
+  plannedNotContacted,
+  neverPitched,
+}: PitchEligibilityDTO) => ({
+  itemType: item.itemType,
+  itemId: item.itemId,
+  contacts: [
+    ...plannedNotContacted.map(({ contactId, displayName, roles, pitchItemId }) => ({
+      contactId,
+      displayName,
+      roles,
+      list: 'planned_not_contacted' as const,
+      pitchItemId,
+    })),
+    ...neverPitched.map(({ contactId, displayName, roles }) => ({
+      contactId,
+      displayName,
+      roles,
+      list: 'never_pitched' as const,
+    })),
+  ],
+});
+
+export const searchPitchEligibilityTool = createTool({
+  id: SEARCH_PITCH_ELIGIBILITY_TOOL_NAME,
+  description:
+    "Who hasn't heard a song: contacts with a planned pitch not yet sent, then active contacts never pitched it, ordered by role rank.",
+  inputSchema: searchPitchEligibilityInputSchema,
+  outputSchema: toolResultSchema<PitchEligibilityDTO>(),
+  execute: (input, context) => runTool(context, (tenant) => searchPitchEligibility(tenant, input)),
+  toModelOutput: modelOutput(summarizeEligibility),
 });

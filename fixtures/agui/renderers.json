@@ -388,6 +388,41 @@
           ]
         }
       }
+    },
+    {
+      "message": "agui eligibility",
+      "toolName": "searchPitchEligibility",
+      "args": {
+        "itemType": "composition",
+        "itemId": "cmp_AGUI1"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "item": {
+            "itemType": "composition",
+            "itemId": "cmp_AGUI1",
+            "title": "Harbor Lights"
+          },
+          "plannedNotContacted": [
+            {
+              "contactId": "con_AGUI1",
+              "displayName": "Mock Supervisor",
+              "roles": ["music_supervisor"],
+              "pitchId": "pit_AGUI1",
+              "pitchItemId": "pti_AGUI1",
+              "currentStatus": "not_contacted"
+            }
+          ],
+          "neverPitched": [
+            {
+              "contactId": "con_AGUI2",
+              "displayName": "Mock Agent",
+              "roles": ["licensing_agent"]
+            }
+          ]
+        }
+      }
     }
   ]
 }
