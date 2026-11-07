@@ -44,7 +44,12 @@ async function call(input: object) {
   let request: ApprovalRequest | undefined;
   const result = await execute()(input, {
     requestContext,
-    agent: { toolCallId, suspend: async (payload: ApprovalRequest) => void (request = payload) },
+    agent: {
+      toolCallId,
+      suspend: async (payload: ApprovalRequest) => {
+        request = payload;
+      },
+    },
   });
   const resume = (approved: boolean) =>
     execute()(input, {
