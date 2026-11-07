@@ -52,7 +52,7 @@ describe('AIMock fixtures (TST-AI-004)', () => {
   });
 
   it('AGUIMock fixtures call only canonical tools with valid arguments', () => {
-    for (const file of ['renderers.json', 'confirmation.json']) {
+    for (const file of ['renderers.json', 'confirmation.json', 'reports.json']) {
       const { fixtures } = JSON.parse(
         readFileSync(join(ROOT, 'fixtures', 'agui', file), 'utf8'),
       ) as { fixtures: { message: string; toolName: string; args: unknown; request?: unknown }[] };

@@ -12,10 +12,14 @@
           {
             "compositionId": "cmp_AGUI1",
             "primaryRecordingId": "rec_AGUI1",
-            "recordingIds": ["rec_AGUI1"],
+            "recordingIds": [
+              "rec_AGUI1"
+            ],
             "title": "Harbor Lights",
             "altTitles": [],
-            "primaryArtistNames": ["Mock Artist"],
+            "primaryArtistNames": [
+              "Mock Artist"
+            ],
             "iswc": "T9000000990",
             "matchType": "exact_title",
             "recordings": [
@@ -93,7 +97,9 @@
                 "contributorId": "ctb_AGUI",
                 "partyId": "pty_AGUI",
                 "displayName": "Mock Writer",
-                "roles": ["songwriter"],
+                "roles": [
+                  "songwriter"
+                ],
                 "shareBp": 10000
               }
             ],
@@ -138,14 +144,19 @@
               "contributorId": "ctb_A",
               "partyId": "pty_A",
               "displayName": "Mock Writer",
-              "roles": ["songwriter", "composer"],
+              "roles": [
+                "songwriter",
+                "composer"
+              ],
               "shareBp": 6000
             },
             {
               "contributorId": "ctb_B",
               "partyId": "pty_B",
               "displayName": "Second Writer",
-              "roles": ["lyricist"],
+              "roles": [
+                "lyricist"
+              ],
               "shareBp": 4000
             }
           ],
@@ -266,7 +277,9 @@
           "writerShares": [
             {
               "partyId": "pty_W",
-              "roles": ["songwriter"],
+              "roles": [
+                "songwriter"
+              ],
               "shareBp": 10000
             }
           ],
@@ -305,10 +318,142 @@
       }
     },
     {
+      "message": "agui contacts",
+      "toolName": "searchContacts",
+      "args": {
+        "query": "Mock"
+      },
+      "result": {
+        "status": "ok",
+        "value": [
+          {
+            "contactId": "con_AGUI1",
+            "partyId": "pty_AGUI_SUP",
+            "displayName": "Mock Supervisor",
+            "organizationPartyId": "pty_AGUI_CO",
+            "organizationName": "Mock Sync Co",
+            "roles": [
+              "music_supervisor"
+            ],
+            "primaryEmail": "supervisor@mock.example",
+            "openItemCount": 1
+          }
+        ]
+      }
+    },
+    {
+      "message": "agui contact card",
+      "toolName": "getContact",
+      "args": {
+        "contactId": "con_AGUI1"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "contactId": "con_AGUI1",
+          "partyId": "pty_AGUI_SUP",
+          "displayName": "Mock Supervisor",
+          "organizationPartyId": "pty_AGUI_CO",
+          "organizationName": "Mock Sync Co",
+          "roles": [
+            "music_supervisor"
+          ],
+          "primaryEmail": "supervisor@mock.example",
+          "openItemCount": 1,
+          "relationshipNotes": null,
+          "active": true,
+          "methods": [
+            {
+              "id": "cm_AGUI1",
+              "methodType": "email",
+              "label": null,
+              "value": "supervisor@mock.example",
+              "isPrimary": true
+            }
+          ],
+          "pitchItems": [
+            {
+              "pitchId": "pit_AGUI1",
+              "pitchItemId": "pti_AGUI1",
+              "contactId": "con_AGUI1",
+              "contactName": "Mock Supervisor",
+              "contactRoles": [
+                "music_supervisor"
+              ],
+              "itemType": "composition",
+              "itemId": "cmp_AGUI1",
+              "itemTitle": "Harbor Lights",
+              "currentStatus": "awaiting_reply",
+              "nextFollowUpAt": "2026-09-10T17:00:00.000Z",
+              "followUpDue": true,
+              "lastContactedAt": "2026-09-03T17:00:00.000Z",
+              "lastOutboundMessageId": "msg_AGUI1",
+              "priorityRank": 1
+            }
+          ],
+          "recentMessages": [
+            {
+              "messageId": "msg_AGUI1",
+              "pitchId": "pit_AGUI1",
+              "direction": "outbound",
+              "purpose": "initial",
+              "status": "sent",
+              "subject": "Harbor Lights for your show",
+              "inReplyToMessageId": null,
+              "sentAt": "2026-09-03T17:00:00.000Z",
+              "receivedAt": null,
+              "createdAt": "2026-09-03T16:00:00.000Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "message": "agui eligibility",
+      "toolName": "searchPitchEligibility",
+      "args": {
+        "itemType": "composition",
+        "itemId": "cmp_AGUI1"
+      },
+      "result": {
+        "status": "ok",
+        "value": {
+          "item": {
+            "itemType": "composition",
+            "itemId": "cmp_AGUI1",
+            "title": "Harbor Lights"
+          },
+          "plannedNotContacted": [
+            {
+              "contactId": "con_AGUI1",
+              "displayName": "Mock Supervisor",
+              "roles": [
+                "music_supervisor"
+              ],
+              "pitchId": "pit_AGUI1",
+              "pitchItemId": "pti_AGUI1",
+              "currentStatus": "not_contacted"
+            }
+          ],
+          "neverPitched": [
+            {
+              "contactId": "con_AGUI2",
+              "displayName": "Mock Agent",
+              "roles": [
+                "licensing_agent"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
       "message": "agui pitches",
       "toolName": "searchPitches",
       "args": {
-        "statuses": ["awaiting_reply"]
+        "statuses": [
+          "awaiting_reply"
+        ]
       },
       "result": {
         "status": "ok",
@@ -318,7 +463,9 @@
             "pitchItemId": "pti_AGUI1",
             "contactId": "con_AGUI1",
             "contactName": "Mock Supervisor",
-            "contactRoles": ["music_supervisor"],
+            "contactRoles": [
+              "music_supervisor"
+            ],
             "itemType": "composition",
             "itemId": "cmp_AGUI1",
             "itemTitle": "Harbor Lights",
@@ -351,7 +498,9 @@
               "pitchItemId": "pti_AGUI1",
               "contactId": "con_AGUI1",
               "contactName": "Mock Supervisor",
-              "contactRoles": ["music_supervisor"],
+              "contactRoles": [
+                "music_supervisor"
+              ],
               "itemType": "composition",
               "itemId": "cmp_AGUI1",
               "itemTitle": "Harbor Lights",
