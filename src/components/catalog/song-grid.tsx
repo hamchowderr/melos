@@ -159,7 +159,7 @@ export function SongGrid({ songs }: { songs: SongListItem[] }) {
   const [open, setOpen] = useState<SongListItem | null>(null);
   if (songs.length === 0) {
     return (
-      <Empty className="border">
+      <Empty className="bg-muted/40">
         <EmptyHeader>
           <EmptyTitle>No Songs Yet</EmptyTitle>
           <EmptyDescription>Songs in this workspace are listed here.</EmptyDescription>
@@ -176,7 +176,7 @@ export function SongGrid({ songs }: { songs: SongListItem[] }) {
       {/* Phone width: one card per song, so no column is cut off. */}
       <ul aria-label="Songs" className="flex flex-col gap-2 sm:hidden">
         {songs.map((song) => (
-          <li key={songKey(song)} className="flex flex-col gap-1.5 rounded-lg border p-3">
+          <li key={songKey(song)} className="flex flex-col gap-1.5 rounded-lg bg-muted/40 p-3">
             <SongTitle song={song} />
             <p className="text-sm">
               {artistsOf(song)}

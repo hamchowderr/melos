@@ -109,7 +109,7 @@ export function SearchResults({ query, readiness, songs, releases }: Props) {
       <section aria-label="Songs" className="flex flex-col gap-2">
         <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Songs</h2>
         {searching && songs.length === 0 ? (
-          <Empty className="border">
+          <Empty className="bg-muted/40">
             <EmptyHeader>
               <EmptyTitle>No Matching Songs</EmptyTitle>
               <EmptyDescription>Try another title, name or readiness.</EmptyDescription>

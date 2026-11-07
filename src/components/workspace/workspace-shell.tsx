@@ -34,6 +34,9 @@ export function WorkspaceShell({ workspaceName, current, fill, children }: Props
         <main
           className={cn(
             'flex min-w-0 flex-1 flex-col bg-background md:rounded-xl md:shadow-sm md:ring-1 md:ring-foreground/5',
+            // The panel is the one framed surface: cards and grids inside it blend in as soft tints
+            // instead of drawing a second frame (impeccable: no nested cards).
+            '[&_[data-slot=card]]:bg-muted/40 [&_[data-slot=card]]:ring-0 [&_[data-slot=grid-frame]]:ring-0',
             fill && 'min-h-0 overflow-hidden',
           )}
         >
