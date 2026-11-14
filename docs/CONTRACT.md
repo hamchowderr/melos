@@ -255,6 +255,8 @@ The same React components render in chat (tool rendering) and in full-page views
 
 **UI copy case (owner decision 2026-11-07).** Labels use Title Case: page and card titles, section headings, dialog titles, buttons, tabs, menu and select options, field labels, column headers, badges and empty-state titles. Articles, coordinating conjunctions and short prepositions (a, an, the, and, or, but, for, nor, to, of, in, on, at, by, with, from, into, as, via, per) stay lowercase unless first or last; both parts of a hyphenated word are capitalized (Follow-Up, Co-Writer). Full sentences stay in sentence case: descriptions, help text, placeholders, notices, errors, and titles that read as a sentence ("You do not have access to pitches").
 
+**Typeface (owner decision 2026-11-14).** The UI is set in Instrument Sans (replacing Geist), loaded through `next/font/google` as `--font-sans`.
+
 | Canonical | Aliases seen (doc §) | Notes |
 |---|---|---|
 | `MusicWorkspaceCard` | same name: BP §9.1, §9.2 · `CompositionDetail`: TS §11, §12, §16 DEMO-001, §19 READ-VS-001 · `CompositionCard`: TS §8 CAT-001, §11 · `RecordingCard`: TS §8 CAT-002 · `SongCard`: BP §8.1; TS §7 TST-AI-003 | Song workspace summary: artwork, player, identifiers, rights readiness, pitch summary. |
