@@ -50,7 +50,7 @@
     "@mastra/core": "1.66.0",
     "@mastra/libsql": "1.22.5",
     "@mastra/memory": "1.29.0",
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "better-auth": "1.7.4",
     "class-variance-authority": "0.7.1",
     "cn": "0.3.0",
