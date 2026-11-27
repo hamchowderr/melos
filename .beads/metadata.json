@@ -3,5 +3,6 @@
   "backend": "dolt",
   "dolt_mode": "embedded",
   "dolt_database": "melos",
-  "project_id": "f9660cb2-2b26-4ca6-ac6d-cd25775c84d4"
+  "project_id": "f9660cb2-2b26-4ca6-ac6d-cd25775c84d4",
+  "braynee_seen_bd_version": "1.3.1"
 }
